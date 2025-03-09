@@ -10,3 +10,5 @@ documentation = "https://docs.rs/hf-mem"
 authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
 
 [dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
+reqwest = "0.12.12"
