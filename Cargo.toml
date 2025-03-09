@@ -1,0 +1,12 @@
+[package]
+name = "hf-mem"
+version = "0.1.0"
+edition = "2024"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+description = "CLI to estimate the required memory to run inference with Hugging Face models"
+repository = "https://github.com/alvarobartt/hf-mem"
+documentation = "https://docs.rs/hf-mem"
+authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
+
+[dependencies]
