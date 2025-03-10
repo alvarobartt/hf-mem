@@ -2,7 +2,7 @@ use anyhow::Context;
 use clap::Parser;
 
 mod fetch;
-use fetch::fetch_metadata;
+use fetch::fetch;
 
 mod token;
 use token::get_token;
@@ -32,7 +32,7 @@ async fn main() -> anyhow::Result<()> {
         get_token().context("the hugging face auth token couldn't be retrieved")?
     };
 
-    let metadata = fetch_metadata(&url, &token)
+    let metadata = fetch(&url, &token)
         .await
         .context("failed to fetch metadata from the safetensors file from the hub")?;
     println!("metadata contains {metadata:?}");
