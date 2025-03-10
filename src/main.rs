@@ -62,18 +62,30 @@ async fn main() -> anyhow::Result<()> {
     }
     let mut total_bytes = 0;
     for (k, v) in parameters {
-        // TODO: ideally use a match to handle all the dtypes
-        total_bytes += if k == "F32" { v * 4 } else { 0 };
+        // TODO: add support for all the available / supported dtypes in here
+        total_bytes += match k.as_str() {
+            "F32" => v * 4,
+            "F16" | "BF16" => v * 2,
+            _ => 0,
+        };
     }
-    println!("total required {total_bytes} B");
-    let total_mb = total_bytes as f64 / 1024_f64.powf(2_f64);
-    println!("total required {total_mb:.2} MB");
-    let total_gb = total_bytes as f64 / 1024_f64.powf(3_f64);
-    println!("total required {total_gb:.5} GB");
+
+    println!("Requirements to run inference with {}", args.model_id);
     println!(
-        "total required giga bytes including the extra memory estimation of an extra {} % (for CUDA Graphs, KV-cache, etc.) is {:.5} GB",
-        18_usize,
-        total_gb * 1.18_f64,
+        "  - Memory in MB: {:.2} MB",
+        total_bytes as f64 / 1024_f64.powf(2_f64)
+    );
+    println!(
+        "  - Memory in MB (+ 18% overhead): {:.2} MB",
+        total_bytes as f64 / 1024_f64.powf(2_f64) * 1.18_f64
+    );
+    println!(
+        "  - Memory in GiB: {:.2} MiB",
+        total_bytes as f64 / 1024_f64.powf(3_f64)
+    );
+    println!(
+        "  - Memory in GiB (+ 18% overhead): {:.2} MiB",
+        total_bytes as f64 / 1024_f64.powf(3_f64) * 1.18_f64
     );
 
     Ok(())
