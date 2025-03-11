@@ -10,8 +10,7 @@ use reqwest::{
 // safetensors files have a metadata size < 100kb (over the top 1000 models on the Hub)
 static MAX_METADATA_SIZE: usize = 100_000;
 
-// TODO: we need to first check if the files are available in the Hugging Face cache, if so, just
-// read those directly; if not, then fetch those from the Hub (probably after the first release)
+// TODO: we need to first check if the files are available in the Hugging Face cache, if so, just read those directly; if not, then fetch those from the Hub (probably after the first release)
 // TODO: in some cases there will be a `model.safetensors.index.json` instead of a single
 // `model.safetensors` file, and the different sharded files need to be read
 async fn fetch_metadata(
@@ -47,8 +46,6 @@ async fn fetch_metadata(
         .context("fetching the provided url failed")
     {
         Ok(response) => match response.status() {
-            // TODO: what if the `safetensors` file is small and fetching 100_000 bytes means
-            // fetching the whole thing, will this response be a 200 instead?
             StatusCode::PARTIAL_CONTENT => {
                 let metadata = response
                     .bytes()

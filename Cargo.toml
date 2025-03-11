@@ -1,12 +1,11 @@
 [package]
 name = "hf-mem"
-version = "0.0.1-dev2"
+version = "0.0.1"
 edition = "2024"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
 description = "A (simple) command-line to estimate inference memory requirements on Hugging Face "
 repository = "https://github.com/alvarobartt/hf-mem"
-documentation = "https://docs.rs/hf-mem"
 authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
 
 [dependencies]
@@ -15,7 +14,8 @@ byteorder = "1.5.0"
 bytes = "1.10.1"
 clap = { version = "4.5.31", features = ["derive"] }
 dirs = "6.0.0"
+futures = "0.3.31"
 reqwest = "0.12.12"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
-tokio = { version = "1.44.0", features = ["macros"] }
+tokio = { version = "1.44.0", features = ["macros", "rt-multi-thread"] }
