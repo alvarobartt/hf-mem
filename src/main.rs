@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
         .get(sharded_url)
         .send()
         .await
-        .context("fetching the shared url failed")
+        .context("fetching the sharded url failed")
     {
         Ok(response) => match response.status() {
             StatusCode::OK => {

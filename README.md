@@ -23,7 +23,7 @@ hf-mem --model-id meta-llama/Llama-3.1-8B-Instruct --token ...
 Hub that contain the metadata
 - Provides an estimation based on the count of the parameters on the different
 dtypes
-- Supports both shared i.e. `model-00000-of-00000.safetensors` and not shared i.e.
+- Supports both sharded i.e. `model-00000-of-00000.safetensors` and not sharded i.e.
 `model.safetensors` files
 
 ## What's next?
