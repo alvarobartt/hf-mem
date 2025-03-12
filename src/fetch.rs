@@ -4,15 +4,22 @@ use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION, RANGE},
     Client, StatusCode,
 };
+use serde::Deserialize;
+use std::collections::HashMap;
 
 // As per https://github.com/huggingface/huggingface_hub/pull/1855#discussion_r1404286419, we
 // only fetch the first 100kb of the `model.safetensors` file, as empirically, 97% of
 // safetensors files have a metadata size < 100kb (over the top 1000 models on the Hub)
 static MAX_METADATA_SIZE: usize = 100_000;
 
+#[derive(Deserialize, Debug)]
+pub struct FileType {
+    pub dtype: Option<String>,
+    pub shape: Option<Vec<u64>>,
+    data_offsets: Option<(u64, u64)>,
+}
+
 // TODO: we need to first check if the files are available in the Hugging Face cache, if so, just read those directly; if not, then fetch those from the Hub (probably after the first release)
-// TODO: in some cases there will be a `model.safetensors.index.json` instead of a single
-// `model.safetensors` file, and the different sharded files need to be read
 async fn fetch_metadata(
     url: &str,
     token: &str,
@@ -60,7 +67,7 @@ async fn fetch_metadata(
     }
 }
 
-pub async fn fetch(url: &str, token: &str) -> anyhow::Result<serde_json::Value> {
+pub async fn fetch(url: &str, token: &str) -> anyhow::Result<HashMap<String, FileType>> {
     let (metadata, metadata_size) = fetch_metadata(url, token, None, None)
         .await
         .context("failed fetching the metadata from the provided url")?;
@@ -74,6 +81,8 @@ pub async fn fetch(url: &str, token: &str) -> anyhow::Result<serde_json::Value> 
         metadata
     };
 
-    serde_json::from_slice::<serde_json::Value>(&metadata[8..metadata_size + 8])
+    // TODO: maybe just a Vec<FileType> with the values is more efficient since the keys are not
+    // used?
+    serde_json::from_slice::<HashMap<String, FileType>>(&metadata[8..metadata_size + 8])
         .context("parsing the metadata bytes into a serde_json::Value failed")
 }

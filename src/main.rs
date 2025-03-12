@@ -6,9 +6,10 @@ use reqwest::{
     Client, StatusCode,
 };
 use serde::Deserialize;
+use std::collections::HashMap;
 
 mod fetch;
-use fetch::fetch;
+use fetch::{fetch, FileType};
 
 mod token;
 use token::get_token;
@@ -26,15 +27,6 @@ struct Args {
 #[derive(Deserialize, Debug)]
 struct ModelIndex {
     weight_map: std::collections::HashMap<String, String>,
-}
-
-// TODO: add an enum for the dtypes
-// Python reference is https://github.com/huggingface/huggingface_hub/blob/c51782a913d128fdab12f065e7a2de20fac3b7d3/src/huggingface_hub/utils/_safetensors.py
-#[derive(Deserialize, Debug)]
-struct FileType {
-    dtype: Option<String>,
-    shape: Option<Vec<u64>>,
-    // data_offsets: (u64, u64),
 }
 
 #[tokio::main]
@@ -63,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
         .build()
         .context("couldn't build the reqwest client")?;
 
-    let parameters = match client
+    let metadata = match client
         .get(sharded_url)
         .send()
         .await
@@ -100,12 +92,12 @@ async fn main() -> anyhow::Result<()> {
                     }));
                 }
 
-                let mut metadatas = Vec::new();
+                let mut metadata = HashMap::<String, FileType>::new();
                 let futures = join_all(tasks).await;
                 for future in futures {
                     match future {
                         Ok(Ok(result)) => {
-                            metadatas.push(result);
+                            metadata.extend(result);
                         }
                         Ok(Err(e)) => {
                             anyhow::bail!("failed to fetch: {:?}", e);
@@ -115,66 +107,45 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
-
-                let mut parameters = std::collections::HashMap::<String, u64>::new();
-                for metadata in metadatas {
-                    for value in metadata
-                        .as_object()
-                        .context("failed to parse metadata json as an object")?
-                        .values()
-                    {
-                        // TODO: probably we can just avoid the clone here
-                        let file_type: FileType = serde_json::from_value(value.clone())
-                            .context("failed to deserialize json value into file type")?;
-                        if file_type.shape.is_none() || file_type.dtype.is_none() {
-                            continue;
-                        }
-                        let layer_parameters = &file_type.shape.unwrap().iter().product::<u64>();
-                        let parameter_count =
-                            parameters.entry(file_type.dtype.unwrap()).or_insert(0);
-                        *parameter_count += layer_parameters;
-                    }
-                }
-                parameters
+                metadata
             }
             StatusCode::NOT_FOUND => {
                 let url = format!(
                     "https://huggingface.co/{}/resolve/main/model.safetensors",
                     args.model_id
                 );
-                let metadata = fetch(&url, &token)
+                fetch(&url, &token)
                     .await
-                    .context("failed to fetch metadata from the safetensors file from the hub")?;
-                let mut parameters = std::collections::HashMap::<String, u64>::new();
-                for value in metadata
-                    .as_object()
-                    .context("failed to parse metadata json as an object")?
-                    .values()
-                {
-                    // TODO: probably we can just avoid the clone here
-                    let file_type: FileType = serde_json::from_value(value.clone())
-                        .context("failed to deserialize json value into file type")?;
-                    if file_type.shape.is_none() || file_type.dtype.is_none() {
-                        eprintln!("doesn't contain file shape {value:?}");
-                        continue;
-                    }
-                    let layer_parameters = &file_type.shape.unwrap().iter().product::<u64>();
-                    let parameter_count = parameters.entry(file_type.dtype.unwrap()).or_insert(0);
-                    *parameter_count += layer_parameters;
-                }
-                parameters
+                    .context("failed to fetch metadata from the safetensors file from the hub")?
             }
             _ => anyhow::bail!("response {response:?}"),
         },
         Err(e) => anyhow::bail!("failed with error {e}"),
     };
 
+    let mut parameters = std::collections::HashMap::<String, u64>::new();
+    for value in metadata.values() {
+        if value.shape.is_none() || value.dtype.is_none() {
+            eprintln!("doesn't contain file shape {value:?}");
+            continue;
+        }
+        let shape = value.shape.clone().unwrap();
+        let layer_parameters = shape.iter().product::<u64>();
+        let dtype = value.dtype.clone().unwrap();
+        let parameter_count = parameters.entry(dtype).or_insert(0);
+        *parameter_count += layer_parameters;
+    }
+
     let mut total_bytes = 0;
     for (k, v) in parameters {
-        // TODO: add support for all the available / supported dtypes in here
-        total_bytes += match k.as_str() {
-            "F32" => v * 4,
-            "F16" | "BF16" => v * 2,
+        let dtype = match k.split_once("_") {
+            Some(ks) => ks.0,
+            None => &k,
+        };
+        total_bytes += v * match dtype {
+            "F32" => 4,
+            "F16" | "BF16" => 2,
+            "F8" => 1,
             _ => 0,
         };
     }
