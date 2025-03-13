@@ -1,17 +1,17 @@
 use anyhow::Context;
 use clap::Parser;
-use futures::future::join_all;
 use reqwest::{
     header::{HeaderMap, HeaderValue, AUTHORIZATION},
-    Client, StatusCode,
+    Client,
 };
-use serde::Deserialize;
-use std::collections::HashMap;
 
 mod fetch;
-use fetch::{fetch, FileType};
-
+mod schemas;
+mod sharded;
 mod token;
+
+use fetch::fetch;
+use sharded::fetch_sharded;
 use token::get_token;
 
 #[derive(Parser, Debug)]
@@ -24,19 +24,10 @@ struct Args {
     token: Option<String>,
 }
 
-#[derive(Deserialize, Debug)]
-struct ModelIndex {
-    weight_map: std::collections::HashMap<String, String>,
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let sharded_url = format!(
-        "https://huggingface.co/{}/resolve/main/model.safetensors.index.json",
-        args.model_id
-    );
     let token = if let Some(token) = args.token {
         token
     } else {
@@ -55,78 +46,19 @@ async fn main() -> anyhow::Result<()> {
         .build()
         .context("couldn't build the reqwest client")?;
 
-    let metadata = match client
-        .get(sharded_url)
-        .send()
-        .await
-        .context("fetching the sharded url failed")
-    {
-        Ok(response) => match response.status() {
-            StatusCode::OK => {
-                let model_index = serde_json::from_str::<ModelIndex>(
-                    &response
-                        .text()
-                        .await
-                        .context("failed to pull the text out of the response")?,
-                )
-                .context("failed deserializing the text into a json")?;
-
-                let urls = model_index
-                    .weight_map
-                    .values()
-                    .map(|v| {
-                        format!(
-                            "https://huggingface.co/{}/resolve/main/{}",
-                            &args.model_id, v
-                        )
-                    })
-                    .collect::<std::collections::HashSet<String>>();
-
-                let mut tasks = Vec::new();
-                for url in urls {
-                    let ctoken = token.clone();
-                    tasks.push(tokio::spawn(async move {
-                        fetch(&url, &ctoken).await.context(
-                            "failed to fetch metadata from the safetensors file from the hub",
-                        )
-                    }));
-                }
-
-                let mut metadata = HashMap::<String, FileType>::new();
-                let futures = join_all(tasks).await;
-                for future in futures {
-                    match future {
-                        Ok(Ok(result)) => {
-                            metadata.extend(result);
-                        }
-                        Ok(Err(e)) => {
-                            anyhow::bail!("failed to fetch: {:?}", e);
-                        }
-                        Err(e) => {
-                            anyhow::bail!("failed to fetch: {:?}", e);
-                        }
-                    }
-                }
-                metadata
+    let metadata = match fetch_sharded(&client, &args.model_id).await.context("failed while fetching the safetensors sharded, rolling back to consolidated safetensors (if available)") {
+        Ok(metadata) => metadata,
+        Err(..) => {
+            match fetch(&client, &args.model_id).await.context("also failed when fetching the consolidated safetensors file") {
+                Ok(metadata) => metadata,
+                Err(..) => anyhow::bail!("neither the sharded nor the consolidated safetensors metadata fetching succeeded..."),
             }
-            StatusCode::NOT_FOUND => {
-                let url = format!(
-                    "https://huggingface.co/{}/resolve/main/model.safetensors",
-                    args.model_id
-                );
-                fetch(&url, &token)
-                    .await
-                    .context("failed to fetch metadata from the safetensors file from the hub")?
-            }
-            _ => anyhow::bail!("response {response:?}"),
-        },
-        Err(e) => anyhow::bail!("failed with error {e}"),
+        }
     };
 
     let mut parameters = std::collections::HashMap::<String, u64>::new();
     for value in metadata.values() {
         if value.shape.is_none() || value.dtype.is_none() {
-            eprintln!("doesn't contain file shape {value:?}");
             continue;
         }
         let shape = value.shape.clone().unwrap();
