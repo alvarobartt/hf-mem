@@ -8,11 +8,13 @@ use crate::schemas::{FileType, ModelIndex};
 
 pub async fn fetch_sharded(
     client: &Client,
-    model_id: &str,
+    model_id: String,
+    revision: Option<String>,
 ) -> anyhow::Result<HashMap<String, FileType>> {
     let url = format!(
-        "https://huggingface.co/{}/resolve/main/model.safetensors.index.json",
-        model_id
+        "https://huggingface.co/{}/resolve/{}/model.safetensors.index.json",
+        model_id.clone(),
+        revision.clone().unwrap_or("main".to_string()),
     );
 
     match client
@@ -40,14 +42,17 @@ pub async fn fetch_sharded(
                 let mut tasks = Vec::new();
                 for filename in filenames {
                     let client_clone = client.clone();
-                    let url = format!(
-                        "https://huggingface.co/{}/resolve/main/{}",
-                        &model_id, filename
-                    );
+                    let model_id_clone = model_id.clone();
+                    let revision_clone = revision.clone();
                     tasks.push(tokio::spawn(async move {
-                        fetch(&client_clone, &url).await.context(
-                            "failed to fetch metadata from the safetensors file from the hub",
+                        fetch(
+                            &client_clone,
+                            model_id_clone,
+                            revision_clone,
+                            Some(filename),
                         )
+                        .await
+                        .context("failed to fetch metadata from the safetensors file from the hub")
                     }));
                 }
 
@@ -58,12 +63,8 @@ pub async fn fetch_sharded(
                         Ok(Ok(result)) => {
                             metadata.extend(result);
                         }
-                        Ok(Err(e)) => {
-                            anyhow::bail!("failed to fetch: {:?}", e);
-                        }
-                        Err(e) => {
-                            anyhow::bail!("failed to fetch: {:?}", e);
-                        }
+                        Ok(Err(e)) => anyhow::bail!(e),
+                        Err(e) => anyhow::bail!(e),
                     }
                 }
                 Ok(metadata)

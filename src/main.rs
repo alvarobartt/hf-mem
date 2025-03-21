@@ -5,6 +5,7 @@ use reqwest::{
     Client,
 };
 
+mod errors;
 mod fetch;
 mod schemas;
 mod sharded;
@@ -19,6 +20,9 @@ use token::get_token;
 struct Args {
     #[arg(short, long)]
     model_id: String,
+
+    #[arg(short, long)]
+    revision: Option<String>,
 
     #[arg(short, long)]
     token: Option<String>,
@@ -46,16 +50,25 @@ async fn main() -> anyhow::Result<()> {
         .build()
         .context("couldn't build the reqwest client")?;
 
-    let metadata = match fetch_sharded(&client, &args.model_id).await.context("failed while fetching the safetensors sharded, rolling back to consolidated safetensors (if available)") {
+    let metadata = match fetch_sharded(&client, args.model_id.clone(), args.revision.clone()).await.context("failed while fetching the safetensors sharded, rolling back to consolidated safetensors (if available)") {
         Ok(metadata) => metadata,
+        // TODO: the error should indeed contain the status code so as to handle it properly or
+        // just link thiserror with the anyhow bail?
         Err(..) => {
-            match fetch(&client, &args.model_id).await.context("also failed when fetching the consolidated safetensors file") {
+            // TODO: find a mock proposal below:
+            // match e {
+            //      HubError::FileNotFound(..) => match fetch { ... },
+            //      HubError::HubIsDown | HubError::HubUnavailable | HubError::HubAuthFailed => bail!
+            // }
+            match fetch(&client, args.model_id.clone(), args.revision.clone(), Some("model.safetensors".to_string())).await.context("also failed when fetching the consolidated safetensors file") {
                 Ok(metadata) => metadata,
-                Err(..) => anyhow::bail!("neither the sharded nor the consolidated safetensors metadata fetching succeeded..."),
+                Err(e) => anyhow::bail!(e),
             }
         }
     };
 
+    // TODO: move this somewhere else and improve the code a bit adding a bit more rationale to it,
+    // and improving the efficiency of it
     let mut parameters = std::collections::HashMap::<String, u64>::new();
     for value in metadata.values() {
         if value.shape.is_none() || value.dtype.is_none() {
@@ -70,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut total_bytes = 0;
     for (k, v) in parameters {
+        // TODO: create some custom enums for the dtypes rather than having a match here
         let dtype = match k.split_once("_") {
             Some(ks) => ks.0,
             None => &k,

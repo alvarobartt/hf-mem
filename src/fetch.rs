@@ -1,3 +1,5 @@
+// TODO: add a progress bar and limit the number of concurrent requests to a reasonable default,
+// rather than the current which is not limited and may cause bottlenecks
 use anyhow::Context;
 use byteorder::{ByteOrder, LittleEndian};
 use reqwest::{
@@ -6,6 +8,7 @@ use reqwest::{
 };
 use std::collections::HashMap;
 
+use crate::errors::HubError;
 use crate::schemas::FileType;
 
 // As per https://github.com/huggingface/huggingface_hub/pull/1855#discussion_r1404286419, we
@@ -18,7 +21,7 @@ async fn fetch_metadata(
     url: &str,
     range_lower: Option<usize>,
     range_upper: Option<usize>,
-) -> anyhow::Result<(bytes::Bytes, usize)> {
+) -> anyhow::Result<(bytes::Bytes, usize), HubError> {
     let range_lower = range_lower.unwrap_or(0);
     let range_upper = range_upper.unwrap_or(MAX_METADATA_SIZE);
 
@@ -42,13 +45,26 @@ async fn fetch_metadata(
                 let metadata_size = LittleEndian::read_u64(&metadata[..8]) as usize;
                 Ok((metadata, metadata_size))
             }
-            _ => anyhow::bail!("failed reading the file bytes"),
+            StatusCode::NOT_FOUND => Err(HubError::FileNotFound(url.to_string())),
+            _ => Err(HubError::Internal),
         },
-        Err(e) => anyhow::bail!("sending the get request to the provided url failed with {e}"),
+        Err(e) => Err(HubError::Other(e)),
     }
 }
 
-pub async fn fetch(client: &Client, url: &str) -> anyhow::Result<HashMap<String, FileType>> {
+pub async fn fetch(
+    client: &Client,
+    model_id: String,
+    revision: Option<String>,
+    filename: Option<String>,
+) -> anyhow::Result<HashMap<String, FileType>, HubError> {
+    let url = format!(
+        "https://huggingface.co/{}/resolve/{}/{}",
+        model_id,
+        revision.unwrap_or("main".to_string()),
+        filename.unwrap_or("model.safetensors".to_string()),
+    );
+
     let (metadata, metadata_size) = fetch_metadata(&client, &url, None, None)
         .await
         .context("failed fetching the metadata from the provided url")?;
@@ -62,6 +78,8 @@ pub async fn fetch(client: &Client, url: &str) -> anyhow::Result<HashMap<String,
         metadata
     };
 
-    serde_json::from_slice::<HashMap<String, FileType>>(&metadata[8..metadata_size + 8])
-        .context("parsing the metadata bytes into a serde_json::Value failed")
+    Ok(
+        serde_json::from_slice::<HashMap<String, FileType>>(&metadata[8..metadata_size + 8])
+            .context("parsing the metadata bytes into a serde_json::Value failed")?,
+    )
 }
