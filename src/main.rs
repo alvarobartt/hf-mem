@@ -83,17 +83,16 @@ async fn main() -> anyhow::Result<()> {
 
     let mut total_bytes = 0;
     for (k, v) in parameters {
-        // TODO: create some custom enums for the dtypes rather than having a match here
-        let dtype = match k.split_once("_") {
-            Some(ks) => ks.0,
-            None => &k,
-        };
-        total_bytes += v * match dtype {
-            "F32" => 4,
-            "F16" | "BF16" => 2,
-            "F8" => 1,
+        let dtype_bytes = match k.as_ref() {
+            "F64" | "I64" | "U64" => 8,
+            "F32" | "I32" | "U32" => 4,
+            "F16" | "BF16" | "I16" | "U16" => 2,
+            "F8_E5M2" | "F8_E4M3" | "I8" | "U8" => 1,
             _ => 0,
         };
+        if dtype_bytes != 0 {
+            total_bytes += v * dtype_bytes;
+        }
     }
 
     println!("Requirements to run inference with {}", args.model_id);
