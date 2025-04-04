@@ -2,23 +2,33 @@
 
 [![Crates.io](https://img.shields.io/crates/v/hf-mem.svg)](https://crates.io/crates/hf-mem)
 
-> A (simple) command-line to estimate inference memory requirements on Hugging Face
+> CLI to estimate inference memory requirements from the Hugging Face Hub
+
+## Install
+
+```console
+$ cargo install hf-mem
+```
 
 ## Usage
 
-```bash
-cargo install hf-mem
-```
+```console
+$ hf-mem --help
+CLI to estimate inference memory requirements from the Hugging Face Hub
 
-And then:
+Usage: hf-mem [OPTIONS] --model-id <MODEL_ID>
 
-```bash
-hf-mem --model-id meta-llama/Llama-3.1-8B-Instruct --token ...
+Options:
+  -m, --model-id <MODEL_ID>
+  -r, --revision <REVISION>
+  -t, --token <TOKEN>
+  -h, --help                 Print help
+  -V, --version              Print version
 ```
 
 ## Features
 
-- Fast and light command-line, with a single installable binary
+- Fast and light CLI with a single installable binary
 - Fetches just the required bytes from the `safetensors` files on the Hugging Face
 Hub that contain the metadata
 - Provides an estimation based on the count of the parameters on the different
