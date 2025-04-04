@@ -1,10 +1,10 @@
 [package]
 name = "hf-mem"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-description = "A (simple) command-line to estimate inference memory requirements on Hugging Face "
+description = "CLI to estimate inference memory requirements from the Hugging Face Hub"
 repository = "https://github.com/alvarobartt/hf-mem"
 authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
 
