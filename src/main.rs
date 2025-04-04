@@ -8,12 +8,10 @@ use reqwest::{
 mod errors;
 mod fetch;
 mod schemas;
-mod sharded;
 mod token;
 
-use errors::HubError;
-use fetch::fetch;
-use sharded::fetch_sharded;
+use errors::RequestError;
+use fetch::{fetch, fetch_sharded};
 use token::get_token;
 
 #[derive(Parser, Debug)]
@@ -54,8 +52,8 @@ async fn main() -> anyhow::Result<()> {
     let metadata = match fetch_sharded(&client, args.model_id.clone(), args.revision.clone()).await
     {
         Ok(metadata) => metadata,
-        Err(err) => match err {
-            HubError::FileNotFound(..) => {
+        Err(e) => match e {
+            RequestError::FileNotFound(..) => {
                 match fetch(
                     &client,
                     args.model_id.clone(),
@@ -66,10 +64,10 @@ async fn main() -> anyhow::Result<()> {
                 .context("also failed when fetching the consolidated safetensors file")
                 {
                     Ok(metadata) => metadata,
-                    Err(e) => anyhow::bail!(e),
+                    Err(e) => anyhow::bail!(RequestError::Other(e)),
                 }
             }
-            _ => anyhow::bail!("failed with bla bla bla"),
+            _ => anyhow::bail!(RequestError::Other(e.into())),
         },
     };
 
