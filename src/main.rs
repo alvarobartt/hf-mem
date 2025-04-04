@@ -11,6 +11,7 @@ mod schemas;
 mod sharded;
 mod token;
 
+use errors::HubError;
 use fetch::fetch;
 use sharded::fetch_sharded;
 use token::get_token;
@@ -50,21 +51,26 @@ async fn main() -> anyhow::Result<()> {
         .build()
         .context("couldn't build the reqwest client")?;
 
-    let metadata = match fetch_sharded(&client, args.model_id.clone(), args.revision.clone()).await.context("failed while fetching the safetensors sharded, rolling back to consolidated safetensors (if available)") {
+    let metadata = match fetch_sharded(&client, args.model_id.clone(), args.revision.clone()).await
+    {
         Ok(metadata) => metadata,
-        // TODO: the error should indeed contain the status code so as to handle it properly or
-        // just link thiserror with the anyhow bail?
-        Err(..) => {
-            // TODO: find a mock proposal below:
-            // match e {
-            //      HubError::FileNotFound(..) => match fetch { ... },
-            //      HubError::HubIsDown | HubError::HubUnavailable | HubError::HubAuthFailed => bail!
-            // }
-            match fetch(&client, args.model_id.clone(), args.revision.clone(), Some("model.safetensors".to_string())).await.context("also failed when fetching the consolidated safetensors file") {
-                Ok(metadata) => metadata,
-                Err(e) => anyhow::bail!(e),
+        Err(err) => match err {
+            HubError::FileNotFound(..) => {
+                match fetch(
+                    &client,
+                    args.model_id.clone(),
+                    args.revision.clone(),
+                    Some("model.safetensors".to_string()),
+                )
+                .await
+                .context("also failed when fetching the consolidated safetensors file")
+                {
+                    Ok(metadata) => metadata,
+                    Err(e) => anyhow::bail!(e),
+                }
             }
-        }
+            _ => anyhow::bail!("failed with bla bla bla"),
+        },
     };
 
     // TODO: move this somewhere else and improve the code a bit adding a bit more rationale to it,

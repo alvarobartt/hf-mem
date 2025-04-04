@@ -3,6 +3,7 @@ use futures::future::join_all;
 use reqwest::{Client, StatusCode};
 use std::collections::{HashMap, HashSet};
 
+use crate::errors::HubError;
 use crate::fetch::fetch;
 use crate::schemas::{FileType, ModelIndex};
 
@@ -10,10 +11,10 @@ pub async fn fetch_sharded(
     client: &Client,
     model_id: String,
     revision: Option<String>,
-) -> anyhow::Result<HashMap<String, FileType>> {
+) -> anyhow::Result<HashMap<String, FileType>, HubError> {
     let url = format!(
         "https://huggingface.co/{}/resolve/{}/model.safetensors.index.json",
-        model_id.clone(),
+        model_id,
         revision.clone().unwrap_or("main".to_string()),
     );
 
@@ -63,17 +64,18 @@ pub async fn fetch_sharded(
                         Ok(Ok(result)) => {
                             metadata.extend(result);
                         }
-                        Ok(Err(e)) => anyhow::bail!(e),
-                        Err(e) => anyhow::bail!(e),
+                        Ok(Err(..)) => panic!("failed capturing future"),
+                        Err(..) => panic!("failed capturing future"),
                     }
                 }
                 Ok(metadata)
             }
-            StatusCode::NOT_FOUND => {
-                anyhow::bail!("the sharded file `model.safetensors.index.json` was not found")
-            }
-            _ => anyhow::bail!("response {response:?}"),
+            StatusCode::NOT_FOUND => Err(HubError::FileNotFound(
+                "`model.safetensors.index.json`".to_string(),
+            )),
+            StatusCode::FORBIDDEN => Err(HubError::HubAuth),
+            _ => Err(HubError::Internal),
         },
-        Err(e) => anyhow::bail!("failed with error {e}"),
+        Err(err) => Err(HubError::Other(err)),
     }
 }
