@@ -19,9 +19,9 @@ CLI to estimate inference memory requirements from the Hugging Face Hub
 Usage: hf-mem [OPTIONS] --model-id <MODEL_ID>
 
 Options:
-  -m, --model-id <MODEL_ID>
-  -r, --revision <REVISION>
-  -t, --token <TOKEN>
+  -m, --model-id <MODEL_ID>  ID of the model on the Hugging Face Hub
+  -r, --revision <REVISION>  Revision of the model on the Hugging Face Hub [default: main]
+  -t, --token <TOKEN>        Hugging Face Hub token with read access over the provided model ID, optional
   -h, --help                 Print help
   -V, --version              Print version
 ```

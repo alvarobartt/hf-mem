@@ -24,14 +24,14 @@ struct Args {
         short,
         long,
         default_value = "main",
-        help = "Revision of the model on the Hugging Face Hub, defaults to `main`"
+        help = "Revision of the model on the Hugging Face Hub"
     )]
     revision: Option<String>,
 
     #[arg(
         short,
         long,
-        help = "Hugging Face Hub token with read access over the provided model ID, if applicable"
+        help = "Hugging Face Hub token with read access over the provided model ID, optional"
     )]
     token: Option<String>,
 }
