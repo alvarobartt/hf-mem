@@ -17,37 +17,43 @@ use fetch::{fetch, fetch_sharded};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long)]
+    #[arg(short, long, help = "ID of the model on the Hugging Face Hub")]
     model_id: String,
 
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        default_value = "main",
+        help = "Revision of the model on the Hugging Face Hub, defaults to `main`"
+    )]
     revision: Option<String>,
 
-    #[arg(short, long)]
+    #[arg(
+        short,
+        long,
+        help = "Hugging Face Hub token with read access over the provided model ID, if applicable"
+    )]
     token: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-
-    let token = if let Some(token) = args.token {
-        token
-    } else {
-        get_token().context("the hugging face auth token couldn't be retrieved")?
-    };
-
     let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(format!("Bearer {}", token).as_str())
-            .context("parsing the authorization header with the hf token failed")?,
-    );
+
+    let token = args.token.or_else(|| get_token().ok());
+    if let Some(token) = &token {
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(format!("Bearer {}", token).as_str())
+                .context("parsing the authorization header with the hf token failed")?,
+        );
+    };
 
     let client = Client::builder()
         .default_headers(headers)
         .build()
-        .context("couldn't build the reqwest client")?;
+        .context("Couldn't build the `reqwest` client")?;
 
     let metadata = match fetch_sharded(&client, args.model_id.clone(), args.revision.clone()).await
     {
@@ -61,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
                     Some("model.safetensors".to_string()),
                 )
                 .await
-                .context("also failed when fetching the consolidated safetensors file")
+                .context("Failed when fetching the consolidated safetensors file")
                 {
                     Ok(metadata) => metadata,
                     Err(e) => anyhow::bail!(RequestError::Other(e)),
@@ -99,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    println!("Requirements to run inference with {}", args.model_id);
+    println!("Requirements to run inference with `{}`", args.model_id);
     println!(
         "  - Memory in MB: {:.2} MB",
         total_bytes as f64 / 1024_f64.powf(2_f64)
