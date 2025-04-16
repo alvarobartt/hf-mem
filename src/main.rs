@@ -5,14 +5,14 @@ use reqwest::{
     Client,
 };
 
+mod auth;
 mod errors;
 mod fetch;
 mod schemas;
-mod token;
 
+use auth::get_token;
 use errors::RequestError;
 use fetch::{fetch, fetch_sharded};
-use token::get_token;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
