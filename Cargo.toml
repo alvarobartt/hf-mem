@@ -11,9 +11,8 @@ authors = ["Alvaro Bartolome <alvarobartt@gmail.com>"]
 [dependencies]
 anyhow = "1.0.97"
 byteorder = "1.5.0"
-bytes = "1.10.1"
 clap = { version = "4.5.31", features = ["derive"] }
-reqwest = "0.12.12"
+reqwest = { version = "0.12.12", default-features = false, features = ["json", "stream"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 thiserror = "2.0.12"
