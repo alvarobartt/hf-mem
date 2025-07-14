@@ -22,6 +22,7 @@ Options:
   -m, --model-id <MODEL_ID>  ID of the model on the Hugging Face Hub
   -r, --revision <REVISION>  Revision of the model on the Hugging Face Hub [default: main]
   -t, --token <TOKEN>        Hugging Face Hub token with read access over the provided model ID, optional
+  -d, --dtype <DTYPE>        Target dtype for conversion (float32, float16, bfloat16, float8, float4)
   -h, --help                 Print help
   -V, --version              Print version
 ```
