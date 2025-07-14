@@ -14,10 +14,24 @@ use auth::get_token;
 use errors::RequestError;
 use fetch::{fetch, fetch_sharded};
 
+fn validate_model_id(model_id: &str) -> Result<String, String> {
+    if model_id.is_empty() {
+        return Err("Model ID cannot be empty".to_string());
+    }
+    if !model_id.contains('/') {
+        return Err("Model ID must be in format 'username/model-name'".to_string());
+    }
+    let parts: Vec<&str> = model_id.split('/').collect();
+    if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+        return Err("Model ID must be in format 'username/model-name'".to_string());
+    }
+    Ok(model_id.to_string())
+}
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, help = "ID of the model on the Hugging Face Hub")]
+    #[arg(short, long, help = "ID of the model on the Hugging Face Hub", value_parser = validate_model_id)]
     model_id: String,
 
     #[arg(
