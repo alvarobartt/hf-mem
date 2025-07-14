@@ -21,6 +21,6 @@ pub fn get_token() -> anyhow::Result<String> {
     };
     // If none of those return a result, then just fail, prompting the user to provide any of those
     anyhow::bail!(
-        "The Hugging Face authentication token is not set, and is required to send requests to the Hugging Face Hub API, so please make sure that you either provide the token via environment variable as `HF_TOKEN` or run `huggingface-cli login` to authenticate yourself."
+        "Hugging Face authentication token not found. Please set the HF_TOKEN environment variable or run 'huggingface-cli login' to authenticate."
     )
 }

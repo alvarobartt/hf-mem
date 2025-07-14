@@ -2,24 +2,33 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum RequestError {
-    #[error("File `{0}` not found on the Hugging Face Hub.")]
+    #[error("File '{0}' not found on Hugging Face Hub")]
     FileNotFound(String),
 
     #[error(
-        "Authentication to the Hugging Face Hub failed, please make sure you're using a valid Hugging Face Hub Token, more information at https://huggingface.co/docs/hub/security-tokens."
+        "Authentication failed: Invalid or missing Hugging Face token. Please ensure you have a valid token from https://huggingface.co/settings/tokens"
     )]
     HubAuth,
 
     #[error(
-        "The Hugging Face Hub seems to be down at the moment, make sure to check https://status.huggingface.co for updates."
+        "Hugging Face Hub is currently unavailable. Please check https://status.huggingface.co for service status"
     )]
     HubIsDown,
 
-    #[error("Internal error, please make sure that the request is correct and/or retry later.")]
+    #[error("Internal server error occurred. Please verify your request and try again")]
     Internal,
 
-    #[error("Request failed due to unknown reasons with status code `{0}`.")]
+    #[error("Request failed with status code {0}")]
     Unknown(reqwest::StatusCode),
+
+    #[error("Network error: {0}")]
+    Network(#[from] reqwest::Error),
+
+    #[error("JSON parsing error: {0}")]
+    JsonParse(#[from] serde_json::Error),
+
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
 
     #[error(transparent)]
     Other(#[from] anyhow::Error),
