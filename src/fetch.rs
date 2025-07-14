@@ -2,7 +2,6 @@
 // rather than the current which is not limited and may cause bottlenecks
 use anyhow::Context;
 use byteorder::{ByteOrder, LittleEndian};
-use futures::future::join_all;
 use reqwest::{
     header::{HeaderValue, RANGE},
     Client, StatusCode,
@@ -22,7 +21,7 @@ async fn fetch_metadata(
     url: &str,
     range_lower: Option<usize>,
     range_upper: Option<usize>,
-) -> anyhow::Result<(bytes::Bytes, usize), RequestError> {
+) -> anyhow::Result<(Vec<u8>, usize), RequestError> {
     let range_lower = range_lower.unwrap_or(0);
     let range_upper = range_upper.unwrap_or(MAX_METADATA_SIZE);
 
@@ -44,7 +43,8 @@ async fn fetch_metadata(
                     let metadata = response
                         .bytes()
                         .await
-                        .context("Failed to read response bytes")?;
+                        .context("Failed to read response bytes")?
+                        .to_vec();
                     let metadata_size = LittleEndian::read_u64(&metadata[..8]) as usize;
                     Ok((metadata, metadata_size))
                 }
@@ -132,12 +132,18 @@ pub async fn fetch_sharded(
                         .cloned()
                         .collect::<HashSet<String>>();
 
+                    let mut metadata = HashMap::<String, FileType>::new();
+                    let semaphore = std::sync::Arc::new(tokio::sync::Semaphore::new(10));
+
                     let mut tasks = Vec::new();
                     for filename in filenames {
                         let client_clone = client.clone();
                         let model_id_clone = model_id.clone();
                         let revision_clone = revision.clone();
+                        let semaphore_clone = semaphore.clone();
+
                         tasks.push(tokio::spawn(async move {
+                            let _permit = semaphore_clone.acquire().await.unwrap();
                             fetch(
                                 &client_clone,
                                 model_id_clone,
@@ -149,10 +155,8 @@ pub async fn fetch_sharded(
                         }));
                     }
 
-                    let mut metadata = HashMap::<String, FileType>::new();
-                    let futures = join_all(tasks).await;
-                    for future in futures {
-                        match future {
+                    for task in tasks {
+                        match task.await {
                             Ok(Ok(result)) => {
                                 metadata.extend(result);
                             }
