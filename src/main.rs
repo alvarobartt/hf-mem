@@ -46,34 +46,28 @@ async fn main() -> anyhow::Result<()> {
         headers.insert(
             AUTHORIZATION,
             HeaderValue::from_str(format!("Bearer {}", token).as_str())
-                .context("parsing the authorization header with the hf token failed")?,
+                .context("Failed to parse authorization header with Hugging Face token")?,
         );
     };
 
     let client = Client::builder()
         .default_headers(headers)
         .build()
-        .context("Couldn't build the `reqwest` client")?;
+        .context("Failed to build HTTP client")?;
 
     let metadata = match fetch_sharded(&client, args.model_id.clone(), args.revision.clone()).await
     {
         Ok(metadata) => metadata,
         Err(e) => match e {
-            RequestError::FileNotFound(..) => {
-                match fetch(
-                    &client,
-                    args.model_id.clone(),
-                    args.revision.clone(),
-                    Some("model.safetensors".to_string()),
-                )
-                .await
-                .context("Failed when fetching the consolidated safetensors file")
-                {
-                    Ok(metadata) => metadata,
-                    Err(e) => anyhow::bail!(RequestError::Other(e)),
-                }
-            }
-            _ => anyhow::bail!(RequestError::Other(e.into())),
+            RequestError::FileNotFound(..) => fetch(
+                &client,
+                args.model_id.clone(),
+                args.revision.clone(),
+                Some("model.safetensors".to_string()),
+            )
+            .await
+            .context("Failed to fetch consolidated safetensors file")?,
+            _ => return Err(e.into()),
         },
     };
 
@@ -93,6 +87,9 @@ async fn main() -> anyhow::Result<()> {
 
     let mut total_bytes = 0;
     for (k, v) in parameters {
+        // TODO: ideally to handle the dtype the user wants to serve the model in
+        // note that for some models it might not work i.e. some models as
+        // `deepseek-ai/DeepSeek-R1-0528` has multiple dtypes `F16, F8_E4M3, F32`
         let dtype_bytes = match k.as_ref() {
             "F64" | "I64" | "U64" => 8,
             "F32" | "I32" | "U32" => 4,
