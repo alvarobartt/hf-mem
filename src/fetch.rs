@@ -31,11 +31,11 @@ async fn fetch_metadata(
         .header(
             RANGE,
             HeaderValue::from_str(format!("bytes={}-{}", range_lower, range_upper).as_str())
-                .context("parsing the range of bytes to fetch for the range header failed")?,
+                .context("Failed to parse byte range header")?,
         )
         .send()
         .await
-        .context("fetching the provided url failed")
+        .context("Failed to fetch URL")
     {
         Ok(response) => {
             let status_code = response.status();
@@ -44,7 +44,7 @@ async fn fetch_metadata(
                     let metadata = response
                         .bytes()
                         .await
-                        .context("failed reading the bytes from the response")?;
+                        .context("Failed to read response bytes")?;
                     let metadata_size = LittleEndian::read_u64(&metadata[..8]) as usize;
                     Ok((metadata, metadata_size))
                 }
@@ -72,23 +72,28 @@ pub async fn fetch(
         filename.unwrap_or("model.safetensors".to_string()),
     );
 
-    let (metadata, metadata_size) = fetch_metadata(&client, &url, None, None)
+    let (metadata, metadata_size) = fetch_metadata(client, &url, None, None)
         .await
-        .context("failed fetching the metadata from the provided url")?;
+        .context("Failed to fetch safetensors metadata")?;
 
     let metadata = if metadata_size > MAX_METADATA_SIZE {
-        fetch_metadata(&client, &url, Some(8), Some(metadata_size))
+        fetch_metadata(client, &url, Some(8), Some(metadata_size + 7))
             .await
-            .context("failed fetching the complete metadata from the provided url")?
+            .context("Failed to fetch complete metadata")?
             .0
     } else {
         metadata
     };
 
-    Ok(
-        serde_json::from_slice::<HashMap<String, FileType>>(&metadata[8..metadata_size + 8])
-            .context("parsing the metadata bytes into a serde_json::Value failed")?,
-    )
+    let metadata_slice = if metadata_size > MAX_METADATA_SIZE {
+        &metadata[..metadata_size]
+    } else {
+        &metadata[8..metadata_size + 8]
+    };
+
+    serde_json::from_slice::<HashMap<String, FileType>>(metadata_slice)
+        .map_err(RequestError::JsonParse)
+        .context("Failed to parse metadata JSON")
 }
 
 pub async fn fetch_sharded(
@@ -106,19 +111,20 @@ pub async fn fetch_sharded(
         .get(&url)
         .send()
         .await
-        .context("fetching the sharded url failed")
+        .context("Failed to fetch sharded model index")
     {
         Ok(response) => {
             let status_code = response.status();
             match status_code {
                 StatusCode::OK => {
-                    let model_index = serde_json::from_str::<ModelIndex>(
-                        &response
-                            .text()
-                            .await
-                            .context("failed to pull the text out of the response")?,
-                    )
-                    .context("failed deserializing the text into a json")?;
+                    let response_text = response
+                        .text()
+                        .await
+                        .context("Failed to extract response text")?;
+
+                    let model_index = serde_json::from_str::<ModelIndex>(&response_text)
+                        .map_err(RequestError::JsonParse)
+                        .context("Failed to deserialize JSON response")?;
 
                     let filenames = model_index
                         .weight_map
@@ -139,9 +145,7 @@ pub async fn fetch_sharded(
                                 Some(filename),
                             )
                             .await
-                            .context(
-                                "failed to fetch metadata from the safetensors file from the hub",
-                            )
+                            .context("Failed to fetch safetensors metadata from Hugging Face Hub")
                         }));
                     }
 
@@ -152,8 +156,8 @@ pub async fn fetch_sharded(
                             Ok(Ok(result)) => {
                                 metadata.extend(result);
                             }
-                            Ok(Err(..)) => panic!("failed capturing future"),
-                            Err(..) => panic!("failed capturing future"),
+                            Ok(Err(e)) => return Err(RequestError::Other(e)),
+                            Err(e) => return Err(RequestError::Other(e.into())),
                         }
                     }
                     Ok(metadata)
