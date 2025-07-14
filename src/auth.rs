@@ -1,4 +1,4 @@
-use dirs::home_dir;
+use std::path::PathBuf;
 
 pub fn get_token() -> anyhow::Result<String> {
     // First, try to pull the authentication token for the Hugging Face Hub from the HF_TOKEN
@@ -9,12 +9,12 @@ pub fn get_token() -> anyhow::Result<String> {
     // Then, if the HF_TOKEN hasn't been provided then try to read ~/.cache/huggingface/token, that
     // contains the authentication token set via the `huggingface-cli` or any other authentication
     // method
-    if let Some(home) = home_dir() {
-        let file = home.join(".cache/huggingface/token");
+    if let Ok(home) = std::env::var("HOME") {
+        let file = PathBuf::from(home).join(".cache/huggingface/token");
         if file.exists() {
             if let Ok(content) = std::fs::read_to_string(file) {
                 if !content.is_empty() {
-                    return Ok(content);
+                    return Ok(content.trim().to_string());
                 }
             }
         }

@@ -13,7 +13,6 @@ anyhow = "1.0.97"
 byteorder = "1.5.0"
 bytes = "1.10.1"
 clap = { version = "4.5.31", features = ["derive"] }
-dirs = "6.0.0"
 futures = "0.3.31"
 reqwest = "0.12.12"
 serde = { version = "1.0.219", features = ["derive"] }
