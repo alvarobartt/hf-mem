@@ -51,12 +51,13 @@ fn get_dtype_bytes(dtype: &str) -> u64 {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, help = "ID of the model on the Hugging Face Hub", value_parser = validate_model_id)]
+    #[arg(short, long, env, help = "ID of the model on the Hugging Face Hub", value_parser = validate_model_id)]
     model_id: String,
 
     #[arg(
         short,
         long,
+        env,
         default_value = "main",
         help = "Revision of the model on the Hugging Face Hub"
     )]
@@ -65,6 +66,7 @@ struct Args {
     #[arg(
         short,
         long,
+        env = "HT_TOKEN",
         help = "Hugging Face Hub token with read access over the provided model ID, optional"
     )]
     token: Option<String>,
@@ -72,6 +74,7 @@ struct Args {
     #[arg(
         short,
         long,
+        env,
         help = "Target dtype for conversion (float32, float16, bfloat16, float8, float4)",
         value_parser = validate_dtype
     )]
