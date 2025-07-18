@@ -11,7 +11,7 @@ mod errors;
 mod fetch;
 mod schemas;
 
-use auth::get_token;
+use auth::read_token_from_cache;
 use errors::RequestError;
 use fetch::{fetch, fetch_sharded};
 
@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     let mut headers = HeaderMap::new();
 
-    let token = args.token.or_else(|| get_token().ok());
+    let token = args.token.or_else(|| read_token_from_cache().ok());
     if let Some(token) = &token {
         headers.insert(
             AUTHORIZATION,
