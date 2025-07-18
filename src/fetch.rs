@@ -49,7 +49,7 @@ async fn fetch_metadata(
                     Ok((metadata, metadata_size))
                 }
                 StatusCode::NOT_FOUND => Err(RequestError::FileNotFound(url.to_string())),
-                StatusCode::FORBIDDEN => Err(RequestError::HubAuth),
+                StatusCode::UNAUTHORIZED => Err(RequestError::HubAuth),
                 StatusCode::INTERNAL_SERVER_ERROR => Err(RequestError::Internal),
                 StatusCode::SERVICE_UNAVAILABLE => Err(RequestError::HubIsDown),
                 _ => Err(RequestError::Unknown(status_code)),
@@ -167,7 +167,7 @@ pub async fn fetch_sharded(
                     Ok(metadata)
                 }
                 StatusCode::NOT_FOUND => Err(RequestError::FileNotFound(url.to_string())),
-                StatusCode::FORBIDDEN => Err(RequestError::HubAuth),
+                StatusCode::UNAUTHORIZED => Err(RequestError::HubAuth),
                 StatusCode::INTERNAL_SERVER_ERROR => Err(RequestError::Internal),
                 StatusCode::SERVICE_UNAVAILABLE => Err(RequestError::HubIsDown),
                 _ => Err(RequestError::Unknown(status_code)),
