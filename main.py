@@ -58,7 +58,7 @@ def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
 
 
 def main(model_id: str, revision: str) -> None:
-    url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}"
+    url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
 
     headers = {}
     if token := os.getenv("HF_TOKEN", None):
@@ -73,7 +73,7 @@ def main(model_id: str, revision: str) -> None:
         files = [
             f["path"]
             for f in json.loads(response.read())
-            if f.get("path", None) is not None
+            if f.get("path", None) is not None and f.get("type", None) == "file"
         ]
 
     if "model.safetensors" in files:
