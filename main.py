@@ -29,7 +29,8 @@ async def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
     request = Request(url, headers=headers, method="GET")
     with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
         if response.status not in {200, 206}:
-            raise RuntimeError(f"REQUEST FAILED WITH {response.status}")
+            logging.error(f"REQUEST FAILED WITH {response.status}")
+            sys.exit(3)
 
         metadata = response.read()
         # NOTE: Parse the first 8 bytes as a little-endian uint64 (size of the metadata)
@@ -47,7 +48,8 @@ async def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
         request = Request(url, headers=headers, method="GET")
         with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
             if response.status not in {200, 206}:
-                raise RuntimeError(f"REQUEST FAILED WITH {response.status}")
+                logging.error(f"REQUEST FAILED WITH {response.status}")
+                sys.exit(3)
 
             metadata += response.read()
             return json.loads(metadata)
@@ -63,7 +65,8 @@ async def main(model_id: str, revision: str) -> None:
     request = Request(url, headers=headers, method="GET")
     with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
         if response.status != 200:
-            raise RuntimeError(f"REQUEST FAILED WITH {response.status}")
+            logging.error(f"REQUEST FAILED WITH {response.status}")
+            sys.exit(3)
 
         files = [
             f["path"]
@@ -81,7 +84,8 @@ async def main(model_id: str, revision: str) -> None:
         request = Request(url, headers=headers, method="GET")
         with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
             if response.status != 200:
-                raise RuntimeError(f"REQUEST FAILED WITH {response.status}")
+                logging.error(f"REQUEST FAILED WITH {response.status}")
+                sys.exit(3)
 
             urls = {
                 f"https://huggingface.co/{model_id}/resolve/{revision}/{f}"
