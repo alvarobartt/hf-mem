@@ -121,10 +121,14 @@ async def main(model_id: str, revision: str) -> None:
         logging.info(f"DTYPE={dtype}, COUNT={count}\n")
 
         match dtype:
-            case "F32":
+            case "F64" | "I64" | "U64":
+                dtype_b = 8
+            case "F32" | "I32" | "U32":
                 dtype_b = 4
-            case "FP16" | "BF16":
+            case "F16" | "BF16" | "I16" | "U16":
                 dtype_b = 2
+            case "F8_E5M2" | "F8_E4M3" | "I8" | "U8":
+                dtype_b = 1
             case _:
                 logging.error(f"DTYPE={dtype} NOT HANDLED")
                 sys.exit(2)
