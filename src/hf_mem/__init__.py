@@ -57,7 +57,21 @@ def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
             return json.loads(metadata)
 
 
-def main(model_id: str, revision: str) -> None:
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model-id", required=True, help="Model ID on the Hugging Face Hub"
+    )
+    parser.add_argument(
+        "--revision",
+        default="main",
+        help="Model revision on the Hugging Face Hub",
+    )
+
+    args = parser.parse_args()
+    model_id = args.model_id
+    revision = args.revision
+
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
 
     headers = {}
@@ -265,20 +279,3 @@ def main(model_id: str, revision: str) -> None:
     logging.info(f"TOTAL VRAM={total / (1024**3):.2f} (IN GIGABYTES)")
 
     sys.exit(0)
-
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model-id", required=True, help="Model ID on the Hugging Face Hub"
-    )
-    parser.add_argument(
-        "--revision",
-        default="main",
-        help="Model revision on the Hugging Face Hub",
-    )
-
-    args = parser.parse_args()
-    main(model_id=args.model_id, revision=args.revision)
