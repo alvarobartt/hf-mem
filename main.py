@@ -5,14 +5,16 @@ import math
 import os
 import struct
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import reduce
 from typing import Any, Dict
 from urllib.request import Request, urlopen
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
 MAX_METADATA_SIZE = 100_000
-
-REQUEST_TIMEOUT = 30.0
+REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
+MAX_WORKERS = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4)))
 
 
 logging.basicConfig(
@@ -21,7 +23,7 @@ logging.basicConfig(
 )
 
 
-async def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
+def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
     headers = {"Range": f"bytes=0-{MAX_METADATA_SIZE}"}
     if token := os.getenv("HF_TOKEN", None):
         headers["Authorization"] = f"Bearer {token}"
@@ -55,7 +57,7 @@ async def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
             return json.loads(metadata)
 
 
-async def main(model_id: str, revision: str) -> None:
+def main(model_id: str, revision: str) -> None:
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}"
 
     headers = {}
@@ -76,7 +78,7 @@ async def main(model_id: str, revision: str) -> None:
 
     if "model.safetensors" in files:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
-        metadata = await fetch_safetensors_metadata(url=url)
+        metadata = fetch_safetensors_metadata(url=url)
     elif "model.safetensors.index.json" in files:
         # TODO: We could eventually skip this request in favour of a greedy approach on trying to pull all the
         # files following the formatting `model-00000-of-00000.safetensors`
@@ -92,11 +94,17 @@ async def main(model_id: str, revision: str) -> None:
                 for _, f in json.loads(response.read())["weight_map"].items()
             }
 
-        metadatas = await asyncio.gather(*[
-            fetch_safetensors_metadata(url) for url in urls
-        ])
-
-        from functools import reduce
+        metadatas = []
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(fetch_safetensors_metadata, url): url for url in urls
+            }
+            for future in as_completed(futures):
+                try:
+                    metadatas.append(future.result())
+                except Exception as e:
+                    logging.error(f'ANY OF THE FUTURES FAILED "{e}"')
+                    sys.exit(4)
 
         metadata = reduce(lambda acc, metadata: acc | metadata, metadatas, {})
     elif "model_index.json" in files:
@@ -148,7 +156,6 @@ async def main(model_id: str, revision: str) -> None:
 
 if __name__ == "__main__":
     import argparse
-    import asyncio
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -161,4 +168,4 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    asyncio.run(main(model_id=args.model_id, revision=args.revision))
+    main(model_id=args.model_id, revision=args.revision)
