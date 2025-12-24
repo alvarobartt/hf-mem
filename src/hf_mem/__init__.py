@@ -7,7 +7,7 @@ import struct
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import reduce
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from urllib.request import Request, urlopen
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
@@ -21,6 +21,17 @@ logging.basicConfig(
     format="[%(levelname)s] @ %(filename)s:%(lineno)d :: %(message)s",
     level=logging.INFO,
 )
+
+
+# NOTE: Return type-hint set to `Any`, but it will only be a JSON-compatible object
+def get_json_file(url: str, headers: Optional[Dict[str, Any]] = None) -> Any:
+    request = Request(url, headers=headers, method="GET")  # type: ignore
+    with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
+        if response.status != 200:
+            logging.error(f"REQUEST FAILED WITH {response.status}")
+            sys.exit(3)
+
+        return json.loads(response.read())
 
 
 def fetch_safetensors_metadata(url: str) -> Dict[str, Any]:
@@ -72,23 +83,17 @@ def main() -> None:
     model_id = args.model_id
     revision = args.revision
 
-    url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
-
     headers = {}
     if token := os.getenv("HF_TOKEN", None):
         headers["Authorization"] = f"Bearer {token}"
 
-    request = Request(url, headers=headers, method="GET")
-    with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-        if response.status != 200:
-            logging.error(f"REQUEST FAILED WITH {response.status}")
-            sys.exit(3)
+    url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
 
-        files = [
-            f["path"]
-            for f in json.loads(response.read())
-            if f.get("path", None) is not None and f.get("type", None) == "file"
-        ]
+    files = [
+        f["path"]
+        for f in get_json_file(url=url, headers=headers)
+        if f.get("path", None) is not None and f.get("type", None) == "file"
+    ]
 
     if "model.safetensors" in files:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
@@ -97,85 +102,61 @@ def main() -> None:
         # TODO: We could eventually skip this request in favour of a greedy approach on trying to pull all the
         # files following the formatting `model-00000-of-00000.safetensors`
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors.index.json"
-        request = Request(url, headers=headers, method="GET")
-        with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-            if response.status != 200:
-                logging.error(f"REQUEST FAILED WITH {response.status}")
-                sys.exit(3)
+        urls = {
+            f"https://huggingface.co/{model_id}/resolve/{revision}/{f}"
+            for _, f in get_json_file(url=url, headers=headers)["weight_map"].items()
+        }
 
-            urls = {
-                f"https://huggingface.co/{model_id}/resolve/{revision}/{f}"
-                for _, f in json.loads(response.read())["weight_map"].items()
-            }
-
-        metadatas = []
+        metadata_list: List[Dict[str, Any]] = []
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             futures = {
                 executor.submit(fetch_safetensors_metadata, url): url for url in urls
             }
             for future in as_completed(futures):
                 try:
-                    metadatas.append(future.result())
+                    metadata_list.append(future.result())
                 except Exception as e:
                     logging.error(f'ANY OF THE FUTURES FAILED "{e}"')
                     sys.exit(4)
 
-        metadata = reduce(lambda acc, metadata: acc | metadata, metadatas, {})
+        metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
     elif "model_index.json" in files:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model_index.json"
-        request = Request(url, headers=headers, method="GET")
-        with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-            if response.status != 200:
-                logging.error(f"REQUEST FAILED WITH {response.status}")
-                sys.exit(3)
+        paths = {
+            k
+            for k, _ in get_json_file(url=url, headers=headers).items()
+            if not k.startswith("_")  # e.g. `_class_name` or `_diffusers_version`
+        }
 
-            paths = {
-                k
-                for k, _ in json.loads(response.read()).items()
-                if not k.startswith("_")  # e.g. `_class_name` or `_diffusers_version`
-            }
+        path_urls: Dict[str, List[str]] = {}
+        for path in paths:
+            if path not in path_urls:
+                path_urls[path] = []
 
-            path_urls: Dict[str, List[str]] = {}
-            for path in paths:
-                if path not in path_urls:
-                    path_urls[path] = []
-
-                if f"{path}/diffusion_pytorch_model.safetensors" in files:
-                    path_urls[path].append(
-                        f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors"
-                    )
-                elif f"{path}/model.safetensors" in files:
-                    path_urls[path].append(
-                        f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors"
-                    )
-                elif f"{path}/diffusion_pytorch_model.safetensors.index.json" in files:
-                    url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors.index.json"
-                    request = Request(url, headers=headers, method="GET")
-                    with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-                        if response.status != 200:
-                            logging.error(f"REQUEST FAILED WITH {response.status}")
-                            sys.exit(3)
-
-                        path_urls[path] = list({
-                            f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
-                            for _, f in json.loads(response.read())[
-                                "weight_map"
-                            ].items()
-                        })
-                elif f"{path}/model.safetensors.index.json" in files:
-                    url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
-                    request = Request(url, headers=headers, method="GET")
-                    with urlopen(request, timeout=REQUEST_TIMEOUT) as response:
-                        if response.status != 200:
-                            logging.error(f"REQUEST FAILED WITH {response.status}")
-                            sys.exit(3)
-
-                        path_urls[path] = list({
-                            f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
-                            for _, f in json.loads(response.read())[
-                                "weight_map"
-                            ].items()
-                        })
+            if f"{path}/diffusion_pytorch_model.safetensors" in files:
+                path_urls[path].append(
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors"
+                )
+            elif f"{path}/model.safetensors" in files:
+                path_urls[path].append(
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors"
+                )
+            elif f"{path}/diffusion_pytorch_model.safetensors.index.json" in files:
+                url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors.index.json"
+                path_urls[path] = list({
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
+                    for _, f in get_json_file(url=url, headers=headers)[
+                        "weight_map"
+                    ].items()
+                })
+            elif f"{path}/model.safetensors.index.json" in files:
+                url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
+                path_urls[path] = list({
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
+                    for _, f in get_json_file(url=url, headers=headers)[
+                        "weight_map"
+                    ].items()
+                })
 
         path_metadatas: Dict[str, List[Dict[str, Any]]] = {}
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -195,12 +176,12 @@ def main() -> None:
                     logging.error(f'ANY OF THE FUTURES FAILED "{e}"')
                     sys.exit(4)
 
-        metadatas: Dict[str, Dict[str, Any]] = {
-            path: reduce(lambda acc, metadata: acc | metadata, metadatas, {})
-            for path, metadatas in path_metadatas.items()
+        metadata_dict: Dict[str, Dict[str, Any]] = {
+            path: reduce(lambda acc, metadata: acc | metadata, metadata_dict, {})
+            for path, metadata_dict in path_metadatas.items()
         }
 
-        for path, metadata in metadatas.items():
+        for path, metadata in metadata_dict.items():
             ppdt = {}
             for key, value in metadata.items():
                 if key in {"__metadata__"}:
