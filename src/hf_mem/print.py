@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 13
 MIN_DATA_LEN = 20
@@ -19,35 +21,17 @@ BOX = {
 }
 
 
-def print_color(content: str) -> None:
+def cprint(content: str) -> None:
     print(f"\x1b[38;2;244;183;63m{content}\x1b[0m")
 
 
-def _max_length(strings):
-    max_len = 0
-    for s in strings:
-        max_len = max(max_len, len(str(s)))
-    return min(max_len, MAX_DATA_LEN)
-
-
-def _set_current_len(model_id, stats):
-    rows = [
-        "INFERENCE MEMORY ESTIMATE FOR",
-        f"`{model_id}`",
-        "TOTAL MEMORY",
-        "MEMORY REQUIREMENTS",
-    ]
-    for dt, (params, nbytes) in stats.items():
-        rows.append(f"{dt} {params} {nbytes}")
-    return _max_length(rows)
-
-
-def _print_header(current_len):
+def _print_header(current_len: int) -> None:
     length = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING
     top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
+    cprint(top)
+
     bottom = BOX["lm"] + (BOX["bsep"] * (length - 2)) + BOX["rm"]
-    print_color(top)
-    print_color(bottom)
+    cprint(bottom)
 
 
 def _print_centered(text, current_len):
@@ -56,7 +40,7 @@ def _print_centered(text, current_len):
     text_len = len(text)
     pad_left = (total_width - text_len) // 2
     pad_right = total_width - text_len - pad_left
-    print_color(f"{BOX['vt']}{' ' * pad_left}{text}{' ' * pad_right}{BOX['vt']}")
+    cprint(f"{BOX['vt']}{' ' * pad_left}{text}{' ' * pad_right}{BOX['vt']}")
 
 
 def _print_divider(current_len, side=None):
@@ -75,10 +59,10 @@ def _print_divider(current_len, side=None):
     line += mid
     line += BOX["ht"] * data_col_inner
     line += right
-    print_color(line)
+    cprint(line)
 
 
-def _format_name(name):
+def _format_name(name: str) -> str:
     name = str(name)
     if len(name) < MIN_NAME_LEN:
         return f"{name:<{MIN_NAME_LEN}}"
@@ -87,13 +71,13 @@ def _format_name(name):
     return f"{name:<{MAX_NAME_LEN}}"
 
 
-def _print_row(name, text, current_len):
+def _print_row(name: str, text: str, current_len: int) -> None:
     name_fmt = _format_name(name)
     data_fmt = f"{str(text):<{current_len}}"
-    print_color(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
+    cprint(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
 
 
-def _make_bar(used, total, width):
+def _make_bar(used: float, total: float, width: int) -> str:
     if total <= 0:
         return "░" * width
     frac = min(max(used / total, 0.0), 1.0)
@@ -102,44 +86,54 @@ def _make_bar(used, total, width):
     return "█" * filled + "░" * (width - filled)
 
 
-def _format_short_number(n):
+def _format_short_number(n: float) -> str | None:
     n = float(n)
     for unit in ("", "K", "M", "B", "T"):
-        if abs(n) < 1000.0 or unit == "T":
-            if unit == "":
-                return f"{int(n)}"
-            return f"{n:.1f}{unit}"
+        if abs(n) < 1000.0:
+            return f"{int(n)}" if unit == "" else f"{n:.1f}{unit}"
         n /= 1000.0
 
 
-def bytes_to_gb(nbytes):
+def _bytes_to_gb(nbytes: int) -> float:
     return nbytes / (1024**3)
 
 
-def print_report(model_id, stats):
-    current_len = _set_current_len(model_id, stats)
-    bar_width = current_len
+def print_report(model_id: str, stats: Dict[str, Any]) -> None:
+    rows = [
+        "INFERENCE MEMORY ESTIMATE FOR",
+        f"`{model_id}`",
+        "TOTAL MEMORY",
+        "MEMORY REQUIREMENTS",
+    ]
+    for dt, (params, nbytes) in stats.items():
+        rows.append(f"{dt} {params} {nbytes}")
+
+    max_len = 0
+    for r in rows:
+        max_len = max(max_len, len(str(r)))
+
+    current_len = min(max_len, MAX_DATA_LEN)
 
     total_bytes = sum(nbytes for _, nbytes in stats.values())
     total_params = sum(params for params, _ in stats.values())
-    total_gb = bytes_to_gb(total_bytes)
+    total_gb = _bytes_to_gb(total_bytes)
 
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"`{model_id}`", current_len)
     _print_divider(current_len + 1, "top")
 
-    total_text = f"{bytes_to_gb(total_bytes):.2f} GB ({_format_short_number(total_params)} params)"
+    total_text = f"{_bytes_to_gb(total_bytes):.2f} GB ({_format_short_number(total_params)} params)"
     _print_row("MEMORY", total_text, current_len)
 
-    total_bar = _make_bar(total_bytes, total_bytes, bar_width)
+    total_bar = _make_bar(total_bytes, total_bytes, current_len)
     _print_row("REQUIREMENTS", total_bar, current_len)
     _print_divider(current_len + 1)
 
-    max_dtype_length = len("FLOAT16")
+    max_dtype_length = max([len(k) for k in stats.keys()])
     for i, (dtype, (params, nbytes)) in enumerate(stats.items()):
         dtype_name = dtype.upper()
-        dtype_gb = bytes_to_gb(nbytes)
+        dtype_gb = _bytes_to_gb(nbytes)
 
         gb_text = f"{dtype_gb:.1f} / {total_gb:.1f} GB"
         _print_row(
@@ -148,7 +142,7 @@ def print_report(model_id, stats):
             current_len,
         )
 
-        bar = _make_bar(dtype_gb, total_gb, bar_width)
+        bar = _make_bar(dtype_gb, total_gb, current_len)
         _print_row(f"{_format_short_number(params)} PARAMS", bar, current_len)
 
         if i < len(stats) - 1:
