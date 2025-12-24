@@ -7,6 +7,7 @@ authors = [
     { name = "Alvaro Bartolome", email = "36760800+alvarobartt@users.noreply.github.com" }
 ]
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 dependencies = []
 
@@ -15,4 +16,4 @@ requires = ["uv_build>=0.9.5,<0.10.0"]
 build-backend = "uv_build"
 
 [project.scripts]
-hf-mem = "hf_mem.__init__:main"
+hf-mem = "hf_mem:main"
