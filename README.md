@@ -10,8 +10,10 @@
 ## Usage
 
 ```bash
-uvx hf-mem --model-id HuggingFaceTB/SmolLM3-3B
+uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
 ```
+
+<img width="1008" height="724" alt="Screenshot 2025-12-29 at 17 09 16" src="https://github.com/user-attachments/assets/1ac40819-5c08-4cfa-bb09-7e332e7467fc" />
 
 ## References
 
