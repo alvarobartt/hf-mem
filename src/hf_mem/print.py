@@ -121,6 +121,7 @@ def print_report(model_id: str, stats: Dict[str, Any]) -> None:
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"`{model_id}`", current_len)
+    _print_centered("w/ `hf-mem` by @alvarobartt", current_len)
     _print_divider(current_len + 1, "top")
 
     total_text = f"{_bytes_to_gb(total_bytes):.2f} GB ({_format_short_number(total_params)} params)"
@@ -130,14 +131,16 @@ def print_report(model_id: str, stats: Dict[str, Any]) -> None:
     _print_row("REQUIREMENTS", total_bar, current_len)
     _print_divider(current_len + 1)
 
-    max_dtype_length = max([len(k) for k in stats.keys()])
+    max_length = max([
+        len(f"{_format_short_number(params)} PARAMS") for params, _ in stats.values()
+    ])
     for i, (dtype, (params, nbytes)) in enumerate(stats.items()):
         dtype_name = dtype.upper()
         dtype_gb = _bytes_to_gb(nbytes)
 
         gb_text = f"{dtype_gb:.1f} / {total_gb:.1f} GB"
         _print_row(
-            dtype_name + " " * (max_dtype_length - len(dtype_name)),
+            dtype_name + " " * (max_length - len(dtype_name)),
             gb_text,
             current_len,
         )
