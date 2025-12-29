@@ -46,7 +46,7 @@ async def fetch_safetensors_metadata(
     # NOTE: Given that by default we just fetch the first 100_000 bytes, if the content is larger
     # then we simply fetch the remainder again
     metadata = metadata[8 : MAX_METADATA_SIZE + 8]
-    headers["Range"] = f"bytes={MAX_METADATA_SIZE}-{metadata_size + 7}"
+    headers["Range"] = f"bytes={MAX_METADATA_SIZE + 1}-{metadata_size + 7}"
 
     response = await client.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
