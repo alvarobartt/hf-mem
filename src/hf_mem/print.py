@@ -1,4 +1,5 @@
-from typing import Any, Dict
+import math
+from typing import Any, Dict, Literal, Optional
 
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 13
@@ -21,35 +22,43 @@ BOX = {
 }
 
 
-def cprint(content: str) -> None:
+def _print_with_color(content: str) -> None:
     print(f"\x1b[38;2;244;183;63m{content}\x1b[0m")
 
 
 def _print_header(current_len: int) -> None:
     length = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING
     top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
-    cprint(top)
+    _print_with_color(top)
 
     bottom = BOX["lm"] + (BOX["bsep"] * (length - 2)) + BOX["rm"]
-    cprint(bottom)
+    _print_with_color(bottom)
 
 
-def _print_centered(text, current_len):
+def _print_centered(text: str, current_len: int) -> None:
     max_len = current_len + MAX_NAME_LEN - BORDERS_AND_PADDING
     total_width = max_len + 12
     text_len = len(text)
     pad_left = (total_width - text_len) // 2
     pad_right = total_width - text_len - pad_left
-    cprint(f"{BOX['vt']}{' ' * pad_left}{text}{' ' * pad_right}{BOX['vt']}")
+    _print_with_color(f"{BOX['vt']}{' ' * pad_left}{text}{' ' * pad_right}{BOX['vt']}")
 
 
-def _print_divider(current_len, side=None):
-    if side == "top":
-        left, mid, right = BOX["lm"], BOX["tsep"], BOX["rm"]
-    elif side == "bottom":
-        left, mid, right = BOX["bl"], BOX["bsep"], BOX["br"]
-    else:
-        left, mid, right = BOX["lm"], BOX["mm"], BOX["rm"]
+def _print_divider(
+    current_len: int,
+    side: Optional[Literal["top", "top-continue", "bottom", "bottom-continue"]] = None,
+) -> None:
+    match side:
+        case "top":
+            left, mid, right = BOX["lm"], BOX["tsep"], BOX["rm"]
+        case "top-continue":
+            left, mid, right = BOX["lm"], BOX["bsep"], BOX["rm"]
+        case "bottom":
+            left, mid, right = BOX["bl"], BOX["bsep"], BOX["br"]
+        case "bottom-continue":
+            left, mid, right = BOX["lm"], BOX["bsep"], BOX["rm"]
+        case _:
+            left, mid, right = BOX["lm"], BOX["mm"], BOX["rm"]
 
     name_col_inner = MAX_NAME_LEN + 2
     data_col_inner = current_len + 1
@@ -59,11 +68,10 @@ def _print_divider(current_len, side=None):
     line += mid
     line += BOX["ht"] * data_col_inner
     line += right
-    cprint(line)
+    _print_with_color(line)
 
 
 def _format_name(name: str) -> str:
-    name = str(name)
     if len(name) < MIN_NAME_LEN:
         return f"{name:<{MIN_NAME_LEN}}"
     if len(name) > MAX_NAME_LEN:
@@ -74,7 +82,7 @@ def _format_name(name: str) -> str:
 def _print_row(name: str, text: str, current_len: int) -> None:
     name_fmt = _format_name(name)
     data_fmt = f"{str(text):<{current_len}}"
-    cprint(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
+    _print_with_color(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
 
 
 def _make_bar(used: float, total: float, width: int) -> str:
@@ -86,7 +94,7 @@ def _make_bar(used: float, total: float, width: int) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
-def _format_short_number(n: float) -> str | None:
+def _format_short_number(n: float) -> Optional[str]:
     n = float(n)
     for unit in ("", "K", "M", "B", "T"):
         if abs(n) < 1000.0:
@@ -98,14 +106,43 @@ def _bytes_to_gb(nbytes: int) -> float:
     return nbytes / (1024**3)
 
 
-def print_report(model_id: str, stats: Dict[str, Any]) -> None:
+def print_report_for_transformers(
+    model_id: str, revision: str, metadata: Dict[str, Any]
+) -> None:
+    ppdt = {}
+    for key, value in metadata.items():
+        if key in {"__metadata__"}:
+            continue
+        if value["dtype"] not in ppdt:
+            ppdt[value["dtype"]] = (0, 0)
+
+        match value["dtype"]:
+            case "F64" | "I64" | "U64":
+                dtype_b = 8
+            case "F32" | "I32" | "U32":
+                dtype_b = 4
+            case "F16" | "BF16" | "I16" | "U16":
+                dtype_b = 2
+            case "F8_E5M2" | "F8_E4M3" | "I8" | "U8":
+                dtype_b = 1
+            case _:
+                raise RuntimeError(f"DTYPE={value['dtype']} NOT HANDLED")
+
+        current_shape = math.prod(value["shape"])
+        current_shape_bytes = current_shape * dtype_b
+
+        ppdt[value["dtype"]] = (
+            ppdt[value["dtype"]][0] + current_shape,
+            ppdt[value["dtype"]][1] + current_shape_bytes,
+        )
+
     rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
-        f"`{model_id}`",
+        f"https://hf.co/{model_id} @ {revision}",
         "TOTAL MEMORY",
-        "MEMORY REQUIREMENTS",
+        "REQUIREMENTS",
     ]
-    for dt, (params, nbytes) in stats.items():
+    for dt, (params, nbytes) in ppdt.items():
         rows.append(f"{dt} {params} {nbytes}")
 
     max_len = 0
@@ -114,27 +151,26 @@ def print_report(model_id: str, stats: Dict[str, Any]) -> None:
 
     current_len = min(max_len, MAX_DATA_LEN)
 
-    total_bytes = sum(nbytes for _, nbytes in stats.values())
-    total_params = sum(params for params, _ in stats.values())
+    total_bytes = sum(nbytes for _, nbytes in ppdt.values())
+    total_params = sum(params for params, _ in ppdt.values())
     total_gb = _bytes_to_gb(total_bytes)
 
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
-    _print_centered(f"`{model_id}`", current_len)
-    _print_centered("w/ `hf-mem` by @alvarobartt", current_len)
+    _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
     _print_divider(current_len + 1, "top")
 
     total_text = f"{_bytes_to_gb(total_bytes):.2f} GB ({_format_short_number(total_params)} params)"
-    _print_row("MEMORY", total_text, current_len)
+    _print_row("TOTAL MEMORY", total_text, current_len)
 
     total_bar = _make_bar(total_bytes, total_bytes, current_len)
     _print_row("REQUIREMENTS", total_bar, current_len)
     _print_divider(current_len + 1)
 
     max_length = max([
-        len(f"{_format_short_number(params)} PARAMS") for params, _ in stats.values()
+        len(f"{_format_short_number(params)} PARAMS") for params, _ in ppdt.values()
     ])
-    for i, (dtype, (params, nbytes)) in enumerate(stats.items()):
+    for i, (dtype, (params, nbytes)) in enumerate(ppdt.items()):
         dtype_name = dtype.upper()
         dtype_gb = _bytes_to_gb(nbytes)
 
@@ -148,7 +184,107 @@ def print_report(model_id: str, stats: Dict[str, Any]) -> None:
         bar = _make_bar(dtype_gb, total_gb, current_len)
         _print_row(f"{_format_short_number(params)} PARAMS", bar, current_len)
 
-        if i < len(stats) - 1:
+        if i < len(ppdt) - 1:
             _print_divider(current_len + 1)
+
+    _print_divider(current_len + 1, "bottom")
+
+
+def print_report_for_diffusers(
+    model_id: str, revision: str, metadata: Dict[str, Dict[str, Any]]
+) -> None:
+    components_ppdt: Dict[str, Dict[str, tuple[int, int]]] = {}
+    total_bytes = 0
+    total_params = 0
+
+    for path, path_metadata in metadata.items():
+        ppdt: Dict[str, tuple[int, int]] = {}
+        for key, value in path_metadata.items():
+            if key in {"__metadata__"}:
+                continue
+
+            dtype = value["dtype"]
+            match dtype:
+                case "F64" | "I64" | "U64":
+                    dtype_b = 8
+                case "F32" | "I32" | "U32":
+                    dtype_b = 4
+                case "F16" | "BF16" | "I16" | "U16":
+                    dtype_b = 2
+                case "F8_E5M2" | "F8_E4M3" | "I8" | "U8":
+                    dtype_b = 1
+                case _:
+                    raise RuntimeError(f"DTYPE={dtype} NOT HANDLED")
+
+            current_shape = math.prod(value["shape"])
+            current_shape_bytes = current_shape * dtype_b
+
+            if dtype not in ppdt:
+                ppdt[dtype] = (0, 0)
+            ppdt[dtype] = (
+                ppdt[dtype][0] + current_shape,
+                ppdt[dtype][1] + current_shape_bytes,
+            )
+
+        components_ppdt[path] = ppdt
+        for params, nbytes in ppdt.values():
+            total_params += params
+            total_bytes += nbytes
+
+    rows = [
+        "INFERENCE MEMORY ESTIMATE FOR",
+        f"https://hf.co/{model_id} @ {revision}",
+        "TOTAL MEMORY",
+        "REQUIREMENTS",
+    ]
+    for path, ppdt in components_ppdt.items():
+        rows.append(path)
+        for dt, (params, nbytes) in ppdt.items():
+            rows.append(f"{dt} {params} {nbytes}")
+
+    max_len = 0
+    for r in rows:
+        max_len = max(max_len, len(str(r)))
+    current_len = min(max_len, MAX_DATA_LEN)
+
+    _print_header(current_len)
+    _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
+    _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
+    _print_divider(current_len + 1, "top")
+
+    total_text = f"{_bytes_to_gb(total_bytes):.2f} GB ({_format_short_number(total_params)} params)"
+    _print_row("TOTAL MEMORY", total_text, current_len)
+
+    total_bar = _make_bar(total_bytes, total_bytes, current_len)
+    _print_row("REQUIREMENTS", total_bar, current_len)
+
+    for path, ppdt in components_ppdt.items():
+        _print_divider(current_len + 1, "top-continue")
+
+        path_bytes = sum(nbytes for _, nbytes in ppdt.values())
+        path_gb = _bytes_to_gb(path_bytes)
+
+        _print_centered(f"{path.upper()} ({path_gb:.2f} GB)", current_len)
+        _print_divider(current_len + 1, "top")
+
+        max_length = max([
+            len(f"{_format_short_number(params)} PARAMS") for params, _ in ppdt.values()
+        ])
+        for i, (dtype, (params, nbytes)) in enumerate(ppdt.items()):
+            dtype_name = dtype.upper()
+            dtype_gb = _bytes_to_gb(nbytes)
+
+            gb_text = f"{dtype_gb:.1f} / {_bytes_to_gb(total_bytes):.1f} GB"
+            _print_row(
+                dtype_name + " " * (max_length - len(dtype_name)),
+                gb_text,
+                current_len,
+            )
+
+            bar = _make_bar(dtype_gb, _bytes_to_gb(total_bytes), current_len)
+            _print_row(f"{_format_short_number(params)} PARAMS", bar, current_len)
+
+            if i < len(ppdt) - 1:
+                _print_divider(current_len + 1, "bottom-continue")
 
     _print_divider(current_len + 1, "bottom")

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from hf_mem.print import print_report
+from hf_mem.print import print_report_for_diffusers, print_report_for_transformers
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -87,6 +87,7 @@ async def run(model_id: str, revision: str) -> None:
         metadata = await fetch_safetensors_metadata(
             client=client, url=url, headers=headers
         )
+        print_report_for_transformers(model_id, revision, metadata)
     elif "model.safetensors.index.json" in file_paths:
         # TODO: We could eventually skip this request in favour of a greedy approach on trying to pull all the
         # files following the formatting `model-00000-of-00000.safetensors`
@@ -112,39 +113,67 @@ async def run(model_id: str, revision: str) -> None:
         )
 
         metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
+        print_report_for_transformers(model_id, revision, metadata)
+    elif "model_index.json" in file_paths:
+        url = f"https://huggingface.co/{model_id}/resolve/{revision}/model_index.json"
+        files_index = await get_json_file(client=client, url=url, headers=headers)
+        paths = {k for k, _ in files_index.items() if not k.startswith("_")}
+
+        path_urls: Dict[str, List[str]] = {}
+        for path in paths:
+            if f"{path}/diffusion_pytorch_model.safetensors" in file_paths:
+                path_urls[path] = [
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors"
+                ]
+            elif f"{path}/model.safetensors" in file_paths:
+                path_urls[path] = [
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors"
+                ]
+            elif f"{path}/diffusion_pytorch_model.safetensors.index.json" in file_paths:
+                url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors.index.json"
+                files_index = await get_json_file(
+                    client=client, url=url, headers=headers
+                )
+                path_urls[path] = list({
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
+                    for _, f in files_index["weight_map"].items()  # type: ignore
+                })
+            elif f"{path}/model.safetensors.index.json" in file_paths:
+                url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
+                files_index = await get_json_file(
+                    client=client, url=url, headers=headers
+                )
+                path_urls[path] = list({
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
+                    for _, f in files_index["weight_map"].items()  # type: ignore
+                })
+
+        semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+
+        async def fetch_semaphore(url: str) -> Dict[str, Any]:
+            async with semaphore:
+                return await fetch_safetensors_metadata(
+                    client=client, url=url, headers=headers
+                )
+
+        metadata = {}
+        for path, urls in path_urls.items():
+            tasks = [asyncio.create_task(fetch_semaphore(url)) for url in urls]
+            metadata_list: List[Dict[str, Any]] = await asyncio.gather(
+                *tasks, return_exceptions=False
+            )
+            metadata[path] = reduce(
+                lambda acc, metadata: acc | metadata, metadata_list, {}
+            )
+
+        print_report_for_diffusers(
+            model_id=model_id, revision=revision, metadata=metadata
+        )
     else:
         raise RuntimeError(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` HAS BEEN FOUND"
         )
 
-    ppdt = {}
-    for key, value in metadata.items():
-        if key in {"__metadata__"}:
-            continue
-        if value["dtype"] not in ppdt:
-            ppdt[value["dtype"]] = (0, 0)
-
-        match value["dtype"]:
-            case "F64" | "I64" | "U64":
-                dtype_b = 8
-            case "F32" | "I32" | "U32":
-                dtype_b = 4
-            case "F16" | "BF16" | "I16" | "U16":
-                dtype_b = 2
-            case "F8_E5M2" | "F8_E4M3" | "I8" | "U8":
-                dtype_b = 1
-            case _:
-                raise RuntimeError(f"DTYPE={value['dtype']} NOT HANDLED")
-
-        current_shape = math.prod(value["shape"])
-        current_shape_bytes = current_shape * dtype_b
-
-        ppdt[value["dtype"]] = (
-            ppdt[value["dtype"]][0] + current_shape,
-            ppdt[value["dtype"]][1] + current_shape_bytes,
-        )
-
-    print_report(model_id, ppdt)
     sys.exit(0)
 
 
