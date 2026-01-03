@@ -1,10 +1,8 @@
 import argparse
 import asyncio
 import json
-import math
 import os
 import struct
-import sys
 from functools import reduce
 from typing import Any, Dict, List, Optional
 
@@ -173,8 +171,6 @@ async def run(model_id: str, revision: str) -> None:
         raise RuntimeError(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` HAS BEEN FOUND"
         )
-
-    sys.exit(0)
 
 
 def main() -> None:
