@@ -53,7 +53,7 @@ async def fetch_safetensors_metadata(
     return json.loads(metadata)
 
 
-async def run(model_id: str, revision: str) -> None:
+async def run(model_id: str, revision: str, ignore_table_width: bool = False) -> None:
     headers = {}
     if token := os.getenv("HF_TOKEN", None):
         headers["Authorization"] = f"Bearer {token}"
@@ -85,7 +85,12 @@ async def run(model_id: str, revision: str) -> None:
         metadata = await fetch_safetensors_metadata(
             client=client, url=url, headers=headers
         )
-        print_report_for_transformers(model_id, revision, metadata)
+        print_report_for_transformers(
+            model_id=model_id,
+            revision=revision,
+            metadata=metadata,
+            ignore_table_width=ignore_table_width,
+        )
     elif "model.safetensors.index.json" in file_paths:
         # TODO: We could eventually skip this request in favour of a greedy approach on trying to pull all the
         # files following the formatting `model-00000-of-00000.safetensors`
@@ -111,7 +116,12 @@ async def run(model_id: str, revision: str) -> None:
         )
 
         metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
-        print_report_for_transformers(model_id, revision, metadata)
+        print_report_for_transformers(
+            model_id=model_id,
+            revision=revision,
+            metadata=metadata,
+            ignore_table_width=ignore_table_width,
+        )
     elif "model_index.json" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model_index.json"
         files_index = await get_json_file(client=client, url=url, headers=headers)
@@ -165,7 +175,10 @@ async def run(model_id: str, revision: str) -> None:
             )
 
         print_report_for_diffusers(
-            model_id=model_id, revision=revision, metadata=metadata
+            model_id=model_id,
+            revision=revision,
+            metadata=metadata,
+            ignore_table_width=ignore_table_width,
         )
     else:
         raise RuntimeError(
@@ -183,9 +196,18 @@ def main() -> None:
         default="main",
         help="Model revision on the Hugging Face Hub",
     )
+    parser.add_argument(
+        "--ignore-table-width",
+        action="store_true",
+        help="Whether to ignore the maximum recommended table width, in case the `--model-id` and/or `--revision` cause a row overflow when printing those.",
+    )
 
     args = parser.parse_args()
-    model_id = args.model_id
-    revision = args.revision
 
-    asyncio.run(run(model_id, revision))
+    asyncio.run(
+        run(
+            model_id=args.model_id,
+            revision=args.revision,
+            ignore_table_width=args.ignore_table_width,
+        )
+    )

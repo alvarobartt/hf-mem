@@ -1,4 +1,5 @@
 import math
+import warnings
 from typing import Any, Dict, Literal, Optional
 
 MIN_NAME_LEN = 5
@@ -107,7 +108,10 @@ def _bytes_to_gb(nbytes: int) -> float:
 
 
 def print_report_for_transformers(
-    model_id: str, revision: str, metadata: Dict[str, Any]
+    model_id: str,
+    revision: str,
+    metadata: Dict[str, Any],
+    ignore_table_width: bool = False,
 ) -> None:
     ppdt = {}
     for key, value in metadata.items():
@@ -149,7 +153,12 @@ def print_report_for_transformers(
     for r in rows:
         max_len = max(max_len, len(str(r)))
 
-    current_len = min(max_len, MAX_DATA_LEN)
+    if max_len > MAX_DATA_LEN and ignore_table_width is False:
+        warnings.warn(
+            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
+        )
+
+    current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
 
     total_bytes = sum(nbytes for _, nbytes in ppdt.values())
     total_params = sum(params for params, _ in ppdt.values())
@@ -191,7 +200,10 @@ def print_report_for_transformers(
 
 
 def print_report_for_diffusers(
-    model_id: str, revision: str, metadata: Dict[str, Dict[str, Any]]
+    model_id: str,
+    revision: str,
+    metadata: Dict[str, Dict[str, Any]],
+    ignore_table_width: bool = False,
 ) -> None:
     components_ppdt: Dict[str, Dict[str, tuple[int, int]]] = {}
     total_bytes = 0
@@ -245,7 +257,13 @@ def print_report_for_diffusers(
     max_len = 0
     for r in rows:
         max_len = max(max_len, len(str(r)))
-    current_len = min(max_len, MAX_DATA_LEN)
+
+    if max_len > MAX_DATA_LEN and ignore_table_width is False:
+        warnings.warn(
+            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
+        )
+
+    current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
 
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
