@@ -4,7 +4,7 @@ from typing import Any, Dict, Literal, Optional
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 13
 MIN_DATA_LEN = 20
-MAX_DATA_LEN = 32
+MAX_DATA_LEN = 64
 BORDERS_AND_PADDING = 7
 
 BOX = {
