@@ -1,4 +1,6 @@
-<img width="1280" height="640" alt="hf-mem" src="https://github.com/user-attachments/assets/0775a4c1-0750-401e-bfc8-dfb988691e51" />
+<img width="4788" height="1200" alt="hf-mem-github-x4" src="https://github.com/user-attachments/assets/509a8244-8a91-4051-b337-41b7b2fe0e2f" />
+
+---
 
 `hf-mem` is an experimental CLI to estimate inference memory requirements for Hugging Face models, written in Python. `hf-mem` is lightweight, only depends on `httpx`. It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
 
