@@ -2,6 +2,8 @@ import math
 import warnings
 from typing import Any, Dict, Literal, Optional
 
+from hf_mem.metadata import SafetensorsMetadata
+
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 14
 MIN_DATA_LEN = 20
@@ -107,153 +109,28 @@ def _bytes_to_gb(nbytes: int) -> float:
     return nbytes / (1024**3)
 
 
-def print_report_for_transformers(
+def print_report(
     model_id: str,
     revision: str,
-    metadata: Dict[str, Any],
+    metadata: SafetensorsMetadata,
     ignore_table_width: bool = False,
 ) -> None:
-    ppdt = {}
-    for key, value in metadata.items():
-        if key in {"__metadata__"}:
-            continue
-        if value["dtype"] not in ppdt:
-            ppdt[value["dtype"]] = (0, 0)
-
-        match value["dtype"]:
-            case "F64" | "I64" | "U64":
-                dtype_b = 8
-            case "F32" | "I32" | "U32":
-                dtype_b = 4
-            case "F16" | "BF16" | "I16" | "U16":
-                dtype_b = 2
-            case "F8_E5M2" | "F8_E4M3" | "I8" | "U8":
-                dtype_b = 1
-            case _:
-                raise RuntimeError(f"DTYPE={value['dtype']} NOT HANDLED")
-
-        current_shape = math.prod(value["shape"])
-        current_shape_bytes = current_shape * dtype_b
-
-        ppdt[value["dtype"]] = (
-            ppdt[value["dtype"]][0] + current_shape,
-            ppdt[value["dtype"]][1] + current_shape_bytes,
-        )
-
     rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
         "TOTAL MEMORY",
         "REQUIREMENTS",
     ]
-    for dt, (params, nbytes) in ppdt.items():
-        rows.append(f"{dt} {params} {nbytes}")
 
-    max_len = 0
-    for r in rows:
-        max_len = max(max_len, len(str(r)))
+    for name, nested_metadata in metadata.components.items():
+        if len(metadata.components) > 1:
+            rows.append(name)
 
-    if max_len > MAX_DATA_LEN and ignore_table_width is False:
-        warnings.warn(
-            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
-        )
-
-    current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
-
-    total_bytes = sum(nbytes for _, nbytes in ppdt.values())
-    total_params = sum(params for params, _ in ppdt.values())
-    total_gb = _bytes_to_gb(total_bytes)
-
-    _print_header(current_len)
-    _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
-    _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
-    _print_divider(current_len + 1, "top")
-
-    total_text = f"{_bytes_to_gb(total_bytes):.2f} GB ({_format_short_number(total_params)} params)"
-    _print_row("TOTAL MEMORY", total_text, current_len)
-
-    total_bar = _make_bar(total_bytes, total_bytes, current_len)
-    _print_row("REQUIREMENTS", total_bar, current_len)
-    _print_divider(current_len + 1)
-
-    max_length = max([
-        len(f"{_format_short_number(params)} PARAMS") for params, _ in ppdt.values()
-    ])
-    for i, (dtype, (params, nbytes)) in enumerate(ppdt.items()):
-        dtype_name = dtype.upper()
-        dtype_gb = _bytes_to_gb(nbytes)
-
-        gb_text = f"{dtype_gb:.2f} / {total_gb:.2f} GB"
-        _print_row(
-            dtype_name + " " * (max_length - len(dtype_name)),
-            gb_text,
-            current_len,
-        )
-
-        bar = _make_bar(dtype_gb, total_gb, current_len)
-        _print_row(f"{_format_short_number(params)} PARAMS", bar, current_len)
-
-        if i < len(ppdt) - 1:
-            _print_divider(current_len + 1)
-
-    _print_divider(current_len + 1, "bottom")
-
-
-def print_report_for_diffusers(
-    model_id: str,
-    revision: str,
-    metadata: Dict[str, Dict[str, Any]],
-    ignore_table_width: bool = False,
-) -> None:
-    components_ppdt: Dict[str, Dict[str, tuple[int, int]]] = {}
-    total_bytes = 0
-    total_params = 0
-
-    for path, path_metadata in metadata.items():
-        ppdt: Dict[str, tuple[int, int]] = {}
-        for key, value in path_metadata.items():
-            if key in {"__metadata__"}:
-                continue
-
-            dtype = value["dtype"]
-            match dtype:
-                case "F64" | "I64" | "U64":
-                    dtype_b = 8
-                case "F32" | "I32" | "U32":
-                    dtype_b = 4
-                case "F16" | "BF16" | "I16" | "U16":
-                    dtype_b = 2
-                case "F8_E5M2" | "F8_E4M3" | "I8" | "U8":
-                    dtype_b = 1
-                case _:
-                    raise RuntimeError(f"DTYPE={dtype} NOT HANDLED")
-
-            current_shape = math.prod(value["shape"])
-            current_shape_bytes = current_shape * dtype_b
-
-            if dtype not in ppdt:
-                ppdt[dtype] = (0, 0)
-            ppdt[dtype] = (
-                ppdt[dtype][0] + current_shape,
-                ppdt[dtype][1] + current_shape_bytes,
+        for dtype, dtype_metadata in nested_metadata["dtypes"].items():
+            rows.append(
+                f"{dtype} {dtype_metadata['param_count']} {dtype_metadata['bytes_count']}"
             )
 
-        components_ppdt[path] = ppdt
-        for params, nbytes in ppdt.values():
-            total_params += params
-            total_bytes += nbytes
-
-    rows = [
-        "INFERENCE MEMORY ESTIMATE FOR",
-        f"https://hf.co/{model_id} @ {revision}",
-        "TOTAL MEMORY",
-        "REQUIREMENTS",
-    ]
-    for path, ppdt in components_ppdt.items():
-        rows.append(path)
-        for dt, (params, nbytes) in ppdt.items():
-            rows.append(f"{dt} {params} {nbytes}")
-
     max_len = 0
     for r in rows:
         max_len = max(max_len, len(str(r)))
@@ -270,39 +147,45 @@ def print_report_for_diffusers(
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
     _print_divider(current_len + 1, "top")
 
-    total_text = f"{_bytes_to_gb(total_bytes):.2f} GB ({_format_short_number(total_params)} params)"
+    total_text = f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} params)"
     _print_row("TOTAL MEMORY", total_text, current_len)
 
-    total_bar = _make_bar(total_bytes, total_bytes, current_len)
+    total_bar = _make_bar(metadata.bytes_count, metadata.bytes_count, current_len)
     _print_row("REQUIREMENTS", total_bar, current_len)
 
-    for path, ppdt in components_ppdt.items():
-        _print_divider(current_len + 1, "top-continue")
+    for key, value in metadata.components.items():
+        if len(metadata.components) > 1:
+            _print_divider(current_len + 1, "top-continue")
+            _print_centered(
+                f"{key.upper()} ({_bytes_to_gb(value['bytes_count']):.2f} GB)",
+                current_len,
+            )
 
-        path_bytes = sum(nbytes for _, nbytes in ppdt.values())
-        path_gb = _bytes_to_gb(path_bytes)
-
-        _print_centered(f"{path.upper()} ({path_gb:.2f} GB)", current_len)
-        _print_divider(current_len + 1, "top")
+            _print_divider(current_len + 1, "top")
+        else:
+            _print_divider(current_len + 1)
 
         max_length = max([
-            len(f"{_format_short_number(params)} PARAMS") for params, _ in ppdt.values()
+            len(f"{_format_short_number(dtype_metadata['param_count'])} PARAMS")
+            for _, dtype_metadata in value["dtypes"].items()
         ])
-        for i, (dtype, (params, nbytes)) in enumerate(ppdt.items()):
-            dtype_name = dtype.upper()
-            dtype_gb = _bytes_to_gb(nbytes)
-
-            gb_text = f"{dtype_gb:.2f} / {_bytes_to_gb(total_bytes):.2f} GB"
+        for dtype, dtype_metadata in value["dtypes"].items():
+            gb_text = f"{_bytes_to_gb(dtype_metadata['bytes_count']):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
             _print_row(
-                dtype_name + " " * (max_length - len(dtype_name)),
+                dtype.upper() + " " * (max_length - len(dtype)),
                 gb_text,
                 current_len,
             )
 
-            bar = _make_bar(dtype_gb, _bytes_to_gb(total_bytes), current_len)
-            _print_row(f"{_format_short_number(params)} PARAMS", bar, current_len)
-
-            if i < len(ppdt) - 1:
-                _print_divider(current_len + 1, "bottom-continue")
+            bar = _make_bar(
+                _bytes_to_gb(dtype_metadata["bytes_count"]),
+                _bytes_to_gb(metadata.bytes_count),
+                current_len,
+            )
+            _print_row(
+                f"{_format_short_number(dtype_metadata['param_count'])} PARAMS",
+                bar,
+                current_len,
+            )
 
     _print_divider(current_len + 1, "bottom")

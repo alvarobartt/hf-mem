@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from hf_mem.print import print_report_for_diffusers, print_report_for_transformers
+from hf_mem.metadata import parse_safetensors_metadata
+from hf_mem.print import print_report
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -97,15 +98,16 @@ async def run(
 
     if "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
-        metadata = await fetch_safetensors_metadata(
+        raw_metadata = await fetch_safetensors_metadata(
             client=client, url=url, headers=headers
         )
-        print_report_for_transformers(
-            model_id=model_id,
-            revision=revision,
-            metadata=metadata,
-            ignore_table_width=ignore_table_width,
-        )
+
+        # NOTE: Small "hack" so that the default component for Sentence Transformers models is not "transformer"
+        # but rather "0_Transformer" following the current Sentence Transformers convention as defined in modules.json
+        if "config_sentence_transformers.json" in file_paths:
+            raw_metadata = {"0_Transformer": raw_metadata}
+
+        metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     elif "model.safetensors.index.json" in file_paths:
         # TODO: We could eventually skip this request in favour of a greedy approach on trying to pull all the
         # files following the formatting `model-00000-of-00000.safetensors`
@@ -130,13 +132,14 @@ async def run(
             *tasks, return_exceptions=False
         )
 
-        metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
-        print_report_for_transformers(
-            model_id=model_id,
-            revision=revision,
-            metadata=metadata,
-            ignore_table_width=ignore_table_width,
-        )
+        raw_metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
+
+        # NOTE: Small "hack" so that the default component for Sentence Transformers models is not "transformer"
+        # but rather "0_Transformer" following the current Sentence Transformers convention as defined in modules.json
+        if "config_sentence_transformers.json" in file_paths:
+            raw_metadata = {"0_Transformer": raw_metadata}
+
+        metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     elif "model_index.json" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model_index.json"
         files_index = await get_json_file(client=client, url=url, headers=headers)
@@ -179,26 +182,31 @@ async def run(
                     client=client, url=url, headers=headers
                 )
 
-        metadata = {}
+        raw_metadata = {}
         for path, urls in path_urls.items():
             tasks = [asyncio.create_task(fetch_semaphore(url)) for url in urls]
             metadata_list: List[Dict[str, Any]] = await asyncio.gather(
                 *tasks, return_exceptions=False
             )
-            metadata[path] = reduce(
+            raw_metadata[path] = reduce(
                 lambda acc, metadata: acc | metadata, metadata_list, {}
             )
 
-        print_report_for_diffusers(
-            model_id=model_id,
-            revision=revision,
-            metadata=metadata,
-            ignore_table_width=ignore_table_width,
-        )
+        metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     else:
         raise RuntimeError(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` HAS BEEN FOUND"
         )
+
+    if json_output:
+        return {"model_id": model_id, "revision": revision}.update(metadata.to_dict())
+
+    print_report(
+        model_id=model_id,
+        revision=revision,
+        metadata=metadata,
+        ignore_table_width=ignore_table_width,
+    )
 
 
 def main() -> None:
