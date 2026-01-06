@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import struct
+from dataclasses import asdict
 from functools import reduce
 from typing import Any, Dict, List, Optional
 
@@ -200,7 +201,7 @@ async def run(
 
     if json_output:
         out = {"model_id": model_id, "revision": revision}
-        out.update(metadata.to_dict())
+        out.update(asdict(metadata))
         print(json.dumps(out))
     else:
         print_report(
