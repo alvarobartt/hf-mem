@@ -127,9 +127,7 @@ def print_report(
             rows.append(name)
 
         for dtype, dtype_metadata in nested_metadata.dtypes.items():
-            rows.append(
-                f"{dtype} {dtype_metadata.param_count} {dtype_metadata.bytes_count}"
-            )
+            rows.append(f"{dtype} {dtype_metadata.param_count} {dtype_metadata.bytes_count}")
 
     max_len = max(len(str(r)) for r in rows)
 
@@ -145,7 +143,9 @@ def print_report(
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
     _print_divider(current_len + 1, "top")
 
-    total_text = f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} params)"
+    total_text = (
+        f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} params)"
+    )
     _print_row("TOTAL MEMORY", total_text, current_len)
 
     total_bar = _make_bar(metadata.bytes_count, metadata.bytes_count, current_len)
@@ -163,12 +163,16 @@ def print_report(
         else:
             _print_divider(current_len + 1)
 
-        max_length = max([
-            len(f"{_format_short_number(dtype_metadata.param_count)} PARAMS")
-            for _, dtype_metadata in value.dtypes.items()
-        ])
+        max_length = max(
+            [
+                len(f"{_format_short_number(dtype_metadata.param_count)} PARAMS")
+                for _, dtype_metadata in value.dtypes.items()
+            ]
+        )
         for dtype, dtype_metadata in value.dtypes.items():
-            gb_text = f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
+            gb_text = (
+                f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
+            )
             _print_row(
                 dtype.upper() + " " * (max_length - len(dtype)),
                 gb_text,
