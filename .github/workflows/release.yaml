@@ -1,0 +1,45 @@
+name: Release Python package
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    if: github.ref_type == 'tag'
+
+    environment: pypi
+
+    permissions:
+      # IMPORTANT: this permission is mandatory for Trusted Publishing
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Set up Python with uv
+        run: uv venv --python 3.11
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          uv sync
+
+      - name: Build package
+        run: |
+          source .venv/bin/activate
+          uv build
+
+      - name: Publish to PyPI
+        run: |
+          source .venv/bin/activate
+          uv publish
