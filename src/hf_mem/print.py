@@ -125,9 +125,9 @@ def print_report(
         if len(metadata.components) > 1:
             rows.append(name)
 
-        for dtype, dtype_metadata in nested_metadata["dtypes"].items():
+        for dtype, dtype_metadata in nested_metadata.dtypes.items():
             rows.append(
-                f"{dtype} {dtype_metadata['param_count']} {dtype_metadata['bytes_count']}"
+                f"{dtype} {dtype_metadata.param_count} {dtype_metadata.bytes_count}"
             )
 
     max_len = 0
@@ -156,7 +156,7 @@ def print_report(
         if len(metadata.components) > 1:
             _print_divider(current_len + 1, "top-continue")
             _print_centered(
-                f"{key.upper()} ({_bytes_to_gb(value['bytes_count']):.2f} GB)",
+                f"{key.upper()} ({_bytes_to_gb(value.bytes_count):.2f} GB)",
                 current_len,
             )
 
@@ -165,11 +165,11 @@ def print_report(
             _print_divider(current_len + 1)
 
         max_length = max([
-            len(f"{_format_short_number(dtype_metadata['param_count'])} PARAMS")
-            for _, dtype_metadata in value["dtypes"].items()
+            len(f"{_format_short_number(dtype_metadata.param_count)} PARAMS")
+            for _, dtype_metadata in value.dtypes.items()
         ])
-        for dtype, dtype_metadata in value["dtypes"].items():
-            gb_text = f"{_bytes_to_gb(dtype_metadata['bytes_count']):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
+        for dtype, dtype_metadata in value.dtypes.items():
+            gb_text = f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
             _print_row(
                 dtype.upper() + " " * (max_length - len(dtype)),
                 gb_text,
@@ -177,12 +177,12 @@ def print_report(
             )
 
             bar = _make_bar(
-                _bytes_to_gb(dtype_metadata["bytes_count"]),
+                _bytes_to_gb(dtype_metadata.bytes_count),
                 _bytes_to_gb(metadata.bytes_count),
                 current_len,
             )
             _print_row(
-                f"{_format_short_number(dtype_metadata['param_count'])} PARAMS",
+                f"{_format_short_number(dtype_metadata.param_count)} PARAMS",
                 bar,
                 current_len,
             )
