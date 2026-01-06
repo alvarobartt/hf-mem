@@ -1,4 +1,4 @@
-<img width="4788" height="1200" alt="hf-mem-github-x4" src="https://github.com/user-attachments/assets/509a8244-8a91-4051-b337-41b7b2fe0e2f" />
+<img src="https://github.com/user-attachments/assets/509a8244-8a91-4051-b337-41b7b2fe0e2f" />
 
 ---
 
