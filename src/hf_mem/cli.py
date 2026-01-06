@@ -53,7 +53,12 @@ async def fetch_safetensors_metadata(
     return json.loads(metadata)
 
 
-async def run(model_id: str, revision: str, ignore_table_width: bool = False) -> None:
+async def run(
+    model_id: str,
+    revision: str,
+    json_output: bool = False,
+    ignore_table_width: bool = False,
+) -> Dict[str, Any] | None:
     headers = {}
     # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
     if token := os.getenv("HF_TOKEN", None):
@@ -83,9 +88,7 @@ async def run(model_id: str, revision: str, ignore_table_width: bool = False) ->
     # TODO: `recursive=true` shouldn't really be required unless it's a Diffusers
     # models... I don't think this adds extra latency anyway
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
-
     files = await get_json_file(client=client, url=url, headers=headers)
-
     file_paths = [
         f["path"]
         for f in files
@@ -209,6 +212,11 @@ def main() -> None:
         help="Model revision on the Hugging Face Hub",
     )
     parser.add_argument(
+        "--json-output",
+        action="store_true",
+        help="Whether to provide the output as a JSON instead of printed as table.",
+    )
+    parser.add_argument(
         "--ignore-table-width",
         action="store_true",
         help="Whether to ignore the maximum recommended table width, in case the `--model-id` and/or `--revision` cause a row overflow when printing those.",
@@ -220,6 +228,8 @@ def main() -> None:
         run(
             model_id=args.model_id,
             revision=args.revision,
+            # NOTE: Below are the arguments that affect the output format
+            json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
         )
     )
