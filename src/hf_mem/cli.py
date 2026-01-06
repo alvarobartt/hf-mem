@@ -199,14 +199,16 @@ async def run(
         )
 
     if json_output:
-        return {"model_id": model_id, "revision": revision}.update(metadata.to_dict())
-
-    print_report(
-        model_id=model_id,
-        revision=revision,
-        metadata=metadata,
-        ignore_table_width=ignore_table_width,
-    )
+        out = {"model_id": model_id, "revision": revision}
+        out.update(metadata.to_dict())
+        print(json.dumps(out))
+    else:
+        print_report(
+            model_id=model_id,
+            revision=revision,
+            metadata=metadata,
+            ignore_table_width=ignore_table_width,
+        )
 
 
 def main() -> None:
