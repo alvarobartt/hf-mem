@@ -1,6 +1,6 @@
 [project]
 name = "hf-mem"
-version = "0.2.0"
+version = "0.2.1"
 description = "A CLI to estimate inference memory requirements for Hugging Face models, written in Python"
 readme = "README.md"
 authors = [
@@ -16,6 +16,21 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.9.5,<0.10.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+lint = [
+    "pre-commit>=4.5.1",
+    "ruff>=0.14.10",
+]
+
+[tool.ruff]
+line-length = 112
+
+[tool.ruff.lint]
+select = ["I"]
+
+[tool.ruff.lint.isort]
+force-single-line = false
 
 [project.scripts]
 hf-mem = "hf_mem.cli:main"

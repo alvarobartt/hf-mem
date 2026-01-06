@@ -20,9 +20,7 @@ MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4
 
 
 # NOTE: Return type-hint set to `Any`, but it will only be a JSON-compatible object
-async def get_json_file(
-    client: httpx.AsyncClient, url: str, headers: Optional[Dict[str, str]] = None
-) -> Any:
+async def get_json_file(client: httpx.AsyncClient, url: str, headers: Optional[Dict[str, str]] = None) -> Any:
     response = await client.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
     response.raise_for_status()
     return response.json()
@@ -95,9 +93,7 @@ async def run(
 
     if "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
-        raw_metadata = await fetch_safetensors_metadata(
-            client=client, url=url, headers=headers
-        )
+        raw_metadata = await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
         # NOTE: Given that at the moment for Sentence Transformers only the Transformers module is considered, we
         # set the default component name to `0_Transformer` as defined in modules.json
@@ -125,14 +121,10 @@ async def run(
 
         async def fetch_with_semaphore(url: str) -> Dict[str, Any]:
             async with semaphore:
-                return await fetch_safetensors_metadata(
-                    client=client, url=url, headers=headers
-                )
+                return await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
         tasks = [asyncio.create_task(fetch_with_semaphore(url)) for url in urls]
-        metadata_list: List[Dict[str, Any]] = await asyncio.gather(
-            *tasks, return_exceptions=False
-        )
+        metadata_list: List[Dict[str, Any]] = await asyncio.gather(*tasks, return_exceptions=False)
 
         raw_metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
 
@@ -164,18 +156,16 @@ async def run(
                 ]
             elif f"{path}/diffusion_pytorch_model.safetensors.index.json" in file_paths:
                 url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors.index.json"
-                files_index = await get_json_file(
-                    client=client, url=url, headers=headers
-                )
+                files_index = await get_json_file(client=client, url=url, headers=headers)
                 path_urls[path] = [
                     f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
                     for f in set(files_index["weight_map"].values())
                 ]
             elif f"{path}/model.safetensors.index.json" in file_paths:
-                url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
-                files_index = await get_json_file(
-                    client=client, url=url, headers=headers
+                url = (
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
                 )
+                files_index = await get_json_file(client=client, url=url, headers=headers)
                 path_urls[path] = [
                     f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
                     for f in set(files_index["weight_map"].values())
@@ -185,19 +175,13 @@ async def run(
 
         async def fetch_with_semaphore(url: str) -> Dict[str, Any]:
             async with semaphore:
-                return await fetch_safetensors_metadata(
-                    client=client, url=url, headers=headers
-                )
+                return await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
         raw_metadata = {}
         for path, urls in path_urls.items():
             tasks = [asyncio.create_task(fetch_with_semaphore(url)) for url in urls]
-            metadata_list: List[Dict[str, Any]] = await asyncio.gather(
-                *tasks, return_exceptions=False
-            )
-            raw_metadata[path] = reduce(
-                lambda acc, metadata: acc | metadata, metadata_list, {}
-            )
+            metadata_list: List[Dict[str, Any]] = await asyncio.gather(*tasks, return_exceptions=False)
+            raw_metadata[path] = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     else:
@@ -219,9 +203,7 @@ async def run(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model-id", required=True, help="Model ID on the Hugging Face Hub"
-    )
+    parser.add_argument("--model-id", required=True, help="Model ID on the Hugging Face Hub")
     parser.add_argument(
         "--revision",
         default="main",

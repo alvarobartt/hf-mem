@@ -1,0 +1,36 @@
+name: pre-commit checks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  pre-commit:
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+
+      - name: Set up Python with uv
+        run: uv venv --python 3.11
+
+      - name: Install dependencies
+        run: |
+          source .venv/bin/activate
+          uv pip install --group lint
+
+      - name: Run pre-commit checks
+        run: |
+          source .venv/bin/activate
+          uv run pre-commit run --all-files
