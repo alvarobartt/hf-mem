@@ -28,9 +28,9 @@ jobs:
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          uv pip install pre-commit ruff
+          uv pip install --group lint
 
       - name: Run pre-commit checks
         run: |
           source .venv/bin/activate
-          pre-commit run --all-files
+          uv run pre-commit run --all-files
