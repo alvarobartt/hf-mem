@@ -1,6 +1,5 @@
-import math
 import warnings
-from typing import Any, Dict, Literal, Optional
+from typing import Literal, Optional
 
 from hf_mem.metadata import SafetensorsMetadata
 
