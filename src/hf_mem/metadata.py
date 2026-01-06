@@ -25,18 +25,15 @@ class SafetensorsMetadata:
     bytes_count: int
 
 
-def parse_safetensors_metadata(raw_metadata: Dict[str, Any]) -> SafetensorsMetadata:
-    # NOTE: This is a small "hack" to prevent from having dedicated parsing functions for Transformers, Sentence
-    # Transformers and Diffusers, and rather unify within the same function
-    if "__metadata__" in raw_metadata:
-        raw_metadata = {"transformer": raw_metadata}
-
+def parse_safetensors_metadata(
+    raw_metadata: Dict[str, Dict[str, Any]],
+) -> SafetensorsMetadata:
     components = {}
     total_param_count, total_bytes_count = 0, 0
 
-    for component_name, component_metadata in raw_metadata.items():
+    for name, metadata in raw_metadata.items():
         component = ComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
-        for key, value in component_metadata.items():
+        for key, value in metadata.items():
             if key in {"__metadata__"}:
                 continue
 
@@ -49,15 +46,13 @@ def parse_safetensors_metadata(raw_metadata: Dict[str, Any]) -> SafetensorsMetad
             current_shape_bytes = current_shape * dtype_bytes
 
             component.dtypes[dtype].param_count += current_shape
-            component.param_count += current_shape
-            total_param_count += current_shape
-
             component.dtypes[dtype].bytes_count += current_shape_bytes
-            component.bytes_count += current_shape
+            component.param_count += current_shape
+            component.bytes_count += current_shape_bytes
+            total_param_count += current_shape
             total_bytes_count += current_shape_bytes
 
-        if component:
-            components[component_name] = component
+        components[name] = component
 
     return SafetensorsMetadata(
         components=components,

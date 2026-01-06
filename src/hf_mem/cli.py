@@ -63,9 +63,9 @@ async def run(
 ) -> Dict[str, Any] | None:
     headers = {}
     # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
-    if token := os.getenv("HF_TOKEN", None):
+    if token := os.getenv("HF_TOKEN"):
         headers["Authorization"] = f"Bearer {token}"
-    if "Authorization" not in headers:
+    elif "Authorization" not in headers:
         path = os.getenv("HF_HOME", ".cache/huggingface")
         filename = (
             os.path.join(os.path.expanduser("~"), path, "token")
@@ -91,11 +91,7 @@ async def run(
     # models... I don't think this adds extra latency anyway
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
-    file_paths = [
-        f["path"]
-        for f in files
-        if f.get("path", None) is not None and f.get("type", None) == "file"
-    ]
+    file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
     if "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
@@ -103,10 +99,15 @@ async def run(
             client=client, url=url, headers=headers
         )
 
-        # NOTE: Small "hack" so that the default component for Sentence Transformers models is not "transformer"
-        # but rather "0_Transformer" following the current Sentence Transformers convention as defined in modules.json
+        # NOTE: Given that at the moment for Sentence Transformers only the Transformers module is considered, we
+        # set the default component name to `0_Transformer` as defined in modules.json
         if "config_sentence_transformers.json" in file_paths:
             raw_metadata = {"0_Transformer": raw_metadata}
+
+        # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
+        # make sure that we provide the expected input to the `parse_safetensors_metadata`
+        if "__metadata__" in raw_metadata:
+            raw_metadata = {"Transformer": raw_metadata}
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     elif "model.safetensors.index.json" in file_paths:
@@ -122,23 +123,28 @@ async def run(
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
 
-        async def fetch_semaphore(url: str) -> Dict[str, Any]:
+        async def fetch_with_semaphore(url: str) -> Dict[str, Any]:
             async with semaphore:
                 return await fetch_safetensors_metadata(
                     client=client, url=url, headers=headers
                 )
 
-        tasks = [asyncio.create_task(fetch_semaphore(url)) for url in urls]
+        tasks = [asyncio.create_task(fetch_with_semaphore(url)) for url in urls]
         metadata_list: List[Dict[str, Any]] = await asyncio.gather(
             *tasks, return_exceptions=False
         )
 
         raw_metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
 
-        # NOTE: Small "hack" so that the default component for Sentence Transformers models is not "transformer"
-        # but rather "0_Transformer" following the current Sentence Transformers convention as defined in modules.json
+        # NOTE: Given that at the moment for Sentence Transformers only the Transformers module is considered, we
+        # set the default component name to `0_Transformer` as defined in modules.json
         if "config_sentence_transformers.json" in file_paths:
             raw_metadata = {"0_Transformer": raw_metadata}
+
+        # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
+        # make sure that we provide the expected input to the `parse_safetensors_metadata`
+        if "__metadata__" in raw_metadata:
+            raw_metadata = {"Transformer": raw_metadata}
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     elif "model_index.json" in file_paths:
@@ -161,23 +167,23 @@ async def run(
                 files_index = await get_json_file(
                     client=client, url=url, headers=headers
                 )
-                path_urls[path] = list({
+                path_urls[path] = [
                     f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
-                    for _, f in files_index["weight_map"].items()  # type: ignore
-                })
+                    for f in set(files_index["weight_map"].values())
+                ]
             elif f"{path}/model.safetensors.index.json" in file_paths:
                 url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
                 files_index = await get_json_file(
                     client=client, url=url, headers=headers
                 )
-                path_urls[path] = list({
+                path_urls[path] = [
                     f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
-                    for _, f in files_index["weight_map"].items()  # type: ignore
-                })
+                    for f in set(files_index["weight_map"].values())
+                ]
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
 
-        async def fetch_semaphore(url: str) -> Dict[str, Any]:
+        async def fetch_with_semaphore(url: str) -> Dict[str, Any]:
             async with semaphore:
                 return await fetch_safetensors_metadata(
                     client=client, url=url, headers=headers
@@ -185,7 +191,7 @@ async def run(
 
         raw_metadata = {}
         for path, urls in path_urls.items():
-            tasks = [asyncio.create_task(fetch_semaphore(url)) for url in urls]
+            tasks = [asyncio.create_task(fetch_with_semaphore(url)) for url in urls]
             metadata_list: List[Dict[str, Any]] = await asyncio.gather(
                 *tasks, return_exceptions=False
             )
@@ -200,8 +206,7 @@ async def run(
         )
 
     if json_output:
-        out = {"model_id": model_id, "revision": revision}
-        out.update(asdict(metadata))
+        out = {"model_id": model_id, "revision": revision, **asdict(metadata)}
         print(json.dumps(out))
     else:
         print_report(

@@ -96,12 +96,13 @@ def _make_bar(used: float, total: float, width: int) -> str:
     return "█" * filled + "░" * (width - filled)
 
 
-def _format_short_number(n: float) -> Optional[str]:
+def _format_short_number(n: float) -> str:
     n = float(n)
     for unit in ("", "K", "M", "B", "T"):
         if abs(n) < 1000.0:
             return f"{int(n)}" if unit == "" else f"{n:.2f}{unit}"
         n /= 1000.0
+    return f"{n:.2f}P"
 
 
 def _bytes_to_gb(nbytes: int) -> float:
@@ -130,9 +131,7 @@ def print_report(
                 f"{dtype} {dtype_metadata.param_count} {dtype_metadata.bytes_count}"
             )
 
-    max_len = 0
-    for r in rows:
-        max_len = max(max_len, len(str(r)))
+    max_len = max(len(str(r)) for r in rows)
 
     if max_len > MAX_DATA_LEN and ignore_table_width is False:
         warnings.warn(
