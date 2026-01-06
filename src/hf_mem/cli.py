@@ -55,8 +55,20 @@ async def fetch_safetensors_metadata(
 
 async def run(model_id: str, revision: str, ignore_table_width: bool = False) -> None:
     headers = {}
+    # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
     if token := os.getenv("HF_TOKEN", None):
         headers["Authorization"] = f"Bearer {token}"
+    if "Authorization" not in headers:
+        path = os.getenv("HF_HOME", ".cache/huggingface")
+        filename = (
+            os.path.join(os.path.expanduser("~"), path, "token")
+            if not os.path.isabs(path)
+            else os.path.join(path, "token")
+        )
+
+        if os.path.exists(filename):
+            with open(filename, "r", encoding="utf-8") as f:
+                headers["Authorization"] = f"Bearer {f.read().strip()}"
 
     client = httpx.AsyncClient(
         limits=httpx.Limits(
