@@ -17,6 +17,6 @@ jobs:
           fetch-depth: 0
 
       - name: Secret Scanning
-        uses: trufflesecurity/trufflehog@3.92.4
+        uses: trufflesecurity/trufflehog@v3.92.4
         with:
           extra_args: --results=verified,unknown --exclude-detectors=postgres
