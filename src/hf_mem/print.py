@@ -3,7 +3,7 @@ import warnings
 from typing import Any, Dict, Literal, Optional
 
 MIN_NAME_LEN = 5
-MAX_NAME_LEN = 13
+MAX_NAME_LEN = 14
 MIN_DATA_LEN = 20
 MAX_DATA_LEN = 64
 BORDERS_AND_PADDING = 7
@@ -99,7 +99,7 @@ def _format_short_number(n: float) -> Optional[str]:
     n = float(n)
     for unit in ("", "K", "M", "B", "T"):
         if abs(n) < 1000.0:
-            return f"{int(n)}" if unit == "" else f"{n:.1f}{unit}"
+            return f"{int(n)}" if unit == "" else f"{n:.2f}{unit}"
         n /= 1000.0
 
 
@@ -183,7 +183,7 @@ def print_report_for_transformers(
         dtype_name = dtype.upper()
         dtype_gb = _bytes_to_gb(nbytes)
 
-        gb_text = f"{dtype_gb:.1f} / {total_gb:.1f} GB"
+        gb_text = f"{dtype_gb:.2f} / {total_gb:.2f} GB"
         _print_row(
             dtype_name + " " * (max_length - len(dtype_name)),
             gb_text,
@@ -292,7 +292,7 @@ def print_report_for_diffusers(
             dtype_name = dtype.upper()
             dtype_gb = _bytes_to_gb(nbytes)
 
-            gb_text = f"{dtype_gb:.1f} / {_bytes_to_gb(total_bytes):.1f} GB"
+            gb_text = f"{dtype_gb:.2f} / {_bytes_to_gb(total_bytes):.2f} GB"
             _print_row(
                 dtype_name + " " * (max_length - len(dtype_name)),
                 gb_text,
