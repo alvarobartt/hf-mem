@@ -99,10 +99,9 @@ async def run(
         # set the default component name to `0_Transformer` as defined in modules.json
         if "config_sentence_transformers.json" in file_paths:
             raw_metadata = {"0_Transformer": raw_metadata}
-
-        # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
-        # make sure that we provide the expected input to the `parse_safetensors_metadata`
-        if "__metadata__" in raw_metadata:
+        else:
+            # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
+            # make sure that we provide the expected input to the `parse_safetensors_metadata`
             raw_metadata = {"Transformer": raw_metadata}
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
@@ -132,10 +131,9 @@ async def run(
         # set the default component name to `0_Transformer` as defined in modules.json
         if "config_sentence_transformers.json" in file_paths:
             raw_metadata = {"0_Transformer": raw_metadata}
-
-        # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
-        # make sure that we provide the expected input to the `parse_safetensors_metadata`
-        if "__metadata__" in raw_metadata:
+        else:
+            # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
+            # make sure that we provide the expected input to the `parse_safetensors_metadata`
             raw_metadata = {"Transformer": raw_metadata}
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
