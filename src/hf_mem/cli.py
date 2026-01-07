@@ -12,7 +12,7 @@ from uuid import uuid4
 import httpx
 
 from hf_mem.metadata import parse_safetensors_metadata
-from hf_mem.print import print_report
+from hf_mem.print import print_report, print_report_for_gguf
 from hf_mem.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
@@ -235,9 +235,25 @@ async def run(
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     else:
-        raise RuntimeError(
-            "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` HAS BEEN FOUND"
-        )
+        # Check for GGUF files
+        gguf_files = {
+            f["path"]: f["size"]
+            for f in files
+            if f.get("path", "").endswith(".gguf") and f.get("size") is not None
+        }
+
+        if gguf_files:
+            print_report_for_gguf(
+                model_id=model_id,
+                revision=revision,
+                gguf_files=gguf_files,
+                ignore_table_width=ignore_table_width,
+            )
+            return
+        else:
+            raise RuntimeError(
+                "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json`, OR `.gguf` FILES HAVE BEEN FOUND"
+            )
 
     cache_size = None
     if experimental:

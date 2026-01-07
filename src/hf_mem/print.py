@@ -1,3 +1,4 @@
+import re
 import warnings
 from typing import Any, Dict, Literal, Optional
 
@@ -105,8 +106,14 @@ def _format_short_number(n: float) -> str:
     return f"{n:.2f}P"
 
 
-def _bytes_to_gb(nbytes: int) -> float:
-    return nbytes / (1024**3)
+def _bytes_to_gb(nbytes: int, use_decimal: bool = False) -> float:
+    """Convert bytes to gigabytes.
+
+    Args:
+        nbytes: Number of bytes
+        use_decimal: If True, use GB (1e9), else use GiB (1024^3)
+    """
+    return nbytes / 1e9 if use_decimal else nbytes / (1024**3)
 
 
 def print_report(
@@ -261,3 +268,124 @@ def print_report(
         )
 
     _print_divider(data_col_width + 1, "bottom")
+    _print_divider(current_len + 1, "bottom")
+
+
+def _print_header_gguf(current_len: int, name_len: int) -> None:
+    length = current_len + name_len + BORDERS_AND_PADDING
+    top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
+    _print_with_color(top)
+
+    bottom = BOX["lm"] + (BOX["bsep"] * (length - 2)) + BOX["rm"]
+    _print_with_color(bottom)
+
+
+def _print_centered_gguf(text: str, current_len: int, name_len: int) -> None:
+    max_len = current_len + name_len - BORDERS_AND_PADDING
+    total_width = max_len + 12
+    text_len = len(text)
+    pad_left = (total_width - text_len) // 2
+    pad_right = total_width - text_len - pad_left
+    _print_with_color(f"{BOX['vt']}{' ' * pad_left}{text}{' ' * pad_right}{BOX['vt']}")
+
+
+def _print_divider_gguf(
+    current_len: int,
+    name_len: int,
+    side: Optional[Literal["top", "top-continue", "bottom", "bottom-continue"]] = None,
+) -> None:
+    match side:
+        case "top":
+            left, mid, right = BOX["lm"], BOX["tsep"], BOX["rm"]
+        case "top-continue":
+            left, mid, right = BOX["lm"], BOX["bsep"], BOX["rm"]
+        case "bottom":
+            left, mid, right = BOX["bl"], BOX["bsep"], BOX["br"]
+        case "bottom-continue":
+            left, mid, right = BOX["lm"], BOX["bsep"], BOX["rm"]
+        case _:
+            left, mid, right = BOX["lm"], BOX["mm"], BOX["rm"]
+
+    name_col_inner = name_len + 2
+    data_col_inner = current_len + 1
+
+    line = left
+    line += BOX["ht"] * name_col_inner
+    line += mid
+    line += BOX["ht"] * data_col_inner
+    line += right
+    _print_with_color(line)
+
+
+def _print_row_gguf(name: str, text: str, current_len: int, name_len: int) -> None:
+    name_fmt = f"{name:<{name_len}}"
+    data_fmt = f"{str(text):<{current_len}}"
+    _print_with_color(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
+
+
+def _group_gguf_files(gguf_files: Dict[str, int]) -> Dict[str, int]:
+    """Group sharded GGUF files by model variant and sum their sizes.
+
+    Files like 'BF16/model-00001-of-00010.gguf' are grouped together.
+    Single files like 'model-Q4_K_M.gguf' remain as-is.
+    """
+    grouped: Dict[str, int] = {}
+    shard_pattern = re.compile(r"-\d{5}-of-\d{5}\.gguf$")
+
+    for path, size in gguf_files.items():
+        if shard_pattern.search(path):
+            base = shard_pattern.sub(".gguf", path)
+            grouped[base] = grouped.get(base, 0) + size
+        else:
+            grouped[path] = size
+
+    return grouped
+
+
+def print_report_for_gguf(
+    model_id: str,
+    revision: str,
+    gguf_files: Dict[str, int],
+    ignore_table_width: bool = False,
+) -> None:
+    """Print VRAM report for GGUF models.
+
+    Args:
+        model_id: HuggingFace model ID
+        revision: Model revision
+        gguf_files: Dict mapping filename to file size in bytes
+        ignore_table_width: Whether to ignore max table width
+    """
+    grouped_files = _group_gguf_files(gguf_files)
+
+    max_name_len = max(len(filename) for filename in grouped_files.keys())
+
+    rows = [
+        "INFERENCE MEMORY ESTIMATE FOR",
+        f"https://hf.co/{model_id} @ {revision}",
+    ]
+
+    max_len = 0
+    for r in rows:
+        max_len = max(max_len, len(str(r)))
+
+    if max_len > MAX_DATA_LEN and ignore_table_width is False:
+        warnings.warn(
+            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
+        )
+
+    current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
+
+    _print_header_gguf(current_len, max_name_len)
+    _print_centered_gguf("INFERENCE MEMORY ESTIMATE FOR", current_len, max_name_len)
+    _print_centered_gguf(f"https://hf.co/{model_id} @ {revision}", current_len, max_name_len)
+    _print_divider_gguf(current_len + 1, max_name_len, "top")
+
+    for i, (filename, size_bytes) in enumerate(grouped_files.items()):
+        file_gb = _bytes_to_gb(size_bytes, use_decimal=True)
+        _print_row_gguf(filename, f"{file_gb:.2f} GB", current_len, max_name_len)
+
+        if i < len(grouped_files) - 1:
+            _print_divider_gguf(current_len + 1, max_name_len)
+
+    _print_divider_gguf(current_len + 1, max_name_len, "bottom")
