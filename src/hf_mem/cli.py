@@ -102,7 +102,9 @@ async def run(
 
         # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
         # make sure that we provide the expected input to the `parse_safetensors_metadata`
-        if "__metadata__" in raw_metadata:
+        # Check if raw_metadata is tensor-level (has dtype/shape) rather than component-level
+        first_value = next((v for k, v in raw_metadata.items() if k != "__metadata__"), None)
+        if first_value and isinstance(first_value, dict) and "dtype" in first_value:
             raw_metadata = {"Transformer": raw_metadata}
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
@@ -135,7 +137,9 @@ async def run(
 
         # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
         # make sure that we provide the expected input to the `parse_safetensors_metadata`
-        if "__metadata__" in raw_metadata:
+        # Check if raw_metadata is tensor-level (has dtype/shape) rather than component-level
+        first_value = next((v for k, v in raw_metadata.items() if k != "__metadata__"), None)
+        if first_value and isinstance(first_value, dict) and "dtype" in first_value:
             raw_metadata = {"Transformer": raw_metadata}
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
