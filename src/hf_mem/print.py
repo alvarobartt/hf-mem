@@ -169,7 +169,7 @@ def print_report(
                 for _, dtype_metadata in value.dtypes.items()
             ]
         )
-        for dtype, dtype_metadata in value.dtypes.items():
+        for idx, (dtype, dtype_metadata) in enumerate(value.dtypes.items()):
             gb_text = (
                 f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
             )
@@ -189,5 +189,8 @@ def print_report(
                 bar,
                 current_len,
             )
+
+            if idx < len(value.dtypes) - 1:
+                _print_divider(current_len + 1)
 
     _print_divider(current_len + 1, "bottom")
