@@ -1,6 +1,6 @@
 [project]
 name = "hf-mem"
-version = "0.2.1"
+version = "0.2.2"
 description = "A CLI to estimate inference memory requirements for Hugging Face models, written in Python"
 readme = "README.md"
 authors = [
