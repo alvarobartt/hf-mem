@@ -29,8 +29,8 @@ def _print_with_color(content: str) -> None:
     print(f"\x1b[38;2;244;183;63m{content}\x1b[0m")
 
 
-def _print_header(current_len: int) -> None:
-    length = current_len + 2 * BORDERS_AND_PADDING + 2
+def _print_header(current_len: int, name_len: int = MAX_NAME_LEN) -> None:
+    length = current_len + name_len + BORDERS_AND_PADDING
     top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
     _print_with_color(top)
 
@@ -38,8 +38,9 @@ def _print_header(current_len: int) -> None:
     _print_with_color(bottom)
 
 
-def _print_centered(text: str, current_len: int) -> None:
-    total_width = current_len + 2 * BORDERS_AND_PADDING
+def _print_centered(text: str, current_len: int, name_len: int = MAX_NAME_LEN) -> None:
+    max_len = current_len + name_len - BORDERS_AND_PADDING
+    total_width = max_len + 12
     text_len = len(text)
     pad_left = (total_width - text_len) // 2
     pad_right = total_width - text_len - pad_left
@@ -74,12 +75,12 @@ def _print_divider(
     _print_with_color(line)
 
 
-def _format_name(name: str, max_len: int = MAX_NAME_LEN) -> str:
+def _format_name(name: str, name_len: int = MAX_NAME_LEN) -> str:
     if len(name) < MIN_NAME_LEN:
         return f"{name:<{MIN_NAME_LEN}}"
-    if len(name) > max_len:
-        return name[: max_len - 3] + "..."
-    return f"{name:<{max_len}}"
+    if len(name) > name_len:
+        return name[: name_len - 3] + "..."
+    return f"{name:<{name_len}}"
 
 
 def _print_row(name: str, text: str, current_len: int, name_len: int = MAX_NAME_LEN) -> None:
@@ -271,66 +272,17 @@ def print_report(
     _print_divider(current_len + 1, "bottom")
 
 
-def _print_header_gguf(current_len: int, name_len: int) -> None:
-    length = current_len + name_len + BORDERS_AND_PADDING
-    top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
-    _print_with_color(top)
-
-    bottom = BOX["lm"] + (BOX["bsep"] * (length - 2)) + BOX["rm"]
-    _print_with_color(bottom)
-
-
-def _print_centered_gguf(text: str, current_len: int, name_len: int) -> None:
-    max_len = current_len + name_len - BORDERS_AND_PADDING
-    total_width = max_len + 12
-    text_len = len(text)
-    pad_left = (total_width - text_len) // 2
-    pad_right = total_width - text_len - pad_left
-    _print_with_color(f"{BOX['vt']}{' ' * pad_left}{text}{' ' * pad_right}{BOX['vt']}")
-
-
-def _print_divider_gguf(
-    current_len: int,
-    name_len: int,
-    side: Optional[Literal["top", "top-continue", "bottom", "bottom-continue"]] = None,
-) -> None:
-    match side:
-        case "top":
-            left, mid, right = BOX["lm"], BOX["tsep"], BOX["rm"]
-        case "top-continue":
-            left, mid, right = BOX["lm"], BOX["bsep"], BOX["rm"]
-        case "bottom":
-            left, mid, right = BOX["bl"], BOX["bsep"], BOX["br"]
-        case "bottom-continue":
-            left, mid, right = BOX["lm"], BOX["bsep"], BOX["rm"]
-        case _:
-            left, mid, right = BOX["lm"], BOX["mm"], BOX["rm"]
-
-    name_col_inner = name_len + 2
-    data_col_inner = current_len + 1
-
-    line = left
-    line += BOX["ht"] * name_col_inner
-    line += mid
-    line += BOX["ht"] * data_col_inner
-    line += right
-    _print_with_color(line)
-
-
-def _print_row_gguf(name: str, text: str, current_len: int, name_len: int) -> None:
-    name_fmt = f"{name:<{name_len}}"
-    data_fmt = f"{str(text):<{current_len}}"
-    _print_with_color(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
-
-
 def _group_gguf_files(gguf_files: Dict[str, int]) -> Dict[str, int]:
     """Group sharded GGUF files by model variant and sum their sizes.
 
     Files like 'BF16/model-00001-of-00010.gguf' are grouped together.
+    For example, 'BF16/model-00001-of-00010.gguf' and 'BF16/model-00002-of-00010.gguf'
+    are grouped under 'BF16/model.gguf'.
     Single files like 'model-Q4_K_M.gguf' remain as-is.
+    Supports various shard formats: -1-of-2.gguf, -001-of-002.gguf, -00001-of-00010.gguf, etc.
     """
     grouped: Dict[str, int] = {}
-    shard_pattern = re.compile(r"-\d{5}-of-\d{5}\.gguf$")
+    shard_pattern = re.compile(r"-\d+-of-\d+\.gguf$")
 
     for path, size in gguf_files.items():
         if shard_pattern.search(path):
@@ -376,16 +328,16 @@ def print_report_for_gguf(
 
     current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
 
-    _print_header_gguf(current_len, max_name_len)
-    _print_centered_gguf("INFERENCE MEMORY ESTIMATE FOR", current_len, max_name_len)
-    _print_centered_gguf(f"https://hf.co/{model_id} @ {revision}", current_len, max_name_len)
-    _print_divider_gguf(current_len + 1, max_name_len, "top")
+    _print_header(current_len, max_name_len)
+    _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len, max_name_len)
+    _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len, max_name_len)
+    _print_divider(current_len + 1, "top", max_name_len)
 
     for i, (filename, size_bytes) in enumerate(grouped_files.items()):
         file_gb = _bytes_to_gb(size_bytes, use_decimal=True)
-        _print_row_gguf(filename, f"{file_gb:.2f} GB", current_len, max_name_len)
+        _print_row(filename, f"{file_gb:.2f} GB", current_len, max_name_len)
 
         if i < len(grouped_files) - 1:
-            _print_divider_gguf(current_len + 1, max_name_len)
+            _print_divider(current_len + 1, name_len=max_name_len)
 
-    _print_divider_gguf(current_len + 1, max_name_len, "bottom")
+    _print_divider(current_len + 1, "bottom", max_name_len)
