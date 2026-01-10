@@ -175,10 +175,17 @@ async def run(
             async with semaphore:
                 return await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
-        raw_metadata = {}
+        # NOTE: Given that we need to fetch the Safetensors metadata for multiple components on Diffusers models,
+        # to speed the download up and not block (await) the for-loop, we instead create all the tasks within a
+        # for-loop then we await for those outside
+        _tasks = {}
         for path, urls in path_urls.items():
-            tasks = [asyncio.create_task(fetch_with_semaphore(url)) for url in urls]
-            metadata_list: List[Dict[str, Any]] = await asyncio.gather(*tasks, return_exceptions=False)
+            _tasks[path] = [asyncio.create_task(fetch_with_semaphore(url)) for url in urls]
+        await asyncio.gather(*[task for tasks in _tasks.values() for task in tasks], return_exceptions=False)
+
+        raw_metadata = {}
+        for path, tasks in _tasks.items():
+            metadata_list = [task.result() for task in tasks]
             raw_metadata[path] = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
