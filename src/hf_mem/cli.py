@@ -53,6 +53,29 @@ async def fetch_safetensors_metadata(
     return json.loads(metadata)
 
 
+async def fetch_modules_and_dense_metadata(
+    client: httpx.AsyncClient, url: str, headers: Optional[Dict[str, str]]
+) -> Dict[str, Any]:
+    dense_metadata = {}
+
+    modules = await get_json_file(client=client, url=f"{url}/modules.json", headers=headers)
+    paths = [
+        module.get("path")
+        for module in modules
+        if "type" in module and module.get("type") == "sentence_transformers.models.Dense" and "path" in module
+    ]
+
+    for path in paths:
+        # NOTE: It's "safe" to assume that if there's a `Dense` module defined in `modules.json`, it contains
+        # Safetensors weights and if so, it's a single `model.safetensors` file as the sharding has a default on
+        # ~5Gb per file, and usually the extra `Dense` layers are not larger than that (usually not even close).
+        dense_metadata[path] = await fetch_safetensors_metadata(
+            client=client, url=f"{url}/{path}/model.safetensors", headers=headers
+        )
+
+    return dense_metadata
+
+
 async def run(
     model_id: str,
     revision: str,
@@ -95,10 +118,16 @@ async def run(
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
         raw_metadata = await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
-        # NOTE: Given that at the moment for Sentence Transformers only the Transformers module is considered, we
-        # set the default component name to `0_Transformer` as defined in modules.json
         if "config_sentence_transformers.json" in file_paths:
-            raw_metadata = {"0_Transformer": raw_metadata}
+            dense_metadata = (
+                {}
+                if "modules.json" not in file_paths
+                else await fetch_modules_and_dense_metadata(
+                    client=client, url=f"https://huggingface.co/{model_id}/resolve/{revision}", headers=headers
+                )
+            )
+
+            raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
         else:
             # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
             # make sure that we provide the expected input to the `parse_safetensors_metadata`
@@ -127,10 +156,16 @@ async def run(
 
         raw_metadata = reduce(lambda acc, metadata: acc | metadata, metadata_list, {})
 
-        # NOTE: Given that at the moment for Sentence Transformers only the Transformers module is considered, we
-        # set the default component name to `0_Transformer` as defined in modules.json
         if "config_sentence_transformers.json" in file_paths:
-            raw_metadata = {"0_Transformer": raw_metadata}
+            dense_metadata = (
+                {}
+                if "modules.json" not in file_paths
+                else await fetch_modules_and_dense_metadata(
+                    client=client, url=f"https://huggingface.co/{model_id}/resolve/{revision}", headers=headers
+                )
+            )
+
+            raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
         else:
             # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
             # make sure that we provide the expected input to the `parse_safetensors_metadata`
