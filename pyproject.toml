@@ -33,4 +33,4 @@ select = ["I"]
 force-single-line = false
 
 [project.scripts]
-hf-mem = "hf_mem.cli:main"
+hf-mem = "hf_mem.main:main"
