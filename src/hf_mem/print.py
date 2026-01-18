@@ -1,7 +1,7 @@
 import warnings
 from typing import Literal, Optional
 
-from hf_mem.metadata import SafetensorsMetadata
+from hf_mem.metadata import InferenceEstimate, SafetensorsMetadata
 
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 14
@@ -114,6 +114,7 @@ def print_report(
     revision: str,
     metadata: SafetensorsMetadata,
     ignore_table_width: bool = False,
+    inference_estimate: Optional[InferenceEstimate] = None,
 ) -> None:
     rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
@@ -192,5 +193,41 @@ def print_report(
 
             if idx < len(value.dtypes) - 1:
                 _print_divider(current_len + 1)
+
+    # Display serving memory section if KV cache is available
+    if inference_estimate and inference_estimate.kv_cache:
+        kv = inference_estimate.kv_cache
+        _print_divider(current_len + 1, "top-continue")
+        _print_centered(
+            f"SERVING MEMORY (ctx={kv.context_length}, batch={kv.batch_size}, n={kv.concurrent_requests})",
+            current_len,
+        )
+        _print_divider(current_len + 1, "top")
+
+        # KV Cache row
+        kv_text = f"{_bytes_to_gb(kv.total_bytes):.2f} GB"
+        _print_row("KV CACHE", kv_text, current_len)
+
+        # KV Cache bar (relative to total serving memory)
+        kv_bar = _make_bar(
+            _bytes_to_gb(kv.total_bytes),
+            _bytes_to_gb(inference_estimate.total_bytes),
+            current_len,
+        )
+        _print_row("", kv_bar, current_len)
+
+        _print_divider(current_len + 1)
+
+        # Total serving row
+        total_serving_text = f"{_bytes_to_gb(inference_estimate.total_bytes):.2f} GB"
+        _print_row("TOTAL SERVING", total_serving_text, current_len)
+
+        # Total serving bar (always full)
+        total_bar = _make_bar(
+            inference_estimate.total_bytes,
+            inference_estimate.total_bytes,
+            current_len,
+        )
+        _print_row("", total_bar, current_len)
 
     _print_divider(current_len + 1, "bottom")

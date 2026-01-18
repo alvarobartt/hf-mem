@@ -9,7 +9,9 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from hf_mem.metadata import parse_safetensors_metadata
+from hf_mem.config import fetch_generation_config, fetch_model_config
+from hf_mem.inference import calculate_inference_estimate
+from hf_mem.metadata import InferenceEstimate, ModelConfig, parse_safetensors_metadata
 from hf_mem.print import print_report
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
@@ -81,6 +83,10 @@ async def run(
     revision: str,
     json_output: bool = False,
     ignore_table_width: bool = False,
+    context_length: Optional[int] = None,
+    batch_size: int = 1,
+    concurrent_requests: int = 1,
+    no_kv_cache: bool = False,
 ) -> Dict[str, Any] | None:
     headers = {}
     # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
@@ -113,6 +119,26 @@ async def run(
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
+
+    # Fetch model config and generation config in parallel (if KV cache estimation is enabled)
+    model_config: Optional[ModelConfig] = None
+    generation_config: Optional[Dict[str, Any]] = None
+    effective_context_length = context_length
+
+    if not no_kv_cache:
+        model_config, generation_config = await asyncio.gather(
+            fetch_model_config(client, model_id, revision, headers, REQUEST_TIMEOUT),
+            fetch_generation_config(client, model_id, revision, headers, REQUEST_TIMEOUT),
+        )
+
+        # Determine context length: CLI arg > generation_config.max_length > model_config.max_position_embeddings > 2048
+        if effective_context_length is None:
+            if generation_config and "max_length" in generation_config:
+                effective_context_length = generation_config["max_length"]
+            elif model_config:
+                effective_context_length = model_config.max_position_embeddings
+            else:
+                effective_context_length = 2048
 
     if "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
@@ -229,8 +255,21 @@ async def run(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` HAS BEEN FOUND"
         )
 
+    # Calculate inference estimate (weights + KV cache)
+    inference_estimate: Optional[InferenceEstimate] = None
+    if effective_context_length is not None:
+        inference_estimate = calculate_inference_estimate(
+            weights_bytes=metadata.bytes_count,
+            model_config=model_config,
+            batch_size=batch_size,
+            context_length=effective_context_length,
+            concurrent_requests=concurrent_requests,
+        )
+
     if json_output:
         out = {"model_id": model_id, "revision": revision, **asdict(metadata)}
+        if inference_estimate:
+            out["inference"] = asdict(inference_estimate)
         print(json.dumps(out))
     else:
         print_report(
@@ -238,6 +277,7 @@ async def run(
             revision=revision,
             metadata=metadata,
             ignore_table_width=ignore_table_width,
+            inference_estimate=inference_estimate,
         )
 
 
@@ -259,6 +299,29 @@ def main() -> None:
         action="store_true",
         help="Whether to ignore the maximum recommended table width, in case the `--model-id` and/or `--revision` cause a row overflow when printing those.",
     )
+    parser.add_argument(
+        "--context-length",
+        type=int,
+        default=None,
+        help="Context length for KV cache estimation (default: from generation_config or max_position_embeddings)",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Batch size for KV cache estimation (default: 1)",
+    )
+    parser.add_argument(
+        "--concurrent-requests",
+        type=int,
+        default=1,
+        help="Number of concurrent requests for KV cache estimation (default: 1)",
+    )
+    parser.add_argument(
+        "--no-kv-cache",
+        action="store_true",
+        help="Skip KV cache estimation",
+    )
 
     args = parser.parse_args()
 
@@ -269,5 +332,10 @@ def main() -> None:
             # NOTE: Below are the arguments that affect the output format
             json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
+            # NOTE: Below are the arguments that affect the KV cache estimation
+            context_length=args.context_length,
+            batch_size=args.batch_size,
+            concurrent_requests=args.concurrent_requests,
+            no_kv_cache=args.no_kv_cache,
         )
     )
