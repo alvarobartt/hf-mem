@@ -82,7 +82,7 @@ async def run(
     json_output: bool = False,
     ignore_table_width: bool = False,
 ) -> Dict[str, Any] | None:
-    headers = {}
+    headers = {"User-Agent": f"hf-mem/0.3; model_id={model_id}; revision={revision}"}
     # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
     if token := os.getenv("HF_TOKEN"):
         headers["Authorization"] = f"Bearer {token}"
