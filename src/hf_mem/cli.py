@@ -104,6 +104,7 @@ async def run(
             max_connections=MAX_CONCURRENCY,
         ),
         timeout=httpx.Timeout(REQUEST_TIMEOUT),
+        # NOTE: HTTP/2 for header-compression and connection multiplexing
         http2=True,
         follow_redirects=True,
     )
