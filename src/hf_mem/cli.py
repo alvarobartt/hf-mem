@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
-from hf_mem.config import fetch_generation_config, fetch_model_config
+from hf_mem.config import fetch_model_config, get_json_file
 from hf_mem.inference import calculate_inference_estimate
 from hf_mem.metadata import InferenceEstimate, ModelConfig, parse_safetensors_metadata
 from hf_mem.print import print_report
@@ -19,13 +19,6 @@ from hf_mem.print import print_report
 MAX_METADATA_SIZE = 100_000
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 10.0))
 MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4)))
-
-
-# NOTE: Return type-hint set to `Any`, but it will only be a JSON-compatible object
-async def get_json_file(client: httpx.AsyncClient, url: str, headers: Optional[Dict[str, str]] = None) -> Any:
-    response = await client.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
-    return response.json()
 
 
 async def fetch_safetensors_metadata(
@@ -120,23 +113,28 @@ async def run(
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
-    # Fetch model config and generation config in parallel (if KV cache estimation is enabled)
+    # Fetch model config and generation config (if KV cache estimation is enabled)
     model_config: Optional[ModelConfig] = None
     generation_config: Optional[Dict[str, Any]] = None
     effective_context_length = context_length
 
-    if not no_kv_cache:
-        model_config, generation_config = await asyncio.gather(
-            fetch_model_config(client, model_id, revision, headers, REQUEST_TIMEOUT),
-            fetch_generation_config(client, model_id, revision, headers, REQUEST_TIMEOUT),
-        )
+    if not no_kv_cache and "config.json" in file_paths:
+        model_config = await fetch_model_config(client, model_id, revision, headers, REQUEST_TIMEOUT)
 
-        # Determine context length: CLI arg > generation_config.max_length > model_config.max_position_embeddings > 2048
+        # Fetch generation_config only if file exists
+        if "generation_config.json" in file_paths:
+            url = f"https://huggingface.co/{model_id}/resolve/{revision}/generation_config.json"
+            try:
+                generation_config = await get_json_file(client, url, headers, REQUEST_TIMEOUT)
+            except httpx.HTTPStatusError:
+                generation_config = None
+
+        # Determine context length: CLI arg > max_position_embeddings > generation_config.max_length > 2048
         if effective_context_length is None:
-            if generation_config and "max_length" in generation_config:
-                effective_context_length = generation_config["max_length"]
-            elif model_config:
+            if model_config:
                 effective_context_length = model_config.max_position_embeddings
+            elif generation_config and "max_length" in generation_config:
+                effective_context_length = generation_config["max_length"]
             else:
                 effective_context_length = 2048
 

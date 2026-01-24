@@ -11,24 +11,16 @@ DEFAULT_MAX_POSITION_EMBEDDINGS = 2048
 DEFAULT_TORCH_DTYPE = "float16"
 
 
-async def fetch_json_file(
+async def get_json_file(
     client: httpx.AsyncClient,
-    model_id: str,
-    revision: str,
-    filename: str,
+    url: str,
     headers: Optional[Dict[str, str]] = None,
     timeout: float = 10.0,
-) -> Optional[Dict[str, Any]]:
-    """Fetch a JSON file from HuggingFace Hub, returning None on 404."""
-    url = f"https://huggingface.co/{model_id}/resolve/{revision}/{filename}"
-    try:
-        response = await client.get(url, headers=headers, timeout=timeout)
-        if response.status_code == 404:
-            return None
-        response.raise_for_status()
-        return response.json()
-    except httpx.HTTPStatusError:
-        return None
+) -> Any:
+    """Fetch JSON from URL, raise HTTPStatusError on failure."""
+    response = await client.get(url, headers=headers, timeout=timeout)
+    response.raise_for_status()
+    return response.json()
 
 
 async def fetch_model_config(
@@ -40,10 +32,23 @@ async def fetch_model_config(
 ) -> Optional[ModelConfig]:
     """Fetch config.json and parse required fields for KV cache calculation.
 
-    Returns None if config.json is missing or lacks required fields.
+    Returns None if:
+    - config.json is missing or fetch fails
+    - Model is not a generative model (no CausalLM or ConditionalGeneration in architectures)
+    - Required fields are missing
     """
-    config = await fetch_json_file(client, model_id, revision, "config.json", headers, timeout)
-    if config is None:
+    url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
+    try:
+        config = await get_json_file(client, url, headers, timeout)
+    except httpx.HTTPStatusError:
+        return None
+
+    # Only compute KV cache for generative models
+    architectures = config.get("architectures", [])
+    is_generative = any(
+        "CausalLM" in arch or "ConditionalGeneration" in arch for arch in architectures
+    )
+    if not is_generative:
         return None
 
     # Required fields - return None if any are missing
@@ -83,15 +88,3 @@ async def fetch_model_config(
     )
 
 
-async def fetch_generation_config(
-    client: httpx.AsyncClient,
-    model_id: str,
-    revision: str,
-    headers: Optional[Dict[str, str]] = None,
-    timeout: float = 10.0,
-) -> Optional[Dict[str, Any]]:
-    """Fetch generation_config.json for max_length defaults.
-
-    Returns None if the file doesn't exist.
-    """
-    return await fetch_json_file(client, model_id, revision, "generation_config.json", headers, timeout)
