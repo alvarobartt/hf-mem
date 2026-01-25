@@ -22,6 +22,17 @@ uvx hf-mem --model-id Qwen/Qwen-Image
 
 <img src="https://github.com/user-attachments/assets/cd4234ec-bdcc-4db4-8b01-0ac9b5cd390c" />
 
+## Claude Code Integration
+
+A [Claude Code skill](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/skills) is available in the `skill/` directory. This allows Claude Code to automatically check model memory requirements when users ask questions like "will this model fit on my GPU?".
+
+To install the skill:
+
+```bash
+mkdir -p ~/.claude/skills/hf-mem
+cp skill/SKILL.md ~/.claude/skills/hf-mem/
+```
+
 ## References
 
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
