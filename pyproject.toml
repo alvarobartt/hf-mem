@@ -4,7 +4,7 @@ version = "0.4.0"
 description = "A CLI to estimate inference memory requirements for Hugging Face models, written in Python."
 readme = "README.md"
 authors = [
-    { name = "Alvaro Bartolome", email = "36760800+alvarobartt@users.noreply.github.com" }
+    { name = "Alvaro Bartolome", email = "alvarobartt@gmail.com" }
 ]
 license = "MIT"
 license-files = ["LICENSE"]
