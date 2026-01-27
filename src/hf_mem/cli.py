@@ -6,6 +6,7 @@ import struct
 from dataclasses import asdict
 from functools import reduce
 from typing import Any, Dict, List, Optional
+from uuid import uuid4
 
 import httpx
 
@@ -81,7 +82,7 @@ async def run(
     concurrent_requests: int = 1,
     no_kv_cache: bool = False,
 ) -> Dict[str, Any] | None:
-    headers = {}
+    headers = {"User-Agent": f"hf-mem/0.3; id={uuid4()}; model_id={model_id}; revision={revision}"}
     # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
     if token := os.getenv("HF_TOKEN"):
         headers["Authorization"] = f"Bearer {token}"
@@ -103,6 +104,7 @@ async def run(
             max_connections=MAX_CONCURRENCY,
         ),
         timeout=httpx.Timeout(REQUEST_TIMEOUT),
+        # NOTE: HTTP/2 for header-compression and connection multiplexing
         http2=True,
         follow_redirects=True,
     )
