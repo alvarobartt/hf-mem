@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import struct
+import warnings
 from dataclasses import asdict
 from functools import reduce
 from typing import Any, Dict, List, Optional
@@ -12,11 +13,12 @@ import httpx
 
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report
+from hf_mem.types import get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
 MAX_METADATA_SIZE = 100_000
-REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 10.0))
+REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
 MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4)))
 
 
@@ -80,6 +82,11 @@ async def fetch_modules_and_dense_metadata(
 async def run(
     model_id: str,
     revision: str,
+    # START_KV_CACHE_ARGS
+    experimental: bool = False,
+    max_model_len: int | None = None,
+    batch_size: int = 1,
+    # END_KV_CACHE_ARGS
     json_output: bool = False,
     ignore_table_width: bool = False,
 ) -> Dict[str, Any] | None:
@@ -231,26 +238,118 @@ async def run(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` HAS BEEN FOUND"
         )
 
+    cache_size = None
+    if experimental:
+        # NOTE: In theory, `config.json` should always be present, but checking beforehand just in case
+        if "config.json" in file_paths:
+            url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
+            config: Dict[str, Any] = await get_json_file(client, url, headers)
+
+            if "architectures" in config and any(
+                arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
+                for arch in config["architectures"]
+            ):
+                if max_model_len is None:
+                    max_model_len = config.get(
+                        "max_position_embeddings",
+                        config.get("n_positions", config.get("max_seq_len", max_model_len)),
+                    )
+
+                if max_model_len is None:
+                    warnings.warn(
+                        f"Either the `--max-model-len` was not set, not available in `config.json` with the any of the keys: `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+                    )
+
+                if not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):  # type: ignore
+                    warnings.warn(
+                        f"`config.json` doesn't contain all the keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {config.keys()}."  # type: ignore
+                    )
+
+                # Reference: https://gist.github.com/alvarobartt/1097ca1b07c66fd71470937d599c2072
+                cache_size = (
+                    # NOTE: 2 because it applies to both key and value projections
+                    2
+                    * config.get("num_hidden_layers")  # type: ignore
+                    # NOTE: `num_key_value_heads` defaults to `num_attention_heads` in MHA
+                    * config.get("num_key_value_heads", config.get("num_attention_heads"))  # type: ignore
+                    * (config.get("hidden_size") // config.get("num_attention_heads"))  # type: ignore
+                    * max_model_len
+                    # NOTE: Default to F16 or BF16 if dtype is not set
+                    * get_safetensors_dtype_bytes(
+                        torch_dtype_to_safetensors_dtype(
+                            config.get("torch_dtype", config.get("dtype", "float16"))
+                        )
+                    )  # type: ignore
+                )
+
+                if batch_size:
+                    cache_size *= batch_size
+
+                cache_dtype = torch_dtype_to_safetensors_dtype(
+                    config.get("torch_dtype", config.get("dtype", "float16"))
+                )
+
     if json_output:
         out = {"model_id": model_id, "revision": revision, **asdict(metadata)}
+        if experimental and cache_size:
+            out["max_model_len"] = max_model_len
+            out["batch_size"] = batch_size
+            out["cache_size"] = cache_size
+            out["cache_dtype"] = cache_dtype  # type: ignore
         print(json.dumps(out))
     else:
-        print_report(
-            model_id=model_id,
-            revision=revision,
-            metadata=metadata,
-            ignore_table_width=ignore_table_width,
-        )
+        # TODO: Use a `KvCache` dataclass instead and make sure that the JSON output is aligned
+        if experimental and cache_size:
+            print_report(
+                model_id=model_id,
+                revision=revision,
+                metadata=metadata,
+                cache={
+                    "max_model_len": max_model_len,
+                    "cache_size": cache_size,
+                    "batch_size": batch_size,
+                    "cache_dtype": cache_dtype,  # type: ignore
+                },
+                ignore_table_width=ignore_table_width,
+            )
+        else:
+            print_report(
+                model_id=model_id,
+                revision=revision,
+                metadata=metadata,
+                ignore_table_width=ignore_table_width,
+            )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+
     parser.add_argument("--model-id", required=True, help="Model ID on the Hugging Face Hub")
     parser.add_argument(
         "--revision",
         default="main",
         help="Model revision on the Hugging Face Hub",
     )
+
+    parser.add_argument(
+        "--experimental",
+        action="store_true",
+        help="Whether to enable the experimental KV Cache estimation or not. Only applies to `...ForCausalLM` and `...ForConditionalGeneration` models from Transformers.",
+    )
+    parser.add_argument(
+        "--max-model-len",
+        type=int,
+        default=None,
+        # Reference: https://docs.vllm.ai/en/stable/configuration/engine_args/#-max-model-len
+        help="Model context length (prompt and output). If unspecified, will be automatically derived from the model config.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=1,
+        help="Batch size to help estimate the required RAM for caching when running the inference. Defaults to 1.",
+    )
+
     parser.add_argument(
         "--json-output",
         action="store_true",
@@ -264,10 +363,19 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if args.experimental:
+        warnings.warn(
+            "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
+        )
+
     asyncio.run(
         run(
             model_id=args.model_id,
             revision=args.revision,
+            # NOTE: Below are the arguments that affect the KV cache estimation
+            experimental=args.experimental,
+            max_model_len=args.max_model_len,
+            batch_size=args.batch_size,
             # NOTE: Below are the arguments that affect the output format
             json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
