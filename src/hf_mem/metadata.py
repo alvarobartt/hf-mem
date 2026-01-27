@@ -1,43 +1,8 @@
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from hf_mem.types import SafetensorsDtypes, get_safetensors_dtype_bytes
-
-
-@dataclass
-class ModelConfig:
-    """Transformer architecture from config.json."""
-
-    hidden_size: int
-    num_hidden_layers: int
-    num_attention_heads: int
-    num_key_value_heads: int  # For GQA; defaults to num_attention_heads
-    max_position_embeddings: int
-    head_dim: int  # hidden_size // num_attention_heads
-    torch_dtype: Optional[str] = None
-
-
-@dataclass
-class KVCacheEstimate:
-    """KV cache memory for specific parameters."""
-
-    context_length: int
-    batch_size: int
-    concurrent_requests: int
-    per_token_bytes: int
-    per_request_bytes: int
-    total_bytes: int
-
-
-@dataclass
-class InferenceEstimate:
-    """Complete inference memory breakdown."""
-
-    weights_bytes: int
-    kv_cache: Optional[KVCacheEstimate]
-    total_bytes: int
-    model_config: Optional[ModelConfig]
 
 
 @dataclass

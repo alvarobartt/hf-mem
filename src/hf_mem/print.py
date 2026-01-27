@@ -1,7 +1,7 @@
 import warnings
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
-from hf_mem.metadata import InferenceEstimate, SafetensorsMetadata
+from hf_mem.metadata import SafetensorsMetadata
 
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 14
@@ -21,6 +21,10 @@ BOX = {
     "lm": "├",
     "rm": "┤",
     "mm": "┼",
+    "dht": "═",
+    "dlm": "╞",
+    "drm": "╡",
+    "dmm": "╪",
 }
 
 
@@ -49,6 +53,7 @@ def _print_centered(text: str, current_len: int) -> None:
 def _print_divider(
     current_len: int,
     side: Optional[Literal["top", "top-continue", "bottom", "bottom-continue"]] = None,
+    name_len: int = MAX_NAME_LEN,
 ) -> None:
     match side:
         case "top":
@@ -62,7 +67,7 @@ def _print_divider(
         case _:
             left, mid, right = BOX["lm"], BOX["mm"], BOX["rm"]
 
-    name_col_inner = MAX_NAME_LEN + 2
+    name_col_inner = name_len + 2
     data_col_inner = current_len + 1
 
     line = left
@@ -73,16 +78,16 @@ def _print_divider(
     _print_with_color(line)
 
 
-def _format_name(name: str) -> str:
+def _format_name(name: str, max_len: int = MAX_NAME_LEN) -> str:
     if len(name) < MIN_NAME_LEN:
         return f"{name:<{MIN_NAME_LEN}}"
-    if len(name) > MAX_NAME_LEN:
-        return name[: MAX_NAME_LEN - 3] + "..."
-    return f"{name:<{MAX_NAME_LEN}}"
+    if len(name) > max_len:
+        return name[: max_len - 3] + "..."
+    return f"{name:<{max_len}}"
 
 
-def _print_row(name: str, text: str, current_len: int) -> None:
-    name_fmt = _format_name(name)
+def _print_row(name: str, text: str, current_len: int, name_len: int = MAX_NAME_LEN) -> None:
+    name_fmt = _format_name(name, name_len)
     data_fmt = f"{str(text):<{current_len}}"
     _print_with_color(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
 
@@ -113,15 +118,21 @@ def print_report(
     model_id: str,
     revision: str,
     metadata: SafetensorsMetadata,
+    cache: Optional[Dict[str, Any]] = None,
     ignore_table_width: bool = False,
-    inference_estimate: Optional[InferenceEstimate] = None,
 ) -> None:
     rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
+        f"w/ max-model-len={cache['max_model_len']}, batch-size={cache['batch_size']}"
+        if cache is not None
+        else "",
         "TOTAL MEMORY",
         "REQUIREMENTS",
     ]
+
+    if cache:
+        rows.append(f"{_bytes_to_gb(metadata.bytes_count + cache['cache_size']):.2f} GB")
 
     for name, nested_metadata in metadata.components.items():
         if len(metadata.components) > 1:
@@ -142,24 +153,35 @@ def print_report(
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
+    if cache:
+        _print_centered(
+            f"w/ max-model-len={cache['max_model_len']}, batch-size={cache['batch_size']}",
+            current_len,
+        )
     _print_divider(current_len + 1, "top")
 
-    total_text = (
-        f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} params)"
-    )
-    _print_row("TOTAL MEMORY", total_text, current_len)
-
-    total_bar = _make_bar(metadata.bytes_count, metadata.bytes_count, current_len)
-    _print_row("REQUIREMENTS", total_bar, current_len)
+    if cache:
+        combined_total = metadata.bytes_count + cache["cache_size"]
+        total_text = f"{_bytes_to_gb(combined_total):.2f} GB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
+        total_bar = _make_bar(combined_total, combined_total, current_len)
+        _print_row("TOTAL MEMORY", total_text, current_len)
+        _print_row("REQUIREMENTS", total_bar, current_len)
+    else:
+        model_text = (
+            f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} PARAMS)"
+        )
+        model_bar = _make_bar(metadata.bytes_count, metadata.bytes_count, current_len)
+        _print_row("TOTAL MEMORY", model_text, current_len)
+        _print_row("REQUIREMENTS", model_bar, current_len)
 
     for key, value in metadata.components.items():
-        if len(metadata.components) > 1:
+        if len(metadata.components) > 1 or cache:
             _print_divider(current_len + 1, "top-continue")
+            component_name = key.upper() if len(metadata.components) > 1 else "PARAMETERS"
             _print_centered(
-                f"{key.upper()} ({_bytes_to_gb(value.bytes_count):.2f} GB)",
+                f"{component_name} ({_bytes_to_gb(value.bytes_count):.2f} GB)",
                 current_len,
             )
-
             _print_divider(current_len + 1, "top")
         else:
             _print_divider(current_len + 1)
@@ -171,9 +193,7 @@ def print_report(
             ]
         )
         for idx, (dtype, dtype_metadata) in enumerate(value.dtypes.items()):
-            gb_text = (
-                f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
-            )
+            gb_text = f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(metadata.bytes_count if not cache else combined_total):.2f} GB"  # type: ignore
             _print_row(
                 dtype.upper() + " " * (max_length - len(dtype)),
                 gb_text,
@@ -182,7 +202,7 @@ def print_report(
 
             bar = _make_bar(
                 _bytes_to_gb(dtype_metadata.bytes_count),
-                _bytes_to_gb(metadata.bytes_count),
+                _bytes_to_gb(metadata.bytes_count if not cache else combined_total),  # type: ignore
                 current_len,
             )
             _print_row(
@@ -194,40 +214,26 @@ def print_report(
             if idx < len(value.dtypes) - 1:
                 _print_divider(current_len + 1)
 
-    # Display serving memory section if KV cache is available
-    if inference_estimate and inference_estimate.kv_cache:
-        kv = inference_estimate.kv_cache
+    if cache:
         _print_divider(current_len + 1, "top-continue")
         _print_centered(
-            f"SERVING MEMORY (ctx={kv.context_length}, batch={kv.batch_size}, n={kv.concurrent_requests})",
+            f"KV CACHE ({_bytes_to_gb(cache['cache_size']):.2f} GB)",
             current_len,
         )
         _print_divider(current_len + 1, "top")
 
-        # KV Cache row
-        kv_text = f"{_bytes_to_gb(kv.total_bytes):.2f} GB"
-        _print_row("KV CACHE", kv_text, current_len)
-
-        # KV Cache bar (relative to total serving memory)
-        kv_bar = _make_bar(
-            _bytes_to_gb(kv.total_bytes),
-            _bytes_to_gb(inference_estimate.total_bytes),
+        kv_text = f"{_bytes_to_gb(cache['cache_size']):.2f} / {_bytes_to_gb(combined_total):.2f} GB"  # type: ignore
+        _print_row(
+            cache["cache_dtype"].upper() + " " * (max_length - len(cache["cache_dtype"])),  # type: ignore
+            kv_text,
             current_len,
         )
-        _print_row("", kv_bar, current_len)
 
-        _print_divider(current_len + 1)
-
-        # Total serving row
-        total_serving_text = f"{_bytes_to_gb(inference_estimate.total_bytes):.2f} GB"
-        _print_row("TOTAL SERVING", total_serving_text, current_len)
-
-        # Total serving bar (always full)
-        total_bar = _make_bar(
-            inference_estimate.total_bytes,
-            inference_estimate.total_bytes,
+        kv_bar = _make_bar(cache["cache_size"], combined_total, current_len)  # type: ignore
+        _print_row(
+            f"{cache['max_model_len'] * cache['batch_size']} TOKENS",
+            kv_bar,
             current_len,
         )
-        _print_row("", total_bar, current_len)
 
     _print_divider(current_len + 1, "bottom")

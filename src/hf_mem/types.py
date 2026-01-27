@@ -18,7 +18,7 @@ SafetensorsDtypes = Literal[
 ]
 
 
-def get_safetensors_dtype_bytes(dtype: str) -> int:
+def get_safetensors_dtype_bytes(dtype: SafetensorsDtypes | str) -> int:
     match dtype:
         case "F64" | "I64" | "U64":
             return 8
@@ -30,3 +30,24 @@ def get_safetensors_dtype_bytes(dtype: str) -> int:
             return 1
         case _:
             raise RuntimeError(f"DTYPE={dtype} NOT HANDLED")
+
+
+TorchDtypes = Literal["float32", "float16", "bfloat16", "float8_e4m3fn", "float8_e5m2", "int8"]
+
+
+def torch_dtype_to_safetensors_dtype(dtype: TorchDtypes | str) -> SafetensorsDtypes:
+    if dtype.startswith("torch."):
+        dtype = dtype.replace("torch.", "")
+    match dtype:
+        case "float32":
+            return "F32"
+        case "float16":
+            return "F16"
+        case "bfloat16":
+            return "BF16"
+        case "float8_e4m3fn":
+            return "F8_E4M3"
+        case "float8_e5m2":
+            return "F8_E5M2"
+        case _:
+            return "F16"
