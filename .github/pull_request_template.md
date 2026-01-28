@@ -6,5 +6,3 @@
 
 - [ ] I have read and followed the guidelines in [`CONTRIBUTING.md`](/CONTRIBUTING.md).
 - [ ] This has been discussed over an issue or discussion.
-
-cc @alvarobartt
