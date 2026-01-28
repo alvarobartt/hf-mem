@@ -13,7 +13,7 @@ import httpx
 
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report
-from hf_mem.types import SafetensorsDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
+from hf_mem.types import get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -286,8 +286,12 @@ async def run(
                 if batch_size:
                     cache_size *= batch_size
 
-                if kv_cache_dtype in {"fp8", "fp8_e5m2", "fp8_e4m3"}:
+                if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
                     cache_dtype = kv_cache_dtype.upper()
+                elif kv_cache_dtype in {"fp8", "fp8_ds_mla", "fp8_inc"}:
+                    # NOTE: Default to `FP8` for the calculations, given that all those take 1 byte, but only FP8
+                    # is supported in Safetensors, whilst FP8_DS_MLA (DeepSeek MLA) and FP8_INC (Intel HPUs) are not
+                    cache_dtype = "FP8"
                 elif _cache_dtype := config.get("torch_dtype", None):
                     cache_dtype = _cache_dtype
                 elif _cache_dtype := config.get("dtype", None):
@@ -361,8 +365,9 @@ def main() -> None:
         "--kv-cache-dtype",
         type=str,
         default="auto",
-        choices={"auto", "fp8", "fp8_e5m2", "fp8_e4m3"},
-        help="Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available). Defaults to `auto`.",
+        # NOTE: https://docs.vllm.ai/en/stable/cli/serve/#-kv-cache-dtype
+        choices={"auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"},
+        help="Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available). Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Defaults to `auto`.",
     )
 
     parser.add_argument(
