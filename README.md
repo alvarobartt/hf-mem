@@ -5,47 +5,9 @@
 > [!WARNING]
 > `hf-mem` is still experimental and therefore subject to major changes across releases, so please keep in mind that breaking changes may occur until v1.0.0.
 
-`hf-mem` is a CLI to estimate inference memory requirements for Hugging Face models, written in Python.
-
-`hf-mem` is lightweight, only depends on `httpx`, as it pulls the [Safetensors](https://github.com/huggingface/safetensors) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests). It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
+`hf-mem` is a CLI to estimate inference memory requirements for Hugging Face models, written in Python. `hf-mem` is lightweight, only depends on `httpx`, as it pulls the [Safetensors](https://github.com/huggingface/safetensors) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests). It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
 
 `hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers) and [Sentence Transformers](https://github.com/huggingface/sentence-transformers) models, as well as any model that contains [Safetensors](https://github.com/huggingface/safetensors) compatible weights.
-
-```console
-$ uvx hf-mem --help
-usage: hf-mem [-h] --model-id MODEL_ID [--revision REVISION] [--experimental]
-              [--max-model-len MAX_MODEL_LEN] [--batch-size BATCH_SIZE]
-              [--kv-cache-dtype {fp8,fp8_e5m2,fp8_e4m3,bfloat16,fp8_ds_mla,auto,fp8_inc}]
-              [--json-output] [--ignore-table-width]
-
-options:
-  -h, --help            show this help message and exit
-  --model-id MODEL_ID   Model ID on the Hugging Face Hub
-  --revision REVISION   Model revision on the Hugging Face Hub
-  --experimental        Whether to enable the experimental KV Cache estimation
-                        or not. Only applies to `...ForCausalLM` and
-                        `...ForConditionalGeneration` models from
-                        Transformers.
-  --max-model-len MAX_MODEL_LEN
-                        Model context length (prompt and output). If
-                        unspecified, will be automatically derived from the
-                        model config.
-  --batch-size BATCH_SIZE
-                        Batch size to help estimate the required RAM for
-                        caching when running the inference. Defaults to 1.
-  --kv-cache-dtype {fp8,fp8_e5m2,fp8_e4m3,bfloat16,fp8_ds_mla,auto,fp8_inc}
-                        Data type for the KV cache storage. If `auto` is
-                        specified, it will use the default model dtype
-                        specified in the `config.json` (if available). Despite
-                        the FP8 data types having different formats, all those
-                        take 1 byte, meaning that the calculation would lead
-                        to the same results. Defaults to `auto`.
-  --json-output         Whether to provide the output as a JSON instead of
-                        printed as table.
-  --ignore-table-width  Whether to ignore the maximum recommended table width,
-                        in case the `--model-id` and/or `--revision` cause a
-                        row overflow when printing those.
-```
 
 Read more information about `hf-mem` in [this short-form post](https://alvarobartt.com/hf-mem).
 
