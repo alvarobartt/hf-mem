@@ -246,10 +246,17 @@ async def run(
             url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
             config: Dict[str, Any] = await get_json_file(client, url, headers)
 
-            if "architectures" in config and any(
-                arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
-                for arch in config["architectures"]
+            if "architectures" not in config or (
+                "architectures" in config
+                and not any(
+                    arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
+                    for arch in config["architectures"]
+                )
             ):
+                warnings.warn(
+                    "`--experimental` was provided, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` not `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then remove the `--experimental` flag from the command to supress this warning."
+                )
+            else:
                 if max_model_len is None:
                     max_model_len = config.get(
                         "max_position_embeddings",
