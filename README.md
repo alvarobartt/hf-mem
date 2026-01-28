@@ -7,9 +7,9 @@
 
 `hf-mem` is a CLI to estimate inference memory requirements for Hugging Face models, written in Python.
 
-`hf-mem` is lightweight, only depends on `httpx`, as it pulls the Safetensors metadata via HTTP Range requests. It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
+`hf-mem` is lightweight, only depends on `httpx`, as it pulls the [Safetensors](https://github.com/huggingface/safetensors) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests). It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
 
-`hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including Transformers, Diffusers and Sentence Transformers models, as well as any model that contains [Safetensors](https://github.com/huggingface/safetensors) compatible weights.
+`hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers) and [Sentence Transformers](https://github.com/huggingface/sentence-transformers) models, as well as any model that contains [Safetensors](https://github.com/huggingface/safetensors) compatible weights.
 
 ```console
 $ uvx hf-mem --help
