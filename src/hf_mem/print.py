@@ -173,17 +173,15 @@ def print_report(
     for key, value in metadata.components.items():
         if len(metadata.components) > 1:
             _print_divider(data_col_width + 1, "top-continue")
-            _print_centered(key.upper(), current_len)
             _print_centered(
-                f"{_format_short_number(value.param_count)} PARAMS, {_bytes_to_gb(value.bytes_count):.2f} GB",
+                f"{key.upper()} ({_format_short_number(value.param_count)} PARAMS, {_bytes_to_gb(value.bytes_count):.2f} GB)",
                 current_len,
             )
             _print_divider(data_col_width + 1, "top")
         elif cache:
             _print_divider(data_col_width + 1, "top-continue")
-            _print_centered("PARAMETERS", current_len)
             _print_centered(
-                f"{_format_short_number(value.param_count)} PARAMS, {_bytes_to_gb(value.bytes_count):.2f} GB",
+                f"MODEL ({_format_short_number(value.param_count)} PARAMS, {_bytes_to_gb(value.bytes_count):.2f} GB)",
                 current_len,
             )
             _print_divider(data_col_width + 1, "top")
@@ -220,8 +218,10 @@ def print_report(
 
     if cache:
         _print_divider(data_col_width + 1, "top-continue")
-        _print_centered("KV CACHE", current_len)
-        _print_centered(f"{_bytes_to_gb(cache['cache_size']):.2f} GB", current_len)
+        _print_centered(
+            f"KV CACHE ({cache['max_model_len'] * cache['batch_size']} TOKENS, {_bytes_to_gb(cache['cache_size']):.2f} GB)",
+            current_len,
+        )
         _print_divider(data_col_width + 1, "top")
 
         kv_text = f"{_bytes_to_gb(cache['cache_size']):.2f} / {_bytes_to_gb(combined_total):.2f} GB"  # type: ignore
