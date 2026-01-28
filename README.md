@@ -15,6 +15,7 @@
 $ uvx hf-mem --help
 usage: hf-mem [-h] --model-id MODEL_ID [--revision REVISION] [--experimental]
               [--max-model-len MAX_MODEL_LEN] [--batch-size BATCH_SIZE]
+              [--kv-cache-dtype {fp8,fp8_e5m2,fp8_e4m3,bfloat16,fp8_ds_mla,auto,fp8_inc}]
               [--json-output] [--ignore-table-width]
 
 options:
@@ -32,6 +33,13 @@ options:
   --batch-size BATCH_SIZE
                         Batch size to help estimate the required RAM for
                         caching when running the inference. Defaults to 1.
+  --kv-cache-dtype {fp8,fp8_e5m2,fp8_e4m3,bfloat16,fp8_ds_mla,auto,fp8_inc}
+                        Data type for the KV cache storage. If `auto` is
+                        specified, it will use the default model dtype
+                        specified in the `config.json` (if available). Despite
+                        the FP8 data types having different formats, all those
+                        take 1 byte, meaning that the calculation would lead
+                        to the same results. Defaults to `auto`.
   --json-output         Whether to provide the output as a JSON instead of
                         printed as table.
   --ignore-table-width  Whether to ignore the maximum recommended table width,
@@ -69,13 +77,13 @@ uvx hf-mem --model-id google/embeddinggemma-300m
 
 ## Experimental
 
-By enabling the `--experimental` flag, you can enable the KV Cache memory estimation for LLMs and VLMs, even including a custom `--max-model-len` (defaults to the `config.json` default) and `--batch-size` (defaults to 1).
+By enabling the `--experimental` flag, you can enable the KV Cache memory estimation for LLMs (`...ForCausalLM`) and VLMs (`...ForConditionalGeneration`), even including a custom `--max-model-len` (defaults to the `config.json` default), `--batch-size` (defaults to 1), and the `--kv-cache-dtype` (defaults to `auto` which means it uses the default data type set in `config.json`).
 
 ```bash
-uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental --max-model-len 65536 --batch-size 2
+uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental --max-model-len 65536 --batch-size 1 --kv-cache-dtype fp8_e4m3
 ```
 
-<img src="https://github.com/user-attachments/assets/233a174b-9907-4639-9165-365bd8077de4" />
+<img src="https://github.com/user-attachments/assets/247113cf-59a7-4f76-a8df-735e292558a0" />
 
 ## References
 
