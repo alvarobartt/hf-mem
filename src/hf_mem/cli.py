@@ -86,6 +86,7 @@ async def run(
     experimental: bool = False,
     max_model_len: int | None = None,
     batch_size: int = 1,
+    kv_cache_dtype: str | None = None,
     # END_KV_CACHE_ARGS
     json_output: bool = False,
     ignore_table_width: bool = False,
@@ -245,10 +246,17 @@ async def run(
             url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
             config: Dict[str, Any] = await get_json_file(client, url, headers)
 
-            if "architectures" in config and any(
-                arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
-                for arch in config["architectures"]
+            if "architectures" not in config or (
+                "architectures" in config
+                and not any(
+                    arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
+                    for arch in config["architectures"]
+                )
             ):
+                warnings.warn(
+                    "`--experimental` was provided, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` not `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then remove the `--experimental` flag from the command to supress this warning."
+                )
+            else:
                 if max_model_len is None:
                     max_model_len = config.get(
                         "max_position_embeddings",
@@ -285,9 +293,20 @@ async def run(
                 if batch_size:
                     cache_size *= batch_size
 
-                cache_dtype = torch_dtype_to_safetensors_dtype(
-                    config.get("torch_dtype", config.get("dtype", "float16"))
-                )
+                if kv_cache_dtype in {"bfloat16", "fp8_e5m2", "fp8_e4m3"}:
+                    cache_dtype = kv_cache_dtype.upper()
+                elif kv_cache_dtype in {"fp8", "fp8_ds_mla", "fp8_inc"}:
+                    # NOTE: Default to `FP8` for the calculations, given that all those take 1 byte, but only FP8
+                    # is supported in Safetensors, whilst FP8_DS_MLA (DeepSeek MLA) and FP8_INC (Intel HPUs) are not
+                    cache_dtype = "FP8"
+                elif _cache_dtype := config.get("torch_dtype", None):
+                    cache_dtype = _cache_dtype
+                elif _cache_dtype := config.get("dtype", None):
+                    cache_dtype = _cache_dtype
+                else:
+                    raise RuntimeError(
+                        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `fp8`, `fp8_e5m2` or `fp8_e4m3`, and if `auto` is provided then `config.json` needs to contain either `torch_dtype` or `dtype` set."
+                    )
 
     if json_output:
         out = {"model_id": model_id, "revision": revision, **asdict(metadata)}
@@ -349,6 +368,14 @@ def main() -> None:
         default=1,
         help="Batch size to help estimate the required RAM for caching when running the inference. Defaults to 1.",
     )
+    parser.add_argument(
+        "--kv-cache-dtype",
+        type=str,
+        default="auto",
+        # NOTE: https://docs.vllm.ai/en/stable/cli/serve/#-kv-cache-dtype
+        choices={"auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"},
+        help="Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available). Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Defaults to `auto`.",
+    )
 
     parser.add_argument(
         "--json-output",
@@ -376,6 +403,7 @@ def main() -> None:
             experimental=args.experimental,
             max_model_len=args.max_model_len,
             batch_size=args.batch_size,
+            kv_cache_dtype=args.kv_cache_dtype,
             # NOTE: Below are the arguments that affect the output format
             json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
