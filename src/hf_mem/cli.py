@@ -13,7 +13,7 @@ import httpx
 
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report
-from hf_mem.types import get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
+from hf_mem.types import SafetensorsDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -86,6 +86,7 @@ async def run(
     experimental: bool = False,
     max_model_len: int | None = None,
     batch_size: int = 1,
+    kv_cache_dtype: str | None = None,
     # END_KV_CACHE_ARGS
     json_output: bool = False,
     ignore_table_width: bool = False,
@@ -285,9 +286,16 @@ async def run(
                 if batch_size:
                     cache_size *= batch_size
 
-                cache_dtype = torch_dtype_to_safetensors_dtype(
-                    config.get("torch_dtype", config.get("dtype", "float16"))
-                )
+                if kv_cache_dtype in {"fp8", "fp8_e5m2", "fp8_e4m3"}:
+                    cache_dtype = kv_cache_dtype.upper()
+                elif _cache_dtype := config.get("torch_dtype", None):
+                    cache_dtype = _cache_dtype
+                elif _cache_dtype := config.get("dtype", None):
+                    cache_dtype = _cache_dtype
+                else:
+                    raise RuntimeError(
+                        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `fp8`, `fp8_e5m2` or `fp8_e4m3`, and if `auto` is provided then `config.json` needs to contain either `torch_dtype` or `dtype` set."
+                    )
 
     if json_output:
         out = {"model_id": model_id, "revision": revision, **asdict(metadata)}
@@ -349,6 +357,13 @@ def main() -> None:
         default=1,
         help="Batch size to help estimate the required RAM for caching when running the inference. Defaults to 1.",
     )
+    parser.add_argument(
+        "--kv-cache-dtype",
+        type=str,
+        default="auto",
+        choices={"auto", "fp8", "fp8_e5m2", "fp8_e4m3"},
+        help="Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available). Defaults to `auto`.",
+    )
 
     parser.add_argument(
         "--json-output",
@@ -376,6 +391,7 @@ def main() -> None:
             experimental=args.experimental,
             max_model_len=args.max_model_len,
             batch_size=args.batch_size,
+            kv_cache_dtype=args.kv_cache_dtype,
             # NOTE: Below are the arguments that affect the output format
             json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
