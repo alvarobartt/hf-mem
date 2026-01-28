@@ -80,7 +80,7 @@ uvx hf-mem --model-id google/embeddinggemma-300m
 By enabling the `--experimental` flag, you can enable the KV Cache memory estimation for LLMs (`...ForCausalLM`) and VLMs (`...ForConditionalGeneration`), even including a custom `--max-model-len` (defaults to the `config.json` default), `--batch-size` (defaults to 1), and the `--kv-cache-dtype` (defaults to `auto` which means it uses the default data type set in `config.json`).
 
 ```bash
-uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental --max-model-len 65536 --batch-size 1 --kv-cache-dtype fp8_e4m3
+uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 ```
 
 <img src="https://github.com/user-attachments/assets/247113cf-59a7-4f76-a8df-735e292558a0" />
