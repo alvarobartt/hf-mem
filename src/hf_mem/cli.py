@@ -293,7 +293,7 @@ async def run(
                 if batch_size:
                     cache_size *= batch_size
 
-                if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
+                if kv_cache_dtype in {"bfloat16", "fp8_e5m2", "fp8_e4m3"}:
                     cache_dtype = kv_cache_dtype.upper()
                 elif kv_cache_dtype in {"fp8", "fp8_ds_mla", "fp8_inc"}:
                     # NOTE: Default to `FP8` for the calculations, given that all those take 1 byte, but only FP8
