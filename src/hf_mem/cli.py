@@ -320,7 +320,7 @@ async def run(
                     cache_dtype = torch_dtype_to_safetensors_dtype(_fmt)
                 else:
                     raise RuntimeError(
-                        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `fp8`, `fp8_e5m2` or `fp8_e4m3`, and if `auto` is provided then `config.json` needs to contain either `torch_dtype` or `dtype` set."
+                        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `bfloat16`, `fp8`, `fp8_ds_mla`, `fp8_e4m3`, `fp8_e5m2` or `fp8_inc`. If `auto` is set, then the `config.json` should either contain the `torch_dtype` or `dtype` fields set, or if quantized then `quantization_config` needs to be set and contain the keys `quant_method` and `fmt`, with `quant_method` being `fp8` and `fmt` any valid format as per the `fp8` formats mentioned before."
                     )
 
     if json_output:
