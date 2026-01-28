@@ -273,36 +273,18 @@ async def run(
                         f"`config.json` doesn't contain all the keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {config.keys()}."  # type: ignore
                     )
 
-                # Reference: https://gist.github.com/alvarobartt/1097ca1b07c66fd71470937d599c2072
-                cache_size = (
-                    # NOTE: 2 because it applies to both key and value projections
-                    2
-                    * config.get("num_hidden_layers")  # type: ignore
-                    # NOTE: `num_key_value_heads` defaults to `num_attention_heads` in MHA
-                    * config.get("num_key_value_heads", config.get("num_attention_heads"))  # type: ignore
-                    * (config.get("hidden_size") // config.get("num_attention_heads"))  # type: ignore
-                    * max_model_len
-                    # NOTE: Default to F16 or BF16 if dtype is not set
-                    * get_safetensors_dtype_bytes(
-                        torch_dtype_to_safetensors_dtype(
-                            config.get("torch_dtype", config.get("dtype", "float16"))
-                        )
-                    )  # type: ignore
-                )
-
-                if batch_size:
-                    cache_size *= batch_size
-
-                if kv_cache_dtype in {"bfloat16", "fp8_e5m2", "fp8_e4m3"}:
+                if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
                     cache_dtype = kv_cache_dtype.upper()
                 elif kv_cache_dtype in {"fp8", "fp8_ds_mla", "fp8_inc"}:
                     # NOTE: Default to `FP8` for the calculations, given that all those take 1 byte, but only FP8
                     # is supported in Safetensors, whilst FP8_DS_MLA (DeepSeek MLA) and FP8_INC (Intel HPUs) are not
                     cache_dtype = "FP8"
+                elif kv_cache_dtype == "bfloat16":
+                    cache_dtype = "BF16"
                 elif _cache_dtype := config.get("torch_dtype", None):
-                    cache_dtype = _cache_dtype
+                    cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
                 elif _cache_dtype := config.get("dtype", None):
-                    cache_dtype = _cache_dtype
+                    cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
                 elif "quantization_config" in config and all(
                     k in config["quantization_config"] for k in {"quant_method", "fmt"}
                 ):
@@ -322,6 +304,21 @@ async def run(
                     raise RuntimeError(
                         f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `bfloat16`, `fp8`, `fp8_ds_mla`, `fp8_e4m3`, `fp8_e5m2` or `fp8_inc`. If `auto` is set, then the `config.json` should either contain the `torch_dtype` or `dtype` fields set, or if quantized then `quantization_config` needs to be set and contain the keys `quant_method` and `fmt`, with `quant_method` being `fp8` and `fmt` any valid format as per the `fp8` formats mentioned before."
                     )
+
+                # Reference: https://gist.github.com/alvarobartt/1097ca1b07c66fd71470937d599c2072
+                cache_size = (
+                    # NOTE: 2 because it applies to both key and value projections
+                    2
+                    * config.get("num_hidden_layers")  # type: ignore
+                    # NOTE: `num_key_value_heads` defaults to `num_attention_heads` in MHA
+                    * config.get("num_key_value_heads", config.get("num_attention_heads"))  # type: ignore
+                    * (config.get("hidden_size") // config.get("num_attention_heads"))  # type: ignore
+                    * max_model_len
+                    * get_safetensors_dtype_bytes(cache_dtype)
+                )
+
+                if batch_size:
+                    cache_size *= batch_size
 
     if json_output:
         out = {"model_id": model_id, "revision": revision, **asdict(metadata)}
