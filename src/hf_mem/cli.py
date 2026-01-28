@@ -13,7 +13,7 @@ import httpx
 
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report
-from hf_mem.types import get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
+from hf_mem.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -303,6 +303,21 @@ async def run(
                     cache_dtype = _cache_dtype
                 elif _cache_dtype := config.get("dtype", None):
                     cache_dtype = _cache_dtype
+                elif "quantization_config" in config and all(
+                    k in config["quantization_config"] for k in {"quant_method", "fmt"}
+                ):
+                    _quantization_config = config["quantization_config"]
+                    _quant_method = _quantization_config["quant_method"]
+                    _fmt = _quantization_config["fmt"]
+                    if _quant_method == "fp8" and not _fmt.startswith("float8_"):
+                        _fmt = f"float8_{_fmt}"
+
+                    if _quant_method != "fp8" or _fmt not in TorchDtypes.__args__:
+                        raise RuntimeError(
+                            f"Provided `--kv-cache-dtype=auto` and given that `config.json` contains the following `quantization_config={_quantization_config}` with either a `quant_method` different than `fp8` i.e., `{_quant_method}` or a `fmt` that's not supported (should be any of {TorchDtypes.__args__}). To solve that, you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
+                        )
+
+                    cache_dtype = torch_dtype_to_safetensors_dtype(_fmt)
                 else:
                     raise RuntimeError(
                         f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `fp8`, `fp8_e5m2` or `fp8_e4m3`, and if `auto` is provided then `config.json` needs to contain either `torch_dtype` or `dtype` set."
