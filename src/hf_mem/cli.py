@@ -274,7 +274,7 @@ async def run(
                     )
 
                 if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
-                    cache_dtype = kv_cache_dtype.upper()
+                    cache_dtype = "F8_" + kv_cache_dtype[3:].upper()
                 elif kv_cache_dtype in {"fp8", "fp8_ds_mla", "fp8_inc"}:
                     # NOTE: Default to `FP8` for the calculations, given that all those take 1 byte, but only FP8
                     # is supported in Safetensors, whilst FP8_DS_MLA (DeepSeek MLA) and FP8_INC (Intel HPUs) are not
