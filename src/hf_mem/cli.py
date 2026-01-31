@@ -328,8 +328,13 @@ async def run(
                     2
                     * _get_config_value(config, "num_hidden_layers")
                     # NOTE: `num_key_value_heads` defaults to `num_attention_heads` in MHA
-                    * _get_config_value(config, "num_key_value_heads", _get_config_value(config, "num_attention_heads"))
-                    * (_get_config_value(config, "hidden_size") // _get_config_value(config, "num_attention_heads"))
+                    * _get_config_value(
+                        config, "num_key_value_heads", _get_config_value(config, "num_attention_heads")
+                    )
+                    * (
+                        _get_config_value(config, "hidden_size")
+                        // _get_config_value(config, "num_attention_heads")
+                    )
                     * max_model_len
                     * get_safetensors_dtype_bytes(cache_dtype)
                 )
