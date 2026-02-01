@@ -79,20 +79,6 @@ async def fetch_modules_and_dense_metadata(
     return dense_metadata
 
 
-def _get_config_value(config: Dict[str, Any], key: str, default: Any = None) -> Any:
-    """Get value from config, falling back to text_config if present.
-
-    Some multimodal models (e.g., Kimi-K2.5, LLaVA) store their transformer
-    configuration in a nested `text_config` dictionary. This helper handles
-    both top-level and nested configurations.
-    """
-    if key in config:
-        return config[key]
-    if "text_config" in config and isinstance(config["text_config"], dict) and key in config["text_config"]:
-        return config["text_config"][key]
-    return default
-
-
 async def run(
     model_id: str,
     revision: str,
@@ -271,23 +257,29 @@ async def run(
                     "`--experimental` was provided, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` not `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then remove the `--experimental` flag from the command to supress this warning."
                 )
             else:
-                if max_model_len is None:
-                    max_model_len = _get_config_value(config, "max_position_embeddings")
-                if max_model_len is None:
-                    max_model_len = _get_config_value(config, "n_positions")
-                if max_model_len is None:
-                    max_model_len = _get_config_value(config, "max_seq_len")
+                if (
+                    any(arch.__contains__("ForConditionalGeneration") for arch in config["architectures"])
+                    and "text_config" in config
+                ):
+                    warnings.warn(
+                        f"Given that `--model-id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
+                    )
+                    config = config["text_config"]
 
                 if max_model_len is None:
-                    warnings.warn(
-                        f"Either the `--max-model-len` was not set, not available in `config.json` (including `text_config` if present) with the any of the keys: `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+                    max_model_len = config.get(
+                        "max_position_embeddings",
+                        config.get("n_positions", config.get("max_seq_len", max_model_len)),
                     )
 
-                required_keys = {"hidden_size", "num_hidden_layers", "num_attention_heads"}
-                missing_keys = [k for k in required_keys if _get_config_value(config, k) is None]
-                if missing_keys:
+                if max_model_len is None:
                     warnings.warn(
-                        f"`config.json` doesn't contain all the required keys {missing_keys} (checked both top-level and text_config if present)."
+                        f"Either the `--max-model-len` was not set, is not available in `config.json` with the any of the keys: `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+                    )
+
+                if not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):  # type: ignore
+                    warnings.warn(
+                        f"`config.json` doesn't contain all the keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {config.keys()}."  # type: ignore
                     )
 
                 if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
@@ -326,15 +318,10 @@ async def run(
                 cache_size = (
                     # NOTE: 2 because it applies to both key and value projections
                     2
-                    * _get_config_value(config, "num_hidden_layers")
+                    * config.get("num_hidden_layers")  # type: ignore
                     # NOTE: `num_key_value_heads` defaults to `num_attention_heads` in MHA
-                    * _get_config_value(
-                        config, "num_key_value_heads", _get_config_value(config, "num_attention_heads")
-                    )
-                    * (
-                        _get_config_value(config, "hidden_size")
-                        // _get_config_value(config, "num_attention_heads")
-                    )
+                    * config.get("num_key_value_heads", config.get("num_attention_heads"))  # type: ignore
+                    * (config.get("hidden_size") // config.get("num_attention_heads"))  # type: ignore
                     * max_model_len
                     * get_safetensors_dtype_bytes(cache_dtype)
                 )
