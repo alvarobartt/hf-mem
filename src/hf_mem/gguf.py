@@ -1,13 +1,15 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Dict, Optional, Any, Callable
 from enum import IntEnum
 import httpx
+import os
 import struct
 import math
-from hf_mem.cli import REQUEST_TIMEOUT
 from hf_mem.types import get_safetensors_dtype_bytes
+from hf_mem.metadata import DtypeMetadata
 
-SIZES = [100_000, 1_000_000, 10_000_000, 50_000_000, 100_000_000]
+REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
+SIZES = [1_000_000, 10_000_000, 50_000_000, 100_000_000]
 KV_CACHE_FIELD_ENDINGS = [
     "block_count", 
     "head_count_kv", 
@@ -207,16 +209,12 @@ Parsers: Dict[GGUFMetadataDtype, Callable] = {
     GGUFMetadataDtype.FLOAT64: _read_float64,
 }
 
-@dataclass
-class GGUFDtypeMetadata:
-    param_count: int
-    bytes_count: float
 
 @dataclass
 class GGUFComponentMetadata:
-    dtypes: Dict[GGUFDtype, GGUFDtypeMetadata]
+    dtypes: Dict[GGUFDtype, DtypeMetadata]
     param_count: int
-    bytes_count: float
+    bytes_count: int
 
 @dataclass
 class GGUFKVCacheInfo:
@@ -229,9 +227,77 @@ class GGUFKVCacheInfo:
 class GGUFMetadata:
     components: Dict[str, GGUFComponentMetadata]
     param_count: int
-    bytes_count: float
+    bytes_count: int
     kv_cache_info: Optional[GGUFKVCacheInfo] = None
 
+
+def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
+    merged_components = {}
+    all_component_names = set(shard1.components.keys()) | set(shard2.components.keys())
+    
+    for component_name in all_component_names:
+        comp1 = shard1.components.get(component_name)
+        comp2 = shard2.components.get(component_name)
+        
+        if comp1 and comp2:
+            # Both have it -> merge
+            merged_dtypes = {}
+            all_dtypes = set(comp1.dtypes.keys()) | set(comp2.dtypes.keys())
+            
+            for dtype in all_dtypes:
+                dtype_meta1 = comp1.dtypes.get(dtype)
+                dtype_meta2 = comp2.dtypes.get(dtype)
+                
+                if dtype_meta1 and dtype_meta2:
+                    # Both have it -> merge
+                    merged_dtypes[dtype] = DtypeMetadata(
+                        param_count=dtype_meta1.param_count + dtype_meta2.param_count,
+                        bytes_count=dtype_meta1.bytes_count + dtype_meta2.bytes_count
+                    )
+                elif dtype_meta1:
+                    merged_dtypes[dtype] = dtype_meta1
+                else:
+                    merged_dtypes[dtype] = dtype_meta2
+            
+            merged_components[component_name] = GGUFComponentMetadata(
+                dtypes=merged_dtypes,
+                param_count=comp1.param_count + comp2.param_count,
+                bytes_count=comp1.bytes_count + comp2.bytes_count
+            )
+        elif comp1:
+            merged_components[component_name] = comp1
+        else:
+            merged_components[component_name] = comp2
+    
+    # KV-cache info should be the same for all shards, we use earlier ones since sometimes
+    # cache metadata gets dropped after first shard
+    kv_cache_info = shard1.kv_cache_info or shard2.kv_cache_info
+    
+    return GGUFMetadata(
+        components=merged_components,
+        param_count=shard1.param_count + shard2.param_count,
+        bytes_count=shard1.bytes_count + shard2.bytes_count,
+        kv_cache_info=kv_cache_info
+    )
+
+
+def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) -> Dict[str, Any]:
+    out = asdict(metadata)
+    # Convert dtypes enum keys to string names
+    out["components"]["Transformer"]["dtypes"] = {
+        k.name: v for k, v in out["components"]["Transformer"]["dtypes"].items()
+    }
+    out = {"model_id": model_id, "revision": revision, **out}
+    
+    # If --experimental, move cache info out
+    if out.get("kv_cache_info") is not None:
+        out["max_model_len"] = out["kv_cache_info"]["max_model_len"]
+        out["cache_size"] = out["kv_cache_info"]["cache_size"]
+        out["batch_size"] = out["kv_cache_info"]["batch_size"]
+        out["cache_dtype"] = out["kv_cache_info"]["cache_dtype"]
+    out.pop("kv_cache_info", None)
+
+    return out
 
 def compute_gguf_kv_cache_size(
         kv_metadata: dict, 
@@ -245,7 +311,7 @@ def compute_gguf_kv_cache_size(
     context_length = kv_metadata["context_length"]
 
     size_per_token = (2 * head_count_kv * (embedding_length // head_count))
-    if kv_cache_dtype is not None:
+    if kv_cache_dtype is not None and kv_cache_dtype != "auto":
         total_size = (
             block_count 
             * size_per_token 
@@ -267,7 +333,7 @@ def compute_gguf_kv_cache_size(
 def parse_gguf_metadata(
         raw_metadata: bytes,
         experimental: bool = False,
-        max_model_length: Optional[int] = None,
+        max_model_len: Optional[int] = None,
         kv_cache_dtype: Optional[str] = None,
         batch_size: int = 1
         ) -> GGUFMetadata:
@@ -298,8 +364,8 @@ def parse_gguf_metadata(
         }
 
         # Replace with optional fields
-        if max_model_length is not None: 
-            kv_cache_dict["context_length"] = max_model_length
+        if max_model_len is not None: 
+            kv_cache_dict["context_length"] = max_model_len
         if kv_cache_dtype is not None:
             kv_cache_dict["kv_dtype"] = kv_cache_dtype
         if batch_size is not None:
@@ -338,13 +404,13 @@ def parse_gguf_metadata(
         tensor_offset, offset = _read_uint64(raw_metadata, offset)
 
         param_count = math.prod(dimensions)
-        bytes_count = GGUFDtypeBitsPerWeight[GGUFDtype(tensor_type)] / 8.0 * param_count
+        bytes_count = int(GGUFDtypeBitsPerWeight[GGUFDtype(tensor_type)] / 8.0 * param_count)
         if GGUFDtype(tensor_type) in component.dtypes:
             dtype = component.dtypes[GGUFDtype(tensor_type)]
             dtype.param_count += param_count
             dtype.bytes_count += bytes_count
         else:
-            component.dtypes[GGUFDtype(tensor_type)] = GGUFDtypeMetadata(
+            component.dtypes[GGUFDtype(tensor_type)] = DtypeMetadata(
                 param_count=param_count,
                 bytes_count=bytes_count,
             )
@@ -363,7 +429,7 @@ async def fetch_gguf_metadata(
     client: httpx.AsyncClient, 
     url: str, 
     experimental: bool = False,
-    max_model_length: Optional[int] = None,
+    max_model_len: Optional[int] = None,
     kv_cache_dtype: Optional[str] = "F16",
     batch_size: int = 1,
     headers: Optional[Dict[str, str]] = None
@@ -378,7 +444,7 @@ async def fetch_gguf_metadata(
             processed_metadata = parse_gguf_metadata(
                 raw_metadata = raw_metadata, 
                 experimental = experimental, 
-                max_model_length = max_model_length, 
+                max_model_len = max_model_len, 
                 kv_cache_dtype = kv_cache_dtype, 
                 batch_size = batch_size)
             
