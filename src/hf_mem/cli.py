@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import os
+import re
 import struct
 import warnings
 from dataclasses import asdict
@@ -14,6 +15,7 @@ import httpx
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report, print_report_for_gguf
 from hf_mem.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
+from hf_mem.gguf import fetch_gguf_metadata, gguf_metadata_to_json, GGUFMetadata, merge_shards
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -90,6 +92,7 @@ async def run(
     # END_KV_CACHE_ARGS
     json_output: bool = False,
     ignore_table_width: bool = False,
+    gguf: bool = False,
 ) -> Dict[str, Any] | None:
     headers = {"User-Agent": f"hf-mem/0.4; id={uuid4()}; model_id={model_id}; revision={revision}"}
     # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
@@ -124,7 +127,58 @@ async def run(
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
-    if "model.safetensors" in file_paths:
+    # GGUF support
+    if gguf:
+        gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
+        if not gguf_paths:
+            raise RuntimeError(f"No GGUF files found for {model_id} @ {revision}.")
+        
+        gguf_files: Dict[str, GGUFMetadata] = dict()
+        for path in gguf_paths:
+            f_url = f"https://huggingface.co/{model_id}/resolve/{revision}/{str(path)}"
+            metadata = await fetch_gguf_metadata(
+                client=client, 
+                url=f_url, 
+                experimental=experimental,
+                max_model_len=max_model_len,
+                kv_cache_dtype=kv_cache_dtype,
+                batch_size=batch_size,
+            )
+
+            # In sharded GGUF files tensor metadata also gets sharded, so we need to merge them all
+            shard_pattern = re.match(r'(.+)-\d+-of-\d+\.gguf$', str(path)) # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
+            if shard_pattern:
+                # Ex: base_name = Kimi-K2.5-BF16
+                base_name = shard_pattern.group(1) + ".gguf"
+                print(base_name)
+                if base_name in gguf_files:
+                    gguf_files[base_name] = merge_shards(gguf_files[base_name], metadata)
+                else:
+                    gguf_files[base_name] = metadata
+            else:
+                gguf_files[str(path)] = metadata 
+        
+        
+        if json_output:
+            print(
+                json.dumps([
+                    gguf_metadata_to_json(
+                        model_id=model_id, 
+                        revision=revision, 
+                        metadata=gguf_metadata
+                    ) 
+                    for gguf_metadata in gguf_files.values()
+                ])
+            )
+        else:
+            print_report_for_gguf(
+                model_id=model_id,
+                revision=revision,
+                gguf_files=gguf_files,
+                ignore_table_width=ignore_table_width
+            )
+        return
+    elif "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
         raw_metadata = await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
@@ -235,25 +289,9 @@ async def run(
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
     else:
-        # Check for GGUF files
-        gguf_files = {
-            f["path"]: f["size"]
-            for f in files
-            if f.get("path", "").endswith(".gguf") and f.get("size") is not None
-        }
-
-        if gguf_files:
-            print_report_for_gguf(
-                model_id=model_id,
-                revision=revision,
-                gguf_files=gguf_files,
-                ignore_table_width=ignore_table_width,
-            )
-            return
-        else:
-            raise RuntimeError(
-                "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json`, OR `.gguf` FILES HAVE BEEN FOUND"
-            )
+        raise RuntimeError(
+            "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` FILES HAVE BEEN FOUND"
+        )
 
     cache_size = None
     if experimental:
@@ -458,7 +496,11 @@ def main() -> None:
         action="store_true",
         help="Whether to ignore the maximum recommended table width, in case the `--model-id` and/or `--revision` cause a row overflow when printing those.",
     )
-
+    parser.add_argument(
+        "--gguf",
+        action="store_true",
+        help="Whether to parse GGUF files instead of Safetensors ones.",
+    )
     args = parser.parse_args()
 
     if args.experimental:
@@ -478,5 +520,7 @@ def main() -> None:
             # NOTE: Below are the arguments that affect the output format
             json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
+            # GGUF flag
+            gguf=args.gguf,
         )
     )
