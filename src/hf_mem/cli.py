@@ -257,6 +257,15 @@ async def run(
                     "`--experimental` was provided, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` not `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then remove the `--experimental` flag from the command to supress this warning."
                 )
             else:
+                if (
+                    any(arch.__contains__("ForConditionalGeneration") for arch in config["architectures"])
+                    and "text_config" in config
+                ):
+                    warnings.warn(
+                        f"Given that `--model-id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
+                    )
+                    config = config["text_config"]
+
                 if max_model_len is None:
                     max_model_len = config.get(
                         "max_position_embeddings",
@@ -265,7 +274,7 @@ async def run(
 
                 if max_model_len is None:
                     warnings.warn(
-                        f"Either the `--max-model-len` was not set, not available in `config.json` with the any of the keys: `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+                        f"Either the `--max-model-len` was not set, is not available in `config.json` with the any of the keys: `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
                     )
 
                 if not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):  # type: ignore
