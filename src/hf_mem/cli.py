@@ -121,10 +121,6 @@ async def run(
         follow_redirects=True,
     )
 
-    # TODO: `recursive=true` shouldn't really be required unless it's a Diffusers
-    # models... I don't think this adds extra latency anyway
-    # NOTE: `recursive=true` is also need for GGUF file directories where each 
-    # sharded quantization is inside a different folder like: Q2_K/model_Q2_K-0001-of-0048.gguf
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
@@ -141,7 +137,7 @@ async def run(
             shard_pattern = re.match(r'(.+)-(\d+)-of-(\d+)\.gguf$', str(path)) # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
             parse_kv_cache = experimental
             # For sharded files, parsing kv_cache data might result in runtime errors (missing fields)
-            if shard_pattern:
+            if experimental and shard_pattern:
                 shard_num = int(shard_pattern.group(2)) # Get first number
                 parse_kv_cache = (shard_num == 1)
 
