@@ -49,7 +49,7 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 
 ## (Optional) Agent Skills
 
-Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](skills/hf-mem/SKILL.md).
+Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](.skills/hf-mem/SKILL.md).
 
 More information can be found at [Anthropic Agent Skills and how to use them](https://github.com/anthropics/skills).
 
