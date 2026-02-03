@@ -13,6 +13,11 @@ dependencies = [
     "httpx[http2]>=0.28.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/alvarobartt/hf-mem"
+Repository = "https://github.com/alvarobartt/hf-mem"
+Issues = "https://github.com/alvarobartt/hf-mem/issues"
+
 [build-system]
 requires = ["uv_build>=0.9.5,<0.10.0"]
 build-backend = "uv_build"
