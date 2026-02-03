@@ -1,5 +1,5 @@
 import warnings
-from typing import Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
 from hf_mem.metadata import SafetensorsMetadata
 
@@ -7,7 +7,7 @@ MIN_NAME_LEN = 5
 MAX_NAME_LEN = 14
 MIN_DATA_LEN = 20
 MAX_DATA_LEN = 64
-BORDERS_AND_PADDING = 7
+BORDERS_AND_PADDING = 4
 
 BOX = {
     "tl": "┌",
@@ -29,7 +29,7 @@ def _print_with_color(content: str) -> None:
 
 
 def _print_header(current_len: int) -> None:
-    length = current_len + MAX_NAME_LEN + BORDERS_AND_PADDING
+    length = current_len + 2 * BORDERS_AND_PADDING + 2
     top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
     _print_with_color(top)
 
@@ -38,8 +38,7 @@ def _print_header(current_len: int) -> None:
 
 
 def _print_centered(text: str, current_len: int) -> None:
-    max_len = current_len + MAX_NAME_LEN - BORDERS_AND_PADDING
-    total_width = max_len + 12
+    total_width = current_len + 2 * BORDERS_AND_PADDING
     text_len = len(text)
     pad_left = (total_width - text_len) // 2
     pad_right = total_width - text_len - pad_left
@@ -49,6 +48,7 @@ def _print_centered(text: str, current_len: int) -> None:
 def _print_divider(
     current_len: int,
     side: Optional[Literal["top", "top-continue", "bottom", "bottom-continue"]] = None,
+    name_len: int = MAX_NAME_LEN,
 ) -> None:
     match side:
         case "top":
@@ -62,7 +62,7 @@ def _print_divider(
         case _:
             left, mid, right = BOX["lm"], BOX["mm"], BOX["rm"]
 
-    name_col_inner = MAX_NAME_LEN + 2
+    name_col_inner = name_len + 2
     data_col_inner = current_len + 1
 
     line = left
@@ -73,16 +73,16 @@ def _print_divider(
     _print_with_color(line)
 
 
-def _format_name(name: str) -> str:
+def _format_name(name: str, max_len: int = MAX_NAME_LEN) -> str:
     if len(name) < MIN_NAME_LEN:
         return f"{name:<{MIN_NAME_LEN}}"
-    if len(name) > MAX_NAME_LEN:
-        return name[: MAX_NAME_LEN - 3] + "..."
-    return f"{name:<{MAX_NAME_LEN}}"
+    if len(name) > max_len:
+        return name[: max_len - 3] + "..."
+    return f"{name:<{max_len}}"
 
 
-def _print_row(name: str, text: str, current_len: int) -> None:
-    name_fmt = _format_name(name)
+def _print_row(name: str, text: str, current_len: int, name_len: int = MAX_NAME_LEN) -> None:
+    name_fmt = _format_name(name, name_len)
     data_fmt = f"{str(text):<{current_len}}"
     _print_with_color(f"{BOX['vt']} {name_fmt} {BOX['vt']} {data_fmt} {BOX['vt']}")
 
@@ -113,23 +113,53 @@ def print_report(
     model_id: str,
     revision: str,
     metadata: SafetensorsMetadata,
+    cache: Optional[Dict[str, Any]] = None,
     ignore_table_width: bool = False,
 ) -> None:
-    rows = [
+    combined_total = metadata.bytes_count + cache["cache_size"] if cache else metadata.bytes_count
+
+    centered_rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
-        "TOTAL MEMORY",
-        "REQUIREMENTS",
     ]
-
+    if cache:
+        centered_rows.append(f"w/ max-model-len={cache['max_model_len']}, batch-size={cache['batch_size']}")
     for name, nested_metadata in metadata.components.items():
         if len(metadata.components) > 1:
-            rows.append(name)
+            centered_rows.append(
+                f"{name.upper()} ({_format_short_number(nested_metadata.param_count)} PARAMS, {_bytes_to_gb(nested_metadata.bytes_count):.2f} GB)"
+            )
+        elif cache:
+            centered_rows.append(
+                f"MODEL ({_format_short_number(nested_metadata.param_count)} PARAMS, {_bytes_to_gb(nested_metadata.bytes_count):.2f} GB)"
+            )
+    if cache:
+        centered_rows.append(
+            f"KV CACHE ({cache['max_model_len'] * cache['batch_size']} TOKENS, {_bytes_to_gb(cache['cache_size']):.2f} GB)"
+        )
 
+    data_rows = []
+    if cache:
+        data_rows.append(
+            f"{_bytes_to_gb(combined_total):.2f} GB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
+        )
+    else:
+        data_rows.append(
+            f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} PARAMS)"
+        )
+    for _, nested_metadata in metadata.components.items():
         for dtype, dtype_metadata in nested_metadata.dtypes.items():
-            rows.append(f"{dtype} {dtype_metadata.param_count} {dtype_metadata.bytes_count}")
+            data_rows.append(
+                f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(combined_total):.2f} GB"
+            )
+    if cache:
+        data_rows.append(f"{_bytes_to_gb(cache['cache_size']):.2f} / {_bytes_to_gb(combined_total):.2f} GB")
 
-    max_len = max(len(str(r)) for r in rows)
+    max_centered_len = max(len(r) for r in centered_rows)
+    max_data_len = max(len(r) for r in data_rows)
+
+    min_width_for_data = MAX_NAME_LEN + max_data_len + 5
+    max_len = max(max_centered_len, min_width_for_data)
 
     if max_len > MAX_DATA_LEN and ignore_table_width is False:
         warnings.warn(
@@ -137,31 +167,48 @@ def print_report(
         )
 
     current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
+    data_col_width = current_len + 2 * BORDERS_AND_PADDING - MAX_NAME_LEN - 5
 
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
-    _print_divider(current_len + 1, "top")
+    if cache:
+        _print_centered(
+            f"w/ max-model-len={cache['max_model_len']}, batch-size={cache['batch_size']}",
+            current_len,
+        )
+    _print_divider(data_col_width + 1, "top")
 
-    total_text = (
-        f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} params)"
-    )
-    _print_row("TOTAL MEMORY", total_text, current_len)
-
-    total_bar = _make_bar(metadata.bytes_count, metadata.bytes_count, current_len)
-    _print_row("REQUIREMENTS", total_bar, current_len)
+    if cache:
+        total_text = f"{_bytes_to_gb(combined_total):.2f} GB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
+        total_bar = _make_bar(combined_total, combined_total, data_col_width)
+        _print_row("TOTAL MEMORY", total_text, data_col_width)
+        _print_row("REQUIREMENTS", total_bar, data_col_width)
+    else:
+        model_text = (
+            f"{_bytes_to_gb(metadata.bytes_count):.2f} GB ({_format_short_number(metadata.param_count)} PARAMS)"
+        )
+        model_bar = _make_bar(metadata.bytes_count, metadata.bytes_count, data_col_width)
+        _print_row("TOTAL MEMORY", model_text, data_col_width)
+        _print_row("REQUIREMENTS", model_bar, data_col_width)
 
     for key, value in metadata.components.items():
         if len(metadata.components) > 1:
-            _print_divider(current_len + 1, "top-continue")
+            _print_divider(data_col_width + 1, "top-continue")
             _print_centered(
-                f"{key.upper()} ({_bytes_to_gb(value.bytes_count):.2f} GB)",
+                f"{key.upper()} ({_format_short_number(value.param_count)} PARAMS, {_bytes_to_gb(value.bytes_count):.2f} GB)",
                 current_len,
             )
-
-            _print_divider(current_len + 1, "top")
+            _print_divider(data_col_width + 1, "top")
+        elif cache:
+            _print_divider(data_col_width + 1, "top-continue")
+            _print_centered(
+                f"MODEL ({_format_short_number(value.param_count)} PARAMS, {_bytes_to_gb(value.bytes_count):.2f} GB)",
+                current_len,
+            )
+            _print_divider(data_col_width + 1, "top")
         else:
-            _print_divider(current_len + 1)
+            _print_divider(data_col_width + 1)
 
         max_length = max(
             [
@@ -170,27 +217,47 @@ def print_report(
             ]
         )
         for idx, (dtype, dtype_metadata) in enumerate(value.dtypes.items()):
-            gb_text = (
-                f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(metadata.bytes_count):.2f} GB"
-            )
+            gb_text = f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(combined_total):.2f} GB"
             _print_row(
                 dtype.upper() + " " * (max_length - len(dtype)),
                 gb_text,
-                current_len,
+                data_col_width,
             )
 
             bar = _make_bar(
                 _bytes_to_gb(dtype_metadata.bytes_count),
-                _bytes_to_gb(metadata.bytes_count),
-                current_len,
+                _bytes_to_gb(combined_total),
+                data_col_width,
             )
             _print_row(
                 f"{_format_short_number(dtype_metadata.param_count)} PARAMS",
                 bar,
-                current_len,
+                data_col_width,
             )
 
             if idx < len(value.dtypes) - 1:
-                _print_divider(current_len + 1)
+                _print_divider(data_col_width + 1)
 
-    _print_divider(current_len + 1, "bottom")
+    if cache:
+        _print_divider(data_col_width + 1, "top-continue")
+        _print_centered(
+            f"KV CACHE ({cache['max_model_len'] * cache['batch_size']} TOKENS, {_bytes_to_gb(cache['cache_size']):.2f} GB)",
+            current_len,
+        )
+        _print_divider(data_col_width + 1, "top")
+
+        kv_text = f"{_bytes_to_gb(cache['cache_size']):.2f} / {_bytes_to_gb(combined_total):.2f} GB"
+        _print_row(
+            cache["cache_dtype"].upper() + " " * (max_length - len(cache["cache_dtype"])),  # type: ignore
+            kv_text,
+            data_col_width,
+        )
+
+        kv_bar = _make_bar(cache["cache_size"], combined_total, data_col_width)
+        _print_row(
+            f"{cache['max_model_len'] * cache['batch_size']} TOKENS",
+            kv_bar,
+            data_col_width,
+        )
+
+    _print_divider(data_col_width + 1, "bottom")
