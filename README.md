@@ -47,6 +47,12 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 
 <img src="https://github.com/user-attachments/assets/247113cf-59a7-4f76-a8df-735e292558a0" />
 
+## (Optional) Agent Skills
+
+Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](skills/hf-mem/SKILL.md).
+
+More information can be found at [Anthropic Agent Skills and how to use them](https://github.com/anthropics/skills).
+
 ## References
 
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
