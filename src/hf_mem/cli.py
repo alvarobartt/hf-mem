@@ -15,13 +15,14 @@ import httpx
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report, print_report_for_gguf
 from hf_mem.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
-from hf_mem.gguf import fetch_gguf_metadata, gguf_metadata_to_json, GGUFMetadata, merge_shards
+from hf_mem.gguf import fetch_gguf_metadata, gguf_metadata_to_json, merge_shards, GGUFMetadata, GGUFDtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
 MAX_METADATA_SIZE = 100_000
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
 MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4)))
+KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
 
 
 # NOTE: Return type-hint set to `Any`, but it will only be a JSON-compatible object
@@ -486,11 +487,7 @@ def main() -> None:
         type=str,
         default="auto",
         # NOTE: https://docs.vllm.ai/en/stable/cli/serve/#-kv-cache-dtype
-        # TODO: Might want to change this since --kv-cache-dtype for .GGUF files does not support most of 
-        # these options. It only supports a subset from the ones listed in GGUFDtype enum.
-        # Source: https://github.com/ggml-org/llama.cpp/issues/10373
-        choices={"auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"},
-        help="Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available). Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Defaults to `auto`.",
+        help=f"Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available) or F16 for GGUF files. Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Valid values are {KV_CACHE_DTYPE_CHOICES} without for safetensors files and {["auto"] + list(GGUFDtype.__members__.keys())} for GGUF files. Defaults to `auto`.",
     )
 
     parser.add_argument(
@@ -514,6 +511,13 @@ def main() -> None:
         warnings.warn(
             "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
         )
+    
+    if args.gguf:
+        if args.kv_cache_dtype not in GGUFDtype.__members__ and args.kv_cache_dtype != "auto":
+            raise RuntimeError(f"--kv-cache-dtype={args.kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`.")
+    else:
+        if args.kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
+            raise RuntimeError(f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {KV_CACHE_DTYPE_CHOICES}.")
 
     asyncio.run(
         run(

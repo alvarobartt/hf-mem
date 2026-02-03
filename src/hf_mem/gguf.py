@@ -314,16 +314,16 @@ def compute_gguf_kv_cache_size(
     if kv_cache_dtype is not None:
         if kv_cache_dtype not in GGUFDtype.__members__:
             raise RuntimeError(f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF KV cache size estimation. Valid options: {list(GGUFDtype.__members__.keys())}.")
-        total_size = (
+        total_size = int(
             block_count 
             * size_per_token 
             * context_length 
             * batch_size 
-            * int(GGUFDtypeBitsPerWeight[GGUFDtype[kv_cache_dtype]] / 8.0)
+            * GGUFDtypeBitsPerWeight[GGUFDtype[kv_cache_dtype]] / 8.0
         )
     else:
         # Default to F16 size
-        total_size = (
+        total_size = int(
             block_count 
             * size_per_token 
             * context_length 
