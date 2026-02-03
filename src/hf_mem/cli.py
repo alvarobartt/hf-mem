@@ -139,7 +139,7 @@ async def run(
         for path in gguf_paths:
             # In sharded GGUF files tensor metadata also gets sharded, so we need to merge them all
             shard_pattern = re.match(r'(.+)-(\d+)-of-(\d+)\.gguf$', str(path)) # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
-            parse_kv_cache = True
+            parse_kv_cache = experimental
             # For sharded files, parsing kv_cache data might result in runtime errors (missing fields)
             if shard_pattern:
                 shard_num = int(shard_pattern.group(2)) # Get first number
