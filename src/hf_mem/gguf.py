@@ -301,7 +301,7 @@ def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) 
 
 def compute_gguf_kv_cache_size(
         kv_metadata: dict, 
-        kv_cache_dtype: Optional[str] = None, 
+        kv_cache_dtype: Optional[str] = "F16", 
         batch_size: Optional[int] = 1
         ) -> int:
     block_count = kv_metadata["block_count"]
@@ -311,13 +311,15 @@ def compute_gguf_kv_cache_size(
     context_length = kv_metadata["context_length"]
 
     size_per_token = (2 * head_count_kv * (embedding_length // head_count))
-    if kv_cache_dtype is not None and kv_cache_dtype != "auto":
+    if kv_cache_dtype is not None:
+        if kv_cache_dtype not in GGUFDtype.__members__:
+            raise RuntimeError(f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF KV cache size estimation. Valid options: {list(GGUFDtype.__members__.keys())}.")
         total_size = (
             block_count 
             * size_per_token 
             * context_length 
             * batch_size 
-            * get_safetensors_dtype_bytes(kv_cache_dtype)
+            * int(GGUFDtypeBitsPerWeight[GGUFDtype[kv_cache_dtype]] / 8.0)
         )
     else:
         # Default to F16 size
@@ -334,7 +336,7 @@ def parse_gguf_metadata(
         raw_metadata: bytes,
         experimental: bool = False,
         max_model_len: Optional[int] = None,
-        kv_cache_dtype: Optional[str] = None,
+        kv_cache_dtype: Optional[str] = "F16",
         batch_size: int = 1
         ) -> GGUFMetadata:
     # Header
@@ -436,6 +438,8 @@ async def fetch_gguf_metadata(
 ) -> GGUFMetadata:
     for size in SIZES:
         try: 
+            if kv_cache_dtype is not None and kv_cache_dtype == "auto":
+                kv_cache_dtype = "F16"
             request_headers = {"Range": f"bytes=0-{size}", **(headers or {})}
             response = await client.get(url, headers=request_headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()

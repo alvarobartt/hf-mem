@@ -123,6 +123,8 @@ async def run(
 
     # TODO: `recursive=true` shouldn't really be required unless it's a Diffusers
     # models... I don't think this adds extra latency anyway
+    # NOTE: `recursive=true` is also need for GGUF file directories where each 
+    # sharded quantization is inside a different folder like: Q2_K/model_Q2_K-0001-of-0048.gguf
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
@@ -135,22 +137,28 @@ async def run(
         
         gguf_files: Dict[str, GGUFMetadata] = dict()
         for path in gguf_paths:
+            # In sharded GGUF files tensor metadata also gets sharded, so we need to merge them all
+            shard_pattern = re.match(r'(.+)-(\d+)-of-(\d+)\.gguf$', str(path)) # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
+            parse_kv_cache = True
+            # For sharded files, parsing kv_cache data might result in runtime errors (missing fields)
+            if shard_pattern:
+                shard_num = int(shard_pattern.group(2)) # Get first number
+                parse_kv_cache = (shard_num == 1)
+
             f_url = f"https://huggingface.co/{model_id}/resolve/{revision}/{str(path)}"
             metadata = await fetch_gguf_metadata(
                 client=client, 
                 url=f_url, 
-                experimental=experimental,
+                experimental=parse_kv_cache,
                 max_model_len=max_model_len,
                 kv_cache_dtype=kv_cache_dtype,
                 batch_size=batch_size,
             )
-
-            # In sharded GGUF files tensor metadata also gets sharded, so we need to merge them all
-            shard_pattern = re.match(r'(.+)-\d+-of-\d+\.gguf$', str(path)) # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
+            
+            # Merge metadata for sharded files
             if shard_pattern:
                 # Ex: base_name = Kimi-K2.5-BF16
                 base_name = shard_pattern.group(1) + ".gguf"
-                print(base_name)
                 if base_name in gguf_files:
                     gguf_files[base_name] = merge_shards(gguf_files[base_name], metadata)
                 else:
@@ -482,6 +490,9 @@ def main() -> None:
         type=str,
         default="auto",
         # NOTE: https://docs.vllm.ai/en/stable/cli/serve/#-kv-cache-dtype
+        # TODO: Might want to change this since --kv-cache-dtype for .GGUF files does not support most of 
+        # these options. It only supports a subset from the ones listed in GGUFDtype enum.
+        # Source: https://github.com/ggml-org/llama.cpp/issues/10373
         choices={"auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"},
         help="Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available). Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Defaults to `auto`.",
     )

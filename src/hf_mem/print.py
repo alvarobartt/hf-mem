@@ -277,11 +277,22 @@ def print_report_for_gguf(
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
     ]
-    for filename in gguf_files.keys():
+    for filename, gguf_metadata in gguf_files.items():
         centered_rows.append(filename)
 
+        # Adding also the KV lines to compute curren_len since they are most likely the longest
+        if gguf_metadata.kv_cache_info is not None:
+            cache_size = _bytes_to_gb(gguf_metadata.kv_cache_info.cache_size)
+            name_text = f"KV CACHE ({gguf_metadata.kv_cache_info.cache_dtype})"
+            max_model_len = gguf_metadata.kv_cache_info.max_model_len
+            batch_size = gguf_metadata.kv_cache_info.batch_size
+            total_gbs = _bytes_to_gb(gguf_metadata.bytes_count + gguf_metadata.kv_cache_info.cache_size)
+            gb_text = f"{cache_size:.2f} / {total_gbs:.2f} GB"
+            kv_extra_info = f"(w/ max-model-len={max_model_len}, batch-size={batch_size})"
+            centered_rows.append(name_text + gb_text + kv_extra_info)
+            
     max_centered_len = max(len(r) for r in centered_rows)
-
+    
     if max_centered_len > MAX_DATA_LEN and ignore_table_width is False:
         warnings.warn(
             f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
@@ -304,6 +315,12 @@ def print_report_for_gguf(
         total_gbs = _bytes_to_gb(gguf_metadata.bytes_count)
         total_text = f"{total_gbs:.2f} GB ({_format_short_number(gguf_metadata.param_count)} PARAMS)"
         total_bar = _make_bar(gguf_metadata.bytes_count, gguf_metadata.bytes_count, data_col_width)
+
+        # If kv cache -> Add extra GBs + suffix on first line 
+        if gguf_metadata.kv_cache_info is not None:
+            total_gbs += _bytes_to_gb(gguf_metadata.kv_cache_info.cache_size)
+            total_text = f"{total_gbs:.2f} GB ({_format_short_number(gguf_metadata.param_count)} PARAMS + KV CACHE)"
+        
         _print_row("TOTAL MEMORY", total_text, data_col_width)
         _print_row("REQUIREMENTS", total_bar, data_col_width)
 
@@ -340,6 +357,33 @@ def print_report_for_gguf(
 
                 if idx < len(transformer.dtypes) - 1:
                     _print_divider(data_col_width + 1)
+
+            # Print kv-cache info (1 per .gguf file)
+            # Same size for all but diferent % of total size between models.
+            if gguf_metadata.kv_cache_info is not None:
+                _print_divider(data_col_width + 1)
+                cache_size = _bytes_to_gb(gguf_metadata.kv_cache_info.cache_size)
+                name_text = f"KV CACHE ({gguf_metadata.kv_cache_info.cache_dtype})"
+                max_model_len = gguf_metadata.kv_cache_info.max_model_len
+                batch_size = gguf_metadata.kv_cache_info.batch_size
+                gb_text = f"{cache_size:.2f} / {total_gbs:.2f} GB"
+                kv_extra_info = f"(w/ max-model-len={max_model_len}, batch-size={batch_size})"
+                _print_row(
+                    name_text + " " * (max_length - len(name_text)),
+                    gb_text + " " + kv_extra_info,
+                    data_col_width,
+                )
+
+                bar = _make_bar(
+                    cache_size,
+                    total_gbs,
+                    data_col_width,
+                )
+                _print_row(
+                    f"{gguf_metadata.kv_cache_info.max_model_len * gguf_metadata.kv_cache_info.batch_size} TOKENS",
+                    bar,
+                    data_col_width,
+                )
 
         if i < len(gguf_files) - 1:
             _print_divider(data_col_width + 1, "bottom-continue")
