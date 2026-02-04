@@ -1,3 +1,4 @@
+from functools import cache
 import warnings
 from typing import Any, Dict, Literal, Optional
 
@@ -283,6 +284,10 @@ def print_report_for_gguf(
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
     ]
+    first_cache = list(gguf_files.values())[0].kv_cache_info
+    if first_cache is not None:
+        centered_rows.append(f"w/ max-model-len={first_cache.max_model_len}, batch-size={first_cache.batch_size}")
+    
     for filename, gguf_metadata in gguf_files.items():
         centered_rows.append(filename)
 
@@ -323,7 +328,11 @@ def print_report_for_gguf(
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
-    
+    if first_cache is not None:
+        _print_centered(
+            f"w/ max-model-len={first_cache.max_model_len}, batch-size={first_cache.batch_size}",
+            current_len,
+        )
     max_name_length = min(
         max(
             [
