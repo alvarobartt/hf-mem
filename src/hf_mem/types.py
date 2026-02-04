@@ -45,9 +45,13 @@ def torch_dtype_to_safetensors_dtype(dtype: TorchDtypes | str) -> SafetensorsDty
             return "F16"
         case "bfloat16":
             return "BF16"
-        case "float8_e4m3fn" | "float8_e4m3fn":
+        case "float8_e4m3" | "float8_e4m3fn":
             return "F8_E4M3"
         case "float8_e5m2":
             return "F8_E5M2"
+        # NOTE: `I8` is usally not used for quantizing i.e., the KV cache will never be of type `I8`, hence this
+        # case might never be hit
+        case "int8":
+            return "I8"
         case _:
             return "F16"
