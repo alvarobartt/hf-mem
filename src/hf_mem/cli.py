@@ -290,10 +290,6 @@ async def run(
                     cache_dtype = "FP8"
                 elif kv_cache_dtype == "bfloat16":
                     cache_dtype = "BF16"
-                elif _cache_dtype := config.get("torch_dtype", None):
-                    cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
-                elif _cache_dtype := config.get("dtype", None):
-                    cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
                 elif "quantization_config" in config and "quant_method" in config["quantization_config"]:
                     _quantization_config = config["quantization_config"]
                     _quant_method = _quantization_config["quant_method"]
@@ -313,6 +309,10 @@ async def run(
                         cache_dtype = torch_dtype_to_safetensors_dtype(_fmt)
                     else:
                         cache_dtype = _quant_method.upper()
+                elif _cache_dtype := config.get("torch_dtype", None):
+                    cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
+                elif _cache_dtype := config.get("dtype", None):
+                    cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
                 else:
                     raise RuntimeError(
                         f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `bfloat16`, `fp8`, `fp8_ds_mla`, `fp8_e4m3`, `fp8_e5m2` or `fp8_inc`. If `auto` is set, then the `config.json` should either contain the `torch_dtype` or `dtype` fields set, or if quantized then `quantization_config` needs to be set and contain the key `quant_method` with value `fp8` (as any of `fp32`, `fp16` or `bf16` is considered within the `quantization_config`), and optionally also contain `fmt` set to any valid format as `float8`, `float8_e4m3` or `float8_e4m3fn`."
