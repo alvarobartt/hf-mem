@@ -49,5 +49,7 @@ def torch_dtype_to_safetensors_dtype(dtype: TorchDtypes | str) -> SafetensorsDty
             return "F8_E4M3"
         case "float8_e5m2":
             return "F8_E5M2"
+        case "int8":
+            return "I8"
         case _:
             return "F16"
