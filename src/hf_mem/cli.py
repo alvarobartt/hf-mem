@@ -294,24 +294,28 @@ async def run(
                     cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
                 elif _cache_dtype := config.get("dtype", None):
                     cache_dtype = torch_dtype_to_safetensors_dtype(_cache_dtype)
-                elif "quantization_config" in config and all(
-                    k in config["quantization_config"] for k in {"quant_method", "fmt"}
-                ):
+                elif "quantization_config" in config and "quant_method" in config["quantization_config"]:
                     _quantization_config = config["quantization_config"]
                     _quant_method = _quantization_config["quant_method"]
-                    _fmt = _quantization_config["fmt"]
-                    if _quant_method == "fp8" and not _fmt.startswith("float8_"):
+
+                    _fmt = _quantization_config["fmt"] if "fmt" in _quantization_config else None
+                    if _quant_method == "fp8" and (_fmt and not _fmt.startswith("float8_")):
                         _fmt = f"float8_{_fmt}"
 
-                    if _quant_method != "fp8" or _fmt not in TorchDtypes.__args__:
+                    if _quant_method != "fp8" or (_fmt and _fmt not in TorchDtypes.__args__):
                         raise RuntimeError(
-                            f"Provided `--kv-cache-dtype=auto` and given that `config.json` contains the following `quantization_config={_quantization_config}` with either a `quant_method` different than `fp8` i.e., `{_quant_method}` or a `fmt` that's not supported (should be any of {TorchDtypes.__args__}). To solve that, you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
+                            f"Provided `--kv-cache-dtype=auto` and given that `config.json` contains the following `quantization_config={_quantization_config}` with either a `quant_method` different than `fp8` i.e., `{_quant_method}`, or a `fmt` that's not supported (should be any of {TorchDtypes.__args__}). To solve that, you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
                         )
 
-                    cache_dtype = torch_dtype_to_safetensors_dtype(_fmt)
+                    # NOTE: If `quant_method` in `quantization_config` is set to `fp8` and `fmt` is not set, that
+                    # means that the quantization scheme for the KV cache is `fp8` without a `fmt`
+                    if _fmt:
+                        cache_dtype = torch_dtype_to_safetensors_dtype(_fmt)
+                    else:
+                        cache_dtype = _quant_method.upper()
                 else:
                     raise RuntimeError(
-                        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `bfloat16`, `fp8`, `fp8_ds_mla`, `fp8_e4m3`, `fp8_e5m2` or `fp8_inc`. If `auto` is set, then the `config.json` should either contain the `torch_dtype` or `dtype` fields set, or if quantized then `quantization_config` needs to be set and contain the keys `quant_method` and `fmt`, with `quant_method` being `fp8` and `fmt` any valid format as per the `fp8` formats mentioned before."
+                        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `bfloat16`, `fp8`, `fp8_ds_mla`, `fp8_e4m3`, `fp8_e5m2` or `fp8_inc`. If `auto` is set, then the `config.json` should either contain the `torch_dtype` or `dtype` fields set, or if quantized then `quantization_config` needs to be set and contain the key `quant_method` with value `fp8` (as any of `fp32`, `fp16` or `bf16` is considered within the `quantization_config`), and optionally also contain `fmt` set to any valid format as `float8`, `float8_e4m3` or `float8_e4m3fn`."
                     )
 
                 # Reference: https://gist.github.com/alvarobartt/1097ca1b07c66fd71470937d599c2072
