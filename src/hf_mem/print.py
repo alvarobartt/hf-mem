@@ -1,3 +1,4 @@
+from functools import cache
 import warnings
 from typing import Any, Dict, Literal, Optional
 
