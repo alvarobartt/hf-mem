@@ -35,7 +35,7 @@ uvx hf-mem --model-id Qwen/Qwen-Image
 uvx hf-mem --model-id google/embeddinggemma-300m
 ```
 
-<img src="https://github.com/user-attachments/assets/2844582f-6207-415a-bc6c-27569a5eb262" />
+<img src="https://github.com/user-attachments/assets/a52c464b-a6c1-446d-9921-68aaefb9df88" />
 
 ## Experimental
 
@@ -45,7 +45,7 @@ By enabling the `--experimental` flag, you can enable the KV Cache memory estima
 uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 ```
 
-<img src="https://github.com/user-attachments/assets/247113cf-59a7-4f76-a8df-735e292558a0" />
+<img src="https://github.com/user-attachments/assets/64eaff88-d395-4d8d-849b-78fb86411dc3" />
 
 ## (Optional) Agent Skills
 
