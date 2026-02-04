@@ -310,7 +310,11 @@ def compute_gguf_kv_cache_size(
     embedding_length = kv_metadata["embedding_length"]
     context_length = kv_metadata["context_length"]
 
+    if any([not isinstance(v, int) for v in [block_count, head_count_kv, head_count, embedding_length, context_length]]):
+        raise RuntimeError("KV cache metadata fields must be integers for GGUF KV cache size estimation.")
+
     size_per_token = (2 * head_count_kv * (embedding_length // head_count))
+
     if kv_cache_dtype is not None:
         if kv_cache_dtype not in GGUFDtype.__members__:
             raise RuntimeError(f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF KV cache size estimation. Valid options: {list(GGUFDtype.__members__.keys())}.")

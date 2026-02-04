@@ -115,7 +115,7 @@ def _bytes_to_gb(nbytes: int) -> float:
 def print_report(
     model_id: str,
     revision: str,
-    metadata: SafetensorsMetadata,
+    metadata: SafetensorsMetadata | GGUFMetadata,
     cache: Optional[Dict[str, Any]] = None,
     ignore_table_width: bool = False,
 ) -> None:
@@ -221,11 +221,18 @@ def print_report(
         )
         for idx, (dtype, dtype_metadata) in enumerate(value.dtypes.items()):
             gb_text = f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {_bytes_to_gb(combined_total):.2f} GB"
-            _print_row(
-                dtype.upper() + " " * (max_length - len(dtype)),
-                gb_text,
-                data_col_width,
-            )
+            if isinstance(metadata, GGUFMetadata):
+                _print_row(
+                    dtype.name.upper() + " " * (max_length - len(dtype.name)),
+                    gb_text,
+                    data_col_width,
+                )
+            else:                
+                _print_row(
+                    dtype.upper() + " " * (max_length - len(dtype)),
+                    gb_text,
+                    data_col_width,
+                )
 
             bar = _make_bar(
                 _bytes_to_gb(dtype_metadata.bytes_count),
@@ -272,7 +279,6 @@ def print_report_for_gguf(
     gguf_files: Dict[str, GGUFMetadata],
     ignore_table_width: bool = False,
 ) -> None:
-    
     centered_rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
@@ -280,7 +286,21 @@ def print_report_for_gguf(
     for filename, gguf_metadata in gguf_files.items():
         centered_rows.append(filename)
 
-        # Adding also the KV lines to compute curren_len since they are most likely the longest
+        # Adding model names lines to compute current_len
+        transformer = gguf_metadata.components.get("Transformer")
+        if transformer:
+            for _, dtype_metadata in transformer.dtypes.items():
+                if gguf_metadata.kv_cache_info is not None:
+                    total = dtype_metadata.bytes_count + gguf_metadata.kv_cache_info.cache_size
+                    centered_rows.append(
+                        f"{filename} | {_bytes_to_gb(total):.2f} GB ({_format_short_number(dtype_metadata.param_count)} PARAMS + KV CACHE)"
+                    )
+                else:
+                    centered_rows.append(
+                        f"{filename} | {_bytes_to_gb(dtype_metadata.bytes_count):.2f} GB ({_format_short_number(dtype_metadata.param_count)} PARAMS)"
+                    )
+
+        # Adding also the KV lines to compute current_len
         if gguf_metadata.kv_cache_info is not None:
             cache_size = _bytes_to_gb(gguf_metadata.kv_cache_info.cache_size)
             name_text = f"KV CACHE ({gguf_metadata.kv_cache_info.cache_dtype})"
@@ -298,94 +318,47 @@ def print_report_for_gguf(
             f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
         )
     current_len = min(max_centered_len, MAX_DATA_LEN) if ignore_table_width is False else max_centered_len
-    data_col_width = current_len + 2 * BORDERS_AND_PADDING - MAX_NAME_LEN - 5
 
     # Header
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
-    _print_divider(data_col_width + 1, "mid")
+    
+    max_name_length = min(
+        max(
+            [
+                len(filename)
+                for filename in gguf_files.keys()
+            ]
+        ),
+        MAX_DATA_LEN
+    )
+    data_col_width = current_len + 2 * BORDERS_AND_PADDING - max_name_length - 5
+    _print_divider(data_col_width + 1, "top", name_len=max_name_length)
 
     for i, (filename, gguf_metadata) in enumerate(gguf_files.items()):
-        # Centered name of the file
-        _print_centered(filename, current_len)
-        _print_divider(data_col_width + 1, "top")
-
-        # Total memory requirements row
-        total_gbs = _bytes_to_gb(gguf_metadata.bytes_count)
-        total_text = f"{total_gbs:.2f} GB ({_format_short_number(gguf_metadata.param_count)} PARAMS)"
-        total_bar = _make_bar(gguf_metadata.bytes_count, gguf_metadata.bytes_count, data_col_width)
-
-        # If kv cache -> Add extra GBs + suffix on first line 
-        if gguf_metadata.kv_cache_info is not None:
-            total_gbs += _bytes_to_gb(gguf_metadata.kv_cache_info.cache_size)
-            total_text = f"{total_gbs:.2f} GB ({_format_short_number(gguf_metadata.param_count)} PARAMS + KV CACHE)"
-        
-        _print_row("TOTAL MEMORY", total_text, data_col_width)
-        _print_row("REQUIREMENTS", total_bar, data_col_width)
-
         transformer = gguf_metadata.components.get("Transformer")
         if transformer and transformer.dtypes:
-            _print_divider(data_col_width + 1)
-            max_length = max(
-                [
-                    len(f"{_format_short_number(dtype_metadata.param_count)} PARAMS")
-                    for _, dtype_metadata in transformer.dtypes.items()
-                ]
-            )
-
-            for idx, (dtype, dtype_metadata) in enumerate(transformer.dtypes.items()):
-                
-                # Dtypes rows
-                gb_text = f"{_bytes_to_gb(dtype_metadata.bytes_count):.2f} / {total_gbs:.2f} GB"
+            if gguf_metadata.kv_cache_info is not None:
+                # Print NAME | GBs ( PARAMS + KV CACHE) rows
+                gb_text = f"{_bytes_to_gb(transformer.bytes_count + gguf_metadata.kv_cache_info.cache_size):.2f} GB ({_format_short_number(transformer.param_count)} PARAMS + KV CACHE)"
                 _print_row(
-                    dtype.name.upper() + " " * (max_length - len(dtype.name)),
+                    filename + " " * (max_name_length - len(filename)),
                     gb_text,
                     data_col_width,
+                    name_len=max_name_length,
                 )
-
-                bar = _make_bar(
-                    _bytes_to_gb(dtype_metadata.bytes_count),
-                    total_gbs,
-                    data_col_width,
-                )
+            else:
+                # Print NAME | GBs ( PARAMS ) rows
+                gb_text = f"{_bytes_to_gb(transformer.bytes_count):.2f} GB ({_format_short_number(transformer.param_count)} PARAMS)"
                 _print_row(
-                    f"{_format_short_number(dtype_metadata.param_count)} PARAMS",
-                    bar,
+                    filename + " " * (max_name_length - len(filename)),
+                    gb_text,
                     data_col_width,
-                )
-
-                if idx < len(transformer.dtypes) - 1:
-                    _print_divider(data_col_width + 1)
-
-            # Print kv-cache info (1 per .gguf file)
-            # Same size for all but diferent % of total size between models.
-            if gguf_metadata.kv_cache_info is not None:
-                _print_divider(data_col_width + 1)
-                cache_size = _bytes_to_gb(gguf_metadata.kv_cache_info.cache_size)
-                name_text = f"KV CACHE ({gguf_metadata.kv_cache_info.cache_dtype})"
-                max_model_len = gguf_metadata.kv_cache_info.max_model_len
-                batch_size = gguf_metadata.kv_cache_info.batch_size
-                gb_text = f"{cache_size:.2f} / {total_gbs:.2f} GB"
-                kv_extra_info = f"(w/ max-model-len={max_model_len}, batch-size={batch_size})"
-                _print_row(
-                    name_text + " " * (max_length - len(name_text)),
-                    gb_text + " " + kv_extra_info,
-                    data_col_width,
-                )
-
-                bar = _make_bar(
-                    cache_size,
-                    total_gbs,
-                    data_col_width,
-                )
-                _print_row(
-                    f"{gguf_metadata.kv_cache_info.max_model_len * gguf_metadata.kv_cache_info.batch_size} TOKENS",
-                    bar,
-                    data_col_width,
+                    name_len=max_name_length,
                 )
 
         if i < len(gguf_files) - 1:
-            _print_divider(data_col_width + 1, "bottom-continue")
+            _print_divider(data_col_width + 1, name_len=max_name_length)
         else:
-            _print_divider(data_col_width + 1, "bottom")
+            _print_divider(data_col_width + 1, "bottom", name_len=max_name_length)

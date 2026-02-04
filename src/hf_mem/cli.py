@@ -94,6 +94,7 @@ async def run(
     json_output: bool = False,
     ignore_table_width: bool = False,
     gguf: bool = False,
+    gguf_file: str | None = None,
 ) -> Dict[str, Any] | None:
     headers = {"User-Agent": f"hf-mem/0.4; id={uuid4()}; model_id={model_id}; revision={revision}"}
     # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
@@ -127,11 +128,26 @@ async def run(
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
     # GGUF support
-    if gguf:
+    if gguf or gguf_file is not None:
         gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
         if not gguf_paths:
             raise RuntimeError(f"No GGUF files found for {model_id} @ {revision}.")
         
+        if gguf_file:
+            # Check if it's a sharded file (model-00001-of-00046.gguf)
+            if prefix_match := re.match(r'(.+)-\d+-of-\d+\.gguf$', gguf_file):
+                # Keep all shards with the same prefix
+                prefix = prefix_match.group(1)
+                gguf_paths = [path for path in gguf_paths if re.match(rf'{re.escape(prefix)}-\d+-of-\d+\.gguf$', str(path))]
+            else:
+                # Not sharded
+                gguf_paths = [path for path in gguf_paths if str(path).endswith(gguf_file)]
+                if len(gguf_paths) > 1:
+                    raise RuntimeError(f"Multiple GGUF files named `{gguf_file}` found for {model_id} @ {revision}.")
+            
+            if not gguf_paths:
+                raise RuntimeError(f"No GGUF file matching `{gguf_file}` found for {model_id} @ {revision}.")
+
         gguf_files: Dict[str, GGUFMetadata] = dict()
         for path in gguf_paths:
             # In sharded GGUF files tensor metadata also gets sharded, so we need to merge them all
@@ -168,15 +184,42 @@ async def run(
             print(
                 json.dumps([
                     gguf_metadata_to_json(
-                        model_id=model_id, 
+                        model_id=filename, 
                         revision=revision, 
                         metadata=gguf_metadata
                     ) 
-                    for gguf_metadata in gguf_files.values()
+                    for filename, gguf_metadata in gguf_files.items()
                 ])
             )
         else:
-            print_report_for_gguf(
+            if gguf_file:
+                gguf_metadata = list(gguf_files.values())[0]
+                gguf_file_name = list(gguf_files.keys())[0]
+
+                # If we print just one file, we reuse the print_report function
+                if experimental and gguf_metadata.kv_cache_info is not None:
+                    print_report(
+                        model_id=gguf_file_name,
+                        revision=revision,
+                        metadata=gguf_metadata,
+                        cache={
+                            "max_model_len": gguf_metadata.kv_cache_info.max_model_len,
+                            "cache_size": gguf_metadata.kv_cache_info.cache_size,
+                            "batch_size": gguf_metadata.kv_cache_info.batch_size,
+                            "cache_dtype": gguf_metadata.kv_cache_info.cache_dtype,  # type: ignore
+                        },
+                        ignore_table_width=ignore_table_width,
+                    )
+                else:
+                    print_report(
+                        model_id=gguf_file_name,
+                        revision=revision,
+                        metadata=gguf_metadata,
+                        ignore_table_width=ignore_table_width,
+                    )
+            else:
+                # For multiple files, we use the new one
+                print_report_for_gguf(
                 model_id=model_id,
                 revision=revision,
                 gguf_files=gguf_files,
@@ -505,6 +548,12 @@ def main() -> None:
         action="store_true",
         help="Whether to parse GGUF files instead of Safetensors ones.",
     )
+    parser.add_argument(
+        "--gguf-file",
+        type=str,
+        default=None,
+        help="Specific GGUF file to estimate. If not provided, all GGUF files found in the repo will be estimated. Only the file name is required, not the full path.",
+    )
     args = parser.parse_args()
 
     if args.experimental:
@@ -512,7 +561,7 @@ def main() -> None:
             "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
         )
     
-    if args.gguf:
+    if args.gguf or args.gguf_file is not None:
         if args.kv_cache_dtype not in GGUFDtype.__members__ and args.kv_cache_dtype != "auto":
             raise RuntimeError(f"--kv-cache-dtype={args.kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`.")
     else:
@@ -533,5 +582,6 @@ def main() -> None:
             ignore_table_width=args.ignore_table_width,
             # GGUF flag
             gguf=args.gguf,
+            gguf_file=args.gguf_file
         )
     )
