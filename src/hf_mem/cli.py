@@ -285,9 +285,13 @@ async def run(
                 if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
                     cache_dtype = kv_cache_dtype.upper().replace("FP8", "F8")
                 elif kv_cache_dtype in {"fp8", "fp8_ds_mla", "fp8_inc"}:
-                    # NOTE: Default to `FP8` for the calculations, given that all those take 1 byte, but only FP8
-                    # is supported in Safetensors, whilst FP8_DS_MLA (DeepSeek MLA) and FP8_INC (Intel HPUs) are not
-                    cache_dtype = "FP8"
+                    # NOTE: Default to `F8_E4M3` for the calculations, given that all those take 1 byte, but only F8_E5M2
+                    # or `F8_E4M3` are supported in Safetensors, whilst `FP8_DS_MLA` (DeepSeek MLA) and `FP8_INC` (Intel HPUs)
+                    # are not; and `F8_E4M3` is supported on both CUDA and AMD, hence seems a reasonable default
+                    warnings.warn(
+                        f"--kv-cache-dtype={kv_cache_dtype}` has been provided, but given that none of those matches an actual Safetensors dtype since it should be any of `F8_E5M2` or `F8_E4M3`, the `--kv-cache-dtype` will default to `F8_E4M3` instead, which implies that the calculations are the same given that both dtypes take 1 byte despite the quantization scheme of it, or the hardware compatibility; so the estimations should be accurate enough."
+                    )
+                    cache_dtype = "F8_E4M3"
                 elif kv_cache_dtype == "bfloat16":
                     cache_dtype = "BF16"
                 elif "quantization_config" in config and "quant_method" in config["quantization_config"]:
