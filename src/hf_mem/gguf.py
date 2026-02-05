@@ -1,8 +1,10 @@
 from dataclasses import dataclass, asdict
-from typing import Dict, Optional, Any, Callable
+from typing import Dict, Optional, Any, Callable, Tuple
 from enum import IntEnum
+import asyncio
 import httpx
 import os
+import re
 import struct
 import math
 from hf_mem.types import get_safetensors_dtype_bytes
@@ -429,6 +431,33 @@ def parse_gguf_metadata(
         bytes_count=component.bytes_count,
         kv_cache_info=kv_cache_info,
     )
+
+
+async def fetch_gguf_with_semaphore(
+    semaphore: asyncio.Semaphore,
+    client: httpx.AsyncClient,
+    model_id: str,
+    revision: str,
+    path: str,
+    parse_kv_cache: bool,
+    shard_pattern: Optional[re.Match],
+    max_model_len: Optional[int] = None,
+    kv_cache_dtype: Optional[str] = "F16",
+    batch_size: int = 1,
+    headers: Optional[Dict[str, str]] = None
+) -> Tuple[str, "GGUFMetadata", Optional[re.Match]]:
+    async with semaphore:
+        f_url = f"https://huggingface.co/{model_id}/resolve/{revision}/{str(path)}"
+        metadata = await fetch_gguf_metadata(
+            client=client, 
+            url=f_url, 
+            experimental=parse_kv_cache,
+            max_model_len=max_model_len,
+            kv_cache_dtype=kv_cache_dtype,
+            batch_size=batch_size,
+            headers=headers,
+        )
+        return (str(path), metadata, shard_pattern)
 
 
 async def fetch_gguf_metadata(

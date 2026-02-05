@@ -15,7 +15,7 @@ import httpx
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report, print_report_for_gguf
 from hf_mem.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
-from hf_mem.gguf import fetch_gguf_metadata, gguf_metadata_to_json, merge_shards, GGUFMetadata, GGUFDtype
+from hf_mem.gguf import fetch_gguf_with_semaphore, gguf_metadata_to_json, merge_shards, GGUFMetadata, GGUFDtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -148,7 +148,9 @@ async def run(
             if not gguf_paths:
                 raise RuntimeError(f"No GGUF file matching `{gguf_file}` found for {model_id} @ {revision}.")
 
-        gguf_files: Dict[str, GGUFMetadata] = dict()
+        semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+
+        tasks = []
         for path in gguf_paths:
             # In sharded GGUF files tensor metadata also gets sharded, so we need to merge them all
             shard_pattern = re.match(r'(.+)-(\d+)-of-(\d+)\.gguf$', str(path)) # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
@@ -157,17 +159,28 @@ async def run(
             if experimental and shard_pattern:
                 shard_num = int(shard_pattern.group(2)) # Get first number
                 parse_kv_cache = (shard_num == 1)
-
-            f_url = f"https://huggingface.co/{model_id}/resolve/{revision}/{str(path)}"
-            metadata = await fetch_gguf_metadata(
-                client=client, 
-                url=f_url, 
-                experimental=parse_kv_cache,
-                max_model_len=max_model_len,
-                kv_cache_dtype=kv_cache_dtype,
-                batch_size=batch_size,
-            )
             
+            task = asyncio.create_task(
+                fetch_gguf_with_semaphore(
+                    semaphore=semaphore,
+                    client=client,
+                    model_id=model_id,
+                    revision=revision,
+                    path=path,
+                    parse_kv_cache=parse_kv_cache,
+                    shard_pattern=shard_pattern,
+                    max_model_len=max_model_len,
+                    kv_cache_dtype=kv_cache_dtype,
+                    batch_size=batch_size,
+                    headers=headers,
+                )
+            )
+            tasks.append(task)
+
+        results = await asyncio.gather(*tasks, return_exceptions=False)
+
+        gguf_files: Dict[str, GGUFMetadata] = dict()
+        for path, metadata, shard_pattern in results:
             # Merge metadata for sharded files
             if shard_pattern:
                 # Ex: base_name = Kimi-K2.5-BF16
@@ -177,7 +190,7 @@ async def run(
                 else:
                     gguf_files[base_name] = metadata
             else:
-                gguf_files[str(path)] = metadata 
+                gguf_files[path] = metadata 
         
         
         if json_output:
