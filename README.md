@@ -53,6 +53,17 @@ Optionally, you can add `hf-mem` as an agent skill, which allows the underlying 
 
 More information can be found at [Anthropic Agent Skills and how to use them](https://github.com/anthropics/skills).
 
+
+## GGUF Files
+
+By enabling the `--gguf` flag, you can estimate memory requirements for *.gguf* files. All files will be listed with their corresponding memory estimations. For a more in depth report like the one used for *.safetensors* files (with information regarding weight dtypes) the flag `--gguf-file` can be used to estimate a single GGUF model. For sharded files, the path to any of the individual shards will work.
+
+```bash
+uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf
+```
+
+(here image of the listed results)
+
 ## References
 
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
