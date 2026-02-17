@@ -185,9 +185,7 @@ def print_report(
         _print_row("TOTAL MEMORY", total_text, data_col_width)
         _print_row("REQUIREMENTS", total_bar, data_col_width)
     else:
-        model_text = (
-            f"{_bytes_to_gib(metadata.bytes_count):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS)"
-        )
+        model_text = f"{_bytes_to_gib(metadata.bytes_count):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS)"
         model_bar = _make_bar(metadata.bytes_count, metadata.bytes_count, data_col_width)
         _print_row("TOTAL MEMORY", model_text, data_col_width)
         _print_row("REQUIREMENTS", model_bar, data_col_width)
@@ -217,7 +215,9 @@ def print_report(
             ]
         )
         for idx, (dtype, dtype_metadata) in enumerate(value.dtypes.items()):
-            gib_text = f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+            gib_text = (
+                f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+            )
             _print_row(
                 dtype.upper() + " " * (max_length - len(dtype)),
                 gib_text,
