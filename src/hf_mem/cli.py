@@ -94,7 +94,6 @@ async def run(
     # END_KV_CACHE_ARGS
     json_output: bool = False,
     ignore_table_width: bool = False,
-    gguf: bool = False,
     gguf_file: str | None = None,
 ) -> Dict[str, Any] | None:
     headers = {"User-Agent": f"hf-mem/0.4; id={uuid4()}; model_id={model_id}; revision={revision}"}
@@ -128,8 +127,21 @@ async def run(
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
-    # GGUF support
-    if gguf or gguf_file is not None:
+    has_safetensors = any(f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths)
+    has_gguf = any([f for f in file_paths if str(f).endswith(".gguf")])
+    gguf = gguf_file is not None or (has_gguf and not has_safetensors)
+    
+    if not gguf and (has_safetensors and has_gguf):
+        warnings.warn(
+            f"Both Safetensors and GGUF files have been found for {model_id} @ {revision}, if you want to estimate any of the GGUF file sizes, please use the `--gguf-file` flag with the path to the specific GGUF file. Estimation will continue for Safetensors files."
+        )
+    # NOTE: GGUF support only applies if:
+    # 1. The `--gguf-file` flag is set.
+    # 2. No Safetensors files are found and at least one gguf file is found
+    if gguf:
+        if kv_cache_dtype not in GGUFDtype.__members__ and kv_cache_dtype != "auto":
+            raise RuntimeError(f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`.")
+        
         gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
         if not gguf_paths:
             raise RuntimeError(f"No GGUF files found for {model_id} @ {revision}.")
@@ -561,11 +573,6 @@ def main() -> None:
         help="Whether to ignore the maximum recommended table width, in case the `--model-id` and/or `--revision` cause a row overflow when printing those.",
     )
     parser.add_argument(
-        "--gguf",
-        action="store_true",
-        help="Whether to parse GGUF files instead of Safetensors ones.",
-    )
-    parser.add_argument(
         "--gguf-file",
         type=str,
         default=None,
@@ -578,12 +585,8 @@ def main() -> None:
             "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
         )
     
-    if args.gguf or args.gguf_file is not None:
-        if args.kv_cache_dtype not in GGUFDtype.__members__ and args.kv_cache_dtype != "auto":
-            raise RuntimeError(f"--kv-cache-dtype={args.kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`.")
-    else:
-        if args.kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
-            raise RuntimeError(f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {KV_CACHE_DTYPE_CHOICES}.")
+    if args.kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
+        raise RuntimeError(f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {KV_CACHE_DTYPE_CHOICES}.")
 
     asyncio.run(
         run(
@@ -597,8 +600,7 @@ def main() -> None:
             # NOTE: Below are the arguments that affect the output format
             json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
-            # GGUF flag
-            gguf=args.gguf,
+            # NOTE: GGUF flags
             gguf_file=args.gguf_file
         )
     )
