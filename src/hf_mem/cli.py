@@ -126,23 +126,24 @@ async def run(
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
-
-    has_safetensors = any(f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths)
-    has_gguf = any([f for f in file_paths if str(f).endswith(".gguf")])
-    gguf = gguf_file is not None or (has_gguf and not has_safetensors)
     
-    if not gguf and (has_safetensors and has_gguf):
-        warnings.warn(
-            f"Both Safetensors and GGUF files have been found for {model_id} @ {revision}, if you want to estimate any of the GGUF file sizes, please use the `--gguf-file` flag with the path to the specific GGUF file. Estimation will continue for Safetensors files."
-        )
+
     # NOTE: GGUF support only applies if:
     # 1. The `--gguf-file` flag is set.
     # 2. No Safetensors files are found and at least one gguf file is found
+    gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
+    has_safetensors = any(f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths)
+    gguf = gguf_file is not None or (gguf_paths and not has_safetensors)
+    
+    if not gguf and (has_safetensors and gguf_paths):
+        warnings.warn(
+            f"Both Safetensors and GGUF files have been found for {model_id} @ {revision}, if you want to estimate any of the GGUF file sizes, please use the `--gguf-file` flag with the path to the specific GGUF file. GGUF files found: {gguf_paths}."
+        )
+
     if gguf:
         if kv_cache_dtype not in GGUFDtype.__members__ and kv_cache_dtype != "auto":
             raise RuntimeError(f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`.")
         
-        gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
         if not gguf_paths:
             raise RuntimeError(f"No GGUF files found for {model_id} @ {revision}.")
         
