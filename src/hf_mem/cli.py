@@ -547,7 +547,7 @@ def main() -> None:
         type=str,
         default="auto",
         # NOTE: https://docs.vllm.ai/en/stable/cli/serve/#-kv-cache-dtype
-        help=f"Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available) or F16 for GGUF files. Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Valid values are {KV_CACHE_DTYPE_CHOICES} without for safetensors files and {["auto"] + list(GGUFDtype.__members__.keys())} for GGUF files. Defaults to `auto`.",
+        help=f"Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available) or F16 for GGUF files. Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Valid values are {KV_CACHE_DTYPE_CHOICES} without for safetensors files and {['auto'] + list(GGUFDtype.__members__.keys())} for GGUF files. Defaults to `auto`.",
     )
 
     parser.add_argument(
