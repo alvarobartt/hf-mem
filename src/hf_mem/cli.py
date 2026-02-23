@@ -13,10 +13,10 @@ from uuid import uuid4
 import httpx
 
 from hf_mem import __version__
+from hf_mem.gguf import GGUFDtype, GGUFMetadata, fetch_gguf_with_semaphore, gguf_metadata_to_json, merge_shards
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report, print_report_for_gguf
 from hf_mem.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
-from hf_mem.gguf import fetch_gguf_with_semaphore, gguf_metadata_to_json, merge_shards, GGUFMetadata, GGUFDtype
 
 # NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
 # can indeed be larger than that
@@ -126,15 +126,16 @@ async def run(
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
-    
 
     # NOTE: GGUF support only applies if:
     # 1. The `--gguf-file` flag is set.
     # 2. No Safetensors files are found and at least one gguf file is found
     gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
-    has_safetensors = any(f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths)
+    has_safetensors = any(
+        f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths
+    )
     gguf = gguf_file is not None or (gguf_paths and not has_safetensors)
-    
+
     if not gguf and (has_safetensors and gguf_paths):
         warnings.warn(
             f"Both Safetensors and GGUF files have been found for {model_id} @ {revision}, if you want to estimate any of the GGUF file sizes, please use the `--gguf-file` flag with the path to the specific GGUF file. GGUF files found: {gguf_paths}."
@@ -142,23 +143,31 @@ async def run(
 
     if gguf:
         if kv_cache_dtype not in GGUFDtype.__members__ and kv_cache_dtype != "auto":
-            raise RuntimeError(f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`.")
-        
+            raise RuntimeError(
+                f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`."
+            )
+
         if not gguf_paths:
             raise RuntimeError(f"No GGUF files found for {model_id} @ {revision}.")
-        
+
         if gguf_file:
             # Check if it's a sharded file (model-00001-of-00046.gguf)
-            if prefix_match := re.match(r'(.+)-\d+-of-\d+\.gguf$', gguf_file):
+            if prefix_match := re.match(r"(.+)-\d+-of-\d+\.gguf$", gguf_file):
                 # Keep all shards with the same prefix
                 prefix = prefix_match.group(1)
-                gguf_paths = [path for path in gguf_paths if re.match(rf'{re.escape(prefix)}-\d+-of-\d+\.gguf$', str(path))]
+                gguf_paths = [
+                    path
+                    for path in gguf_paths
+                    if re.match(rf"{re.escape(prefix)}-\d+-of-\d+\.gguf$", str(path))
+                ]
             else:
                 # Not sharded
                 gguf_paths = [path for path in gguf_paths if str(path).endswith(gguf_file)]
                 if len(gguf_paths) > 1:
-                    raise RuntimeError(f"Multiple GGUF files named `{gguf_file}` found for {model_id} @ {revision}.")
-            
+                    raise RuntimeError(
+                        f"Multiple GGUF files named `{gguf_file}` found for {model_id} @ {revision}."
+                    )
+
             if not gguf_paths:
                 raise RuntimeError(f"No GGUF file matching `{gguf_file}` found for {model_id} @ {revision}.")
 
@@ -167,13 +176,15 @@ async def run(
         tasks = []
         for path in gguf_paths:
             # In sharded GGUF files tensor metadata also gets sharded, so we need to merge them all
-            shard_pattern = re.match(r'(.+)-(\d+)-of-(\d+)\.gguf$', str(path)) # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
+            shard_pattern = re.match(
+                r"(.+)-(\d+)-of-(\d+)\.gguf$", str(path)
+            )  # Ex: Kimi-K2.5-BF16-00001-of-00046.gguf
             parse_kv_cache = experimental
             # For sharded files, parsing kv_cache data might result in runtime errors (missing fields)
             if experimental and shard_pattern:
-                shard_num = int(shard_pattern.group(2)) # Get first number
-                parse_kv_cache = (shard_num == 1)
-            
+                shard_num = int(shard_pattern.group(2))  # Get first number
+                parse_kv_cache = shard_num == 1
+
             task = asyncio.create_task(
                 fetch_gguf_with_semaphore(
                     semaphore=semaphore,
@@ -204,19 +215,16 @@ async def run(
                 else:
                     gguf_files[base_name] = metadata
             else:
-                gguf_files[path] = metadata 
-        
-        
+                gguf_files[path] = metadata
+
         if json_output:
             print(
-                json.dumps([
-                    gguf_metadata_to_json(
-                        model_id=filename, 
-                        revision=revision, 
-                        metadata=gguf_metadata
-                    ) 
-                    for filename, gguf_metadata in gguf_files.items()
-                ])
+                json.dumps(
+                    [
+                        gguf_metadata_to_json(model_id=filename, revision=revision, metadata=gguf_metadata)
+                        for filename, gguf_metadata in gguf_files.items()
+                    ]
+                )
             )
         else:
             if gguf_file:
@@ -247,11 +255,11 @@ async def run(
             else:
                 # For multiple files, we use the new one
                 print_report_for_gguf(
-                model_id=model_id,
-                revision=revision,
-                gguf_files=gguf_files,
-                ignore_table_width=ignore_table_width
-            )
+                    model_id=model_id,
+                    revision=revision,
+                    gguf_files=gguf_files,
+                    ignore_table_width=ignore_table_width,
+                )
         return
     elif "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
@@ -585,9 +593,11 @@ def main() -> None:
         warnings.warn(
             "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
         )
-    
+
     if args.kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
-        raise RuntimeError(f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {KV_CACHE_DTYPE_CHOICES}.")
+        raise RuntimeError(
+            f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {KV_CACHE_DTYPE_CHOICES}."
+        )
 
     asyncio.run(
         run(
@@ -602,6 +612,6 @@ def main() -> None:
             json_output=args.json_output,
             ignore_table_width=args.ignore_table_width,
             # NOTE: GGUF flags
-            gguf_file=args.gguf_file
+            gguf_file=args.gguf_file,
         )
     )

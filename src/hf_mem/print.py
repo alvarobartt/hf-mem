@@ -1,10 +1,10 @@
-from functools import cache
 import warnings
+from functools import cache
 from typing import Any, Dict, Literal, Optional
 
 from hf_mem import __version__
-from hf_mem.metadata import SafetensorsMetadata
 from hf_mem.gguf import GGUFMetadata
+from hf_mem.metadata import SafetensorsMetadata
 
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 14
@@ -223,15 +223,16 @@ def print_report(
             ]
         )
         for idx, (dtype, dtype_metadata) in enumerate(value.dtypes.items()):
-
-            gib_text = f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+            gib_text = (
+                f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+            )
             if isinstance(metadata, GGUFMetadata):
                 _print_row(
                     dtype.name.upper() + " " * (max_length - len(dtype.name)),
                     gib_text,
                     data_col_width,
                 )
-            else:                
+            else:
                 _print_row(
                     dtype.upper() + " " * (max_length - len(dtype)),
                     gib_text,
@@ -289,8 +290,10 @@ def print_report_for_gguf(
     ]
     first_cache = list(gguf_files.values())[0].kv_cache_info
     if first_cache is not None:
-        centered_rows.append(f"w/ max-model-len={first_cache.max_model_len}, batch-size={first_cache.batch_size}")
-    
+        centered_rows.append(
+            f"w/ max-model-len={first_cache.max_model_len}, batch-size={first_cache.batch_size}"
+        )
+
     for filename, gguf_metadata in gguf_files.items():
         centered_rows.append(filename)
 
@@ -318,9 +321,9 @@ def print_report_for_gguf(
             gib_text = f"{cache_size:.2f} / {total_gibs:.2f} GiB"
             kv_extra_info = f"(w/ max-model-len={max_model_len}, batch-size={batch_size})"
             centered_rows.append(name_text + gib_text + kv_extra_info)
-            
+
     max_centered_len = max(len(r) for r in centered_rows)
-    
+
     if max_centered_len > MAX_DATA_LEN and ignore_table_width is False:
         warnings.warn(
             f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
@@ -336,15 +339,7 @@ def print_report_for_gguf(
             f"w/ max-model-len={first_cache.max_model_len}, batch-size={first_cache.batch_size}",
             current_len,
         )
-    max_name_length = min(
-        max(
-            [
-                len(filename)
-                for filename in gguf_files.keys()
-            ]
-        ),
-        MAX_DATA_LEN
-    )
+    max_name_length = min(max([len(filename) for filename in gguf_files.keys()]), MAX_DATA_LEN)
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - max_name_length - 5
     _print_divider(data_col_width + 1, "top", name_len=max_name_length)
 

@@ -1,24 +1,27 @@
-from dataclasses import dataclass, asdict
-from typing import Dict, Optional, Any, Callable, Tuple
-from enum import IntEnum
 import asyncio
-import httpx
+import math
 import os
 import re
 import struct
-import math
-from hf_mem.types import get_safetensors_dtype_bytes
+from dataclasses import asdict, dataclass
+from enum import IntEnum
+from typing import Any, Callable, Dict, Optional, Tuple
+
+import httpx
+
 from hf_mem.metadata import DtypeMetadata
+from hf_mem.types import get_safetensors_dtype_bytes
 
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
 SIZES = [1_000_000, 10_000_000, 50_000_000, 100_000_000]
 KV_CACHE_FIELD_ENDINGS = [
-    "block_count", 
-    "head_count_kv", 
+    "block_count",
+    "head_count_kv",
     "head_count",
     "embedding_length",
     "context_length",
 ]
+
 
 # --- GGUF Dtypes (weights) ---
 class GGUFDtype(IntEnum):
@@ -62,7 +65,8 @@ class GGUFDtype(IntEnum):
     # IQ4_NL_4_8 = 37
     # IQ4_NL_8_8 = 38
     MXFP4 = 39
-    COUNT = 40 # For exhaustivity, not used
+    COUNT = 40  # For exhaustivity, not used
+
 
 # Conversion .gguf weight dtype -> bits-per-weight
 GGUFDtypeBitsPerWeight: Dict[GGUFDtype, float] = {
@@ -105,56 +109,65 @@ GGUFDtypeBitsPerWeight: Dict[GGUFDtype, float] = {
 # --- Auxiliary read functions ---
 # Related to .gguf metadata dtypes, not weights dtypes
 def _read_string(raw_metadata: bytes, offset: int) -> tuple[str, int]:
-    length = struct.unpack("<Q", raw_metadata[offset:offset+8])[0]
+    length = struct.unpack("<Q", raw_metadata[offset : offset + 8])[0]
     offset += 8
-    key = raw_metadata[offset:offset+length].decode()
+    key = raw_metadata[offset : offset + length].decode()
     offset += length
     return key, offset
 
+
 def _read_uint8(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<B", raw_metadata[offset:offset+1])[0]
+    value = struct.unpack("<B", raw_metadata[offset : offset + 1])[0]
     offset += 1
     return value, offset
+
 
 def _read_int8(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<b", raw_metadata[offset:offset+1])[0]
+    value = struct.unpack("<b", raw_metadata[offset : offset + 1])[0]
     offset += 1
     return value, offset
+
 
 def _read_uint16(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<H", raw_metadata[offset:offset+2])[0]
+    value = struct.unpack("<H", raw_metadata[offset : offset + 2])[0]
     offset += 2
     return value, offset
+
 
 def _read_int16(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<h", raw_metadata[offset:offset+2])[0]
+    value = struct.unpack("<h", raw_metadata[offset : offset + 2])[0]
     offset += 2
     return value, offset
 
+
 def _read_uint32(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<I", raw_metadata[offset:offset+4])[0]
+    value = struct.unpack("<I", raw_metadata[offset : offset + 4])[0]
     offset += 4
     return value, offset
+
 
 def _read_int32(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<i", raw_metadata[offset:offset+4])[0]
+    value = struct.unpack("<i", raw_metadata[offset : offset + 4])[0]
     offset += 4
     return value, offset
+
 
 def _read_float32(raw_metadata: bytes, offset: int) -> tuple[float, int]:
-    value = struct.unpack("<f", raw_metadata[offset:offset+4])[0]
+    value = struct.unpack("<f", raw_metadata[offset : offset + 4])[0]
     offset += 4
     return value, offset
 
+
 def _read_bool(raw_metadata: bytes, offset: int) -> tuple[bool, int]:
-    value = struct.unpack("<?", raw_metadata[offset:offset+1])[0]
+    value = struct.unpack("<?", raw_metadata[offset : offset + 1])[0]
     offset += 1
     return value, offset
 
+
 def _read_array(raw_metadata: bytes, offset: int) -> tuple[list[Any], int]:
-    value_type = struct.unpack("<I", raw_metadata[offset:offset+4])[0]
+    value_type = struct.unpack("<I", raw_metadata[offset : offset + 4])[0]
     offset += 4
-    length = struct.unpack("<Q", raw_metadata[offset:offset+8])[0]
+    length = struct.unpack("<Q", raw_metadata[offset : offset + 8])[0]
     offset += 8
     value = []
     for i in range(length):
@@ -162,18 +175,21 @@ def _read_array(raw_metadata: bytes, offset: int) -> tuple[list[Any], int]:
         value.append(sub_value)
     return value, offset
 
+
 def _read_uint64(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<Q", raw_metadata[offset:offset+8])[0]
+    value = struct.unpack("<Q", raw_metadata[offset : offset + 8])[0]
     offset += 8
     return value, offset
+
 
 def _read_int64(raw_metadata: bytes, offset: int) -> tuple[int, int]:
-    value = struct.unpack("<q", raw_metadata[offset:offset+8])[0]
+    value = struct.unpack("<q", raw_metadata[offset : offset + 8])[0]
     offset += 8
     return value, offset
 
+
 def _read_float64(raw_metadata: bytes, offset: int) -> tuple[float, int]:
-    value = struct.unpack("<d", raw_metadata[offset:offset+8])[0]
+    value = struct.unpack("<d", raw_metadata[offset : offset + 8])[0]
     offset += 8
     return value, offset
 
@@ -194,6 +210,7 @@ class GGUFMetadataDtype(IntEnum):
     UINT64 = 10
     INT64 = 11
     FLOAT64 = 12
+
 
 Parsers: Dict[GGUFMetadataDtype, Callable] = {
     GGUFMetadataDtype.UINT8: _read_uint8,
@@ -218,12 +235,14 @@ class GGUFComponentMetadata:
     param_count: int
     bytes_count: int
 
+
 @dataclass
 class GGUFKVCacheInfo:
     max_model_len: int
     cache_size: int
     batch_size: int
     cache_dtype: Optional[str] = None
+
 
 @dataclass
 class GGUFMetadata:
@@ -236,50 +255,50 @@ class GGUFMetadata:
 def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
     merged_components = {}
     all_component_names = set(shard1.components.keys()) | set(shard2.components.keys())
-    
+
     for component_name in all_component_names:
         comp1 = shard1.components.get(component_name)
         comp2 = shard2.components.get(component_name)
-        
+
         if comp1 and comp2:
             # Both have it -> merge
             merged_dtypes = {}
             all_dtypes = set(comp1.dtypes.keys()) | set(comp2.dtypes.keys())
-            
+
             for dtype in all_dtypes:
                 dtype_meta1 = comp1.dtypes.get(dtype)
                 dtype_meta2 = comp2.dtypes.get(dtype)
-                
+
                 if dtype_meta1 and dtype_meta2:
                     # Both have it -> merge
                     merged_dtypes[dtype] = DtypeMetadata(
                         param_count=dtype_meta1.param_count + dtype_meta2.param_count,
-                        bytes_count=dtype_meta1.bytes_count + dtype_meta2.bytes_count
+                        bytes_count=dtype_meta1.bytes_count + dtype_meta2.bytes_count,
                     )
                 elif dtype_meta1:
                     merged_dtypes[dtype] = dtype_meta1
                 else:
                     merged_dtypes[dtype] = dtype_meta2
-            
+
             merged_components[component_name] = GGUFComponentMetadata(
                 dtypes=merged_dtypes,
                 param_count=comp1.param_count + comp2.param_count,
-                bytes_count=comp1.bytes_count + comp2.bytes_count
+                bytes_count=comp1.bytes_count + comp2.bytes_count,
             )
         elif comp1:
             merged_components[component_name] = comp1
         else:
             merged_components[component_name] = comp2
-    
+
     # KV-cache info should be the same for all shards, we use earlier ones since sometimes
     # cache metadata gets dropped after first shard
     kv_cache_info = shard1.kv_cache_info or shard2.kv_cache_info
-    
+
     return GGUFMetadata(
         components=merged_components,
         param_count=shard1.param_count + shard2.param_count,
         bytes_count=shard1.bytes_count + shard2.bytes_count,
-        kv_cache_info=kv_cache_info
+        kv_cache_info=kv_cache_info,
     )
 
 
@@ -290,7 +309,7 @@ def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) 
         k.name: v for k, v in out["components"]["Transformer"]["dtypes"].items()
     }
     out = {"model_id": model_id, "revision": revision, **out}
-    
+
     # If --experimental, move cache info out
     if out.get("kv_cache_info") is not None:
         out["max_model_len"] = out["kv_cache_info"]["max_model_len"]
@@ -301,50 +320,52 @@ def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) 
 
     return out
 
+
 def compute_gguf_kv_cache_size(
-        kv_metadata: dict, 
-        kv_cache_dtype: Optional[str] = "F16", 
-        batch_size: Optional[int] = 1
-        ) -> int:
+    kv_metadata: dict, kv_cache_dtype: Optional[str] = "F16", batch_size: Optional[int] = 1
+) -> int:
     block_count = kv_metadata["block_count"]
     head_count_kv = kv_metadata["head_count_kv"]
     head_count = kv_metadata["head_count"]
     embedding_length = kv_metadata["embedding_length"]
     context_length = kv_metadata["context_length"]
 
-    if any([not isinstance(v, int) for v in [block_count, head_count_kv, head_count, embedding_length, context_length]]):
+    if any(
+        [
+            not isinstance(v, int)
+            for v in [block_count, head_count_kv, head_count, embedding_length, context_length]
+        ]
+    ):
         raise RuntimeError("KV cache metadata fields must be integers for GGUF KV cache size estimation.")
 
-    size_per_token = (2 * head_count_kv * (embedding_length // head_count))
+    size_per_token = 2 * head_count_kv * (embedding_length // head_count)
 
     if kv_cache_dtype is not None:
         if kv_cache_dtype not in GGUFDtype.__members__:
-            raise RuntimeError(f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF KV cache size estimation. Valid options: {list(GGUFDtype.__members__.keys())}.")
+            raise RuntimeError(
+                f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF KV cache size estimation. Valid options: {list(GGUFDtype.__members__.keys())}."
+            )
         total_size = int(
-            block_count 
-            * size_per_token 
-            * context_length 
-            * batch_size 
-            * GGUFDtypeBitsPerWeight[GGUFDtype[kv_cache_dtype]] / 8.0
+            block_count
+            * size_per_token
+            * context_length
+            * batch_size
+            * GGUFDtypeBitsPerWeight[GGUFDtype[kv_cache_dtype]]
+            / 8.0
         )
     else:
         # Default to F16 size
-        total_size = int(
-            block_count 
-            * size_per_token 
-            * context_length 
-            * batch_size 
-            * 2
-        )
+        total_size = int(block_count * size_per_token * context_length * batch_size * 2)
     return total_size
 
+
 def parse_gguf_metadata(
-        raw_metadata: bytes,
-        experimental: bool = False,
-        max_model_len: Optional[int] = None,
-        kv_cache_dtype: Optional[str] = "F16",
-        batch_size: int = 1
-        ) -> GGUFMetadata:
+    raw_metadata: bytes,
+    experimental: bool = False,
+    max_model_len: Optional[int] = None,
+    kv_cache_dtype: Optional[str] = "F16",
+    batch_size: int = 1,
+) -> GGUFMetadata:
     # Header
     magic = raw_metadata[:4].decode("ascii")
     version = struct.unpack("<I", raw_metadata[4:8])[0]
@@ -356,11 +377,11 @@ def parse_gguf_metadata(
     # KV Cache Metadata
     for i in range(metadata_kv_count):
         key, offset = _read_string(raw_metadata, offset)
-        value_type = version = struct.unpack("<I", raw_metadata[offset:offset+4])[0]
+        value_type = version = struct.unpack("<I", raw_metadata[offset : offset + 4])[0]
         offset += 4
         value, offset = Parsers[value_type](raw_metadata, offset)
         kv_metadata[key] = value
-    
+
     kv_cache_info = None
     if experimental:
         # Extract and rename KV only necessary cache fields
@@ -372,7 +393,7 @@ def parse_gguf_metadata(
         }
 
         # Replace with optional fields
-        if max_model_len is not None: 
+        if max_model_len is not None:
             kv_cache_dict["context_length"] = max_model_len
         if kv_cache_dtype is not None:
             kv_cache_dict["kv_dtype"] = kv_cache_dtype
@@ -384,21 +405,16 @@ def parse_gguf_metadata(
             raise RuntimeError(
                 f"Incomplete KV cache metadata for size estimation. Missing fields: {missing_fields}"
             )
-        
-        kv_size = compute_gguf_kv_cache_size(
-            kv_cache_dict, 
-            kv_cache_dtype,
-            kv_cache_dict.get("batch_size", 1)
-        )
-        
+
+        kv_size = compute_gguf_kv_cache_size(kv_cache_dict, kv_cache_dtype, kv_cache_dict.get("batch_size", 1))
+
         kv_cache_info = GGUFKVCacheInfo(
             max_model_len=kv_cache_dict["context_length"],
             cache_size=kv_size,
             batch_size=kv_cache_dict["batch_size"],
             cache_dtype=kv_cache_dtype if kv_cache_dtype is not None else "F16",
         )
-        
-    
+
     # Tensor info
     component = GGUFComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
     for i in range(tensor_count):
@@ -444,13 +460,13 @@ async def fetch_gguf_with_semaphore(
     max_model_len: Optional[int] = None,
     kv_cache_dtype: Optional[str] = "F16",
     batch_size: int = 1,
-    headers: Optional[Dict[str, str]] = None
+    headers: Optional[Dict[str, str]] = None,
 ) -> Tuple[str, "GGUFMetadata", Optional[re.Match]]:
     async with semaphore:
         f_url = f"https://huggingface.co/{model_id}/resolve/{revision}/{str(path)}"
         metadata = await fetch_gguf_metadata(
-            client=client, 
-            url=f_url, 
+            client=client,
+            url=f_url,
             experimental=parse_kv_cache,
             max_model_len=max_model_len,
             kv_cache_dtype=kv_cache_dtype,
@@ -461,16 +477,16 @@ async def fetch_gguf_with_semaphore(
 
 
 async def fetch_gguf_metadata(
-    client: httpx.AsyncClient, 
-    url: str, 
+    client: httpx.AsyncClient,
+    url: str,
     experimental: bool = False,
     max_model_len: Optional[int] = None,
     kv_cache_dtype: Optional[str] = "F16",
     batch_size: int = 1,
-    headers: Optional[Dict[str, str]] = None
+    headers: Optional[Dict[str, str]] = None,
 ) -> GGUFMetadata:
     for size in SIZES:
-        try: 
+        try:
             if kv_cache_dtype is not None and kv_cache_dtype == "auto":
                 kv_cache_dtype = "F16"
             request_headers = {"Range": f"bytes=0-{size}", **(headers or {})}
@@ -479,15 +495,18 @@ async def fetch_gguf_metadata(
 
             raw_metadata = response.read()
             processed_metadata = parse_gguf_metadata(
-                raw_metadata = raw_metadata, 
-                experimental = experimental, 
-                max_model_len = max_model_len, 
-                kv_cache_dtype = kv_cache_dtype, 
-                batch_size = batch_size)
-            
+                raw_metadata=raw_metadata,
+                experimental=experimental,
+                max_model_len=max_model_len,
+                kv_cache_dtype=kv_cache_dtype,
+                batch_size=batch_size,
+            )
+
             return processed_metadata
-        
+
         except (struct.error, UnicodeDecodeError):
             if size == SIZES[-1]:
-                raise RuntimeError(f"Failed to parse GGUF metadata from {url}, metadata larger than {size/1_000_000:.2f} MB.")
+                raise RuntimeError(
+                    f"Failed to parse GGUF metadata from {url}, metadata larger than {size / 1_000_000:.2f} MB."
+                )
             continue
