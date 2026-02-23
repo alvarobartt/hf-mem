@@ -9,8 +9,8 @@ from typing import Any, Callable, Dict, Optional, Tuple
 
 import httpx
 
+from hf_mem import __version__
 from hf_mem.metadata import DtypeMetadata
-from hf_mem.types import get_safetensors_dtype_bytes
 
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
 SIZES = [1_000_000, 10_000_000, 50_000_000, 100_000_000]
@@ -304,6 +304,7 @@ def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
 
 def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) -> Dict[str, Any]:
     out = asdict(metadata)
+    out = {"version": __version__, **out}
     # Convert dtypes enum keys to string names
     out["components"]["Transformer"]["dtypes"] = {
         k.name: v for k, v in out["components"]["Transformer"]["dtypes"].items()

@@ -218,14 +218,24 @@ async def run(
                 gguf_files[path] = metadata
 
         if json_output:
-            print(
-                json.dumps(
-                    [
-                        gguf_metadata_to_json(model_id=filename, revision=revision, metadata=gguf_metadata)
-                        for filename, gguf_metadata in gguf_files.items()
-                    ]
+            if gguf_file:
+                print(
+                    json.dumps(
+                        [
+                            gguf_metadata_to_json(model_id=filename, revision=revision, metadata=gguf_metadata)
+                            for filename, gguf_metadata in gguf_files.items()
+                        ][0]
+                    )
                 )
-            )
+            else:
+                print(
+                    json.dumps(
+                        [
+                            gguf_metadata_to_json(model_id=filename, revision=revision, metadata=gguf_metadata)
+                            for filename, gguf_metadata in gguf_files.items()
+                        ]
+                    )
+                )
         else:
             if gguf_file:
                 gguf_metadata = list(gguf_files.values())[0]
