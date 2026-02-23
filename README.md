@@ -56,10 +56,10 @@ More information can be found at [Anthropic Agent Skills and how to use them](ht
 
 ## GGUF Files
 
-By enabling the `--gguf` flag, you can estimate memory requirements for *.gguf* files. All files will be listed with their corresponding memory estimations. For a more in depth report like the one used for *.safetensors* files (with information regarding weight dtypes) the flag `--gguf-file` can be used to estimate a single GGUF model. For sharded files, the path to any of the individual shards will work.
+*.gguf* files will only be listed when no other *.safetensors* files are present in the repository or when using the `--gguf-file` flag followed by a filepath to a GGUF model. For sharded files, the path to any of the individual shards will work.
 
 ```bash
-uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf
+uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf-file deepseek-llm-7b-chat.Q2_K.gguf
 ```
 
 (here image of the listed results)
