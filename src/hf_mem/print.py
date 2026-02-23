@@ -1,6 +1,7 @@
 import warnings
 from typing import Any, Dict, Literal, Optional
 
+from hf_mem import __version__
 from hf_mem.metadata import SafetensorsMetadata
 
 MIN_NAME_LEN = 5
@@ -178,6 +179,9 @@ def print_report(
             current_len,
         )
     _print_divider(data_col_width + 1, "top")
+
+    _print_row("VERSION", f"hf-mem {__version__}", data_col_width)
+    _print_divider(data_col_width + 1)
 
     if cache:
         total_text = f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"

@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import httpx
 
+from hf_mem import __version__
 from hf_mem.metadata import parse_safetensors_metadata
 from hf_mem.print import print_report
 from hf_mem.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
@@ -364,12 +365,15 @@ async def run(
                     cache_size *= batch_size
 
     if json_output:
-        out = {"model_id": model_id, "revision": revision, **asdict(metadata)}
+        from hf_mem import __version__
+
+        out = {"version": __version__, "model_id": model_id, "revision": revision, **asdict(metadata)}
         if experimental and cache_size:
             out["max_model_len"] = max_model_len
             out["batch_size"] = batch_size
             out["cache_size"] = cache_size
             out["cache_dtype"] = cache_dtype  # type: ignore
+
         print(json.dumps(out))
     else:
         # TODO: Use a `KvCache` dataclass instead and make sure that the JSON output is aligned
