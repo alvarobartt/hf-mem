@@ -342,7 +342,8 @@ def print_report_for_gguf(
     max_name_length = min(max([len(filename) for filename in gguf_files.keys()]), MAX_DATA_LEN)
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - max_name_length - 5
     _print_divider(data_col_width + 1, "top", name_len=max_name_length)
-
+    _print_row("VERSION", f"hf-mem {__version__}", data_col_width, name_len=max_name_length)
+    _print_divider(data_col_width + 1, name_len=max_name_length)
     for i, (filename, gguf_metadata) in enumerate(gguf_files.items()):
         transformer = gguf_metadata.components.get("Transformer")
         if transformer and transformer.dtypes:
