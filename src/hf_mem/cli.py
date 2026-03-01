@@ -276,7 +276,9 @@ async def run(
                             warnings.warn(
                                 f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
                             )
-                            text_config = await get_json_file(client, referenced_url, headers)
+                            referenced_config = await get_json_file(client, referenced_url, headers)
+                            referenced_config.update(text_config)
+                            text_config = referenced_config
 
                     config = text_config
 
