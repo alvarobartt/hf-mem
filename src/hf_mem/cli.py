@@ -267,18 +267,16 @@ async def run(
                     )
                     text_config = config["text_config"]
 
-                    if "_name_or_path" in text_config:
-                        referenced_model = text_config["_name_or_path"]
-                        if referenced_model:
-                            referenced_url = (
-                                f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
-                            )
-                            warnings.warn(
-                                f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
-                            )
-                            referenced_config = await get_json_file(client, referenced_url, headers)
-                            referenced_config.update(text_config)
-                            text_config = referenced_config
+                    if referenced_model := text_config.get("_name_or_path"):
+                        referenced_url = (
+                            f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
+                        )
+                        warnings.warn(
+                            f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
+                        )
+                        referenced_config = await get_json_file(client, referenced_url, headers)
+                        referenced_config.update(text_config)
+                        text_config = referenced_config
 
                     config = text_config
 
