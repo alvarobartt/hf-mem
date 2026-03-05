@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from hf_mem.types import SafetensorsDtypes, get_safetensors_dtype_bytes
+from hf_mem.safetensors.types import SafetensorsDtypes, get_safetensors_dtype_bytes
 
 
 @dataclass
