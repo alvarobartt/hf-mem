@@ -1,7 +1,9 @@
 import warnings
+from functools import cache
 from typing import Any, Dict, Literal, Optional
 
 from hf_mem import __version__
+from hf_mem.gguf import GGUFMetadata
 from hf_mem.metadata import SafetensorsMetadata
 
 MIN_NAME_LEN = 5
@@ -48,7 +50,7 @@ def _print_centered(text: str, current_len: int) -> None:
 
 def _print_divider(
     current_len: int,
-    side: Optional[Literal["top", "top-continue", "bottom", "bottom-continue"]] = None,
+    side: Optional[Literal["top", "top-continue", "mid", "bottom", "bottom-continue"]] = None,
     name_len: int = MAX_NAME_LEN,
 ) -> None:
     match side:
@@ -60,6 +62,8 @@ def _print_divider(
             left, mid, right = BOX["bl"], BOX["bsep"], BOX["br"]
         case "bottom-continue":
             left, mid, right = BOX["lm"], BOX["bsep"], BOX["rm"]
+        case "mid":
+            left, mid, right = BOX["lm"], BOX["ht"], BOX["rm"]
         case _:
             left, mid, right = BOX["lm"], BOX["mm"], BOX["rm"]
 
@@ -113,7 +117,7 @@ def _bytes_to_gib(nbytes: int) -> float:
 def print_report(
     model_id: str,
     revision: str,
-    metadata: SafetensorsMetadata,
+    metadata: SafetensorsMetadata | GGUFMetadata,
     cache: Optional[Dict[str, Any]] = None,
     ignore_table_width: bool = False,
 ) -> None:
@@ -222,11 +226,18 @@ def print_report(
             gib_text = (
                 f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
             )
-            _print_row(
-                dtype.upper() + " " * (max_length - len(dtype)),
-                gib_text,
-                data_col_width,
-            )
+            if isinstance(metadata, GGUFMetadata):
+                _print_row(
+                    dtype.name.upper() + " " * (max_length - len(dtype.name)),
+                    gib_text,
+                    data_col_width,
+                )
+            else:
+                _print_row(
+                    dtype.upper() + " " * (max_length - len(dtype)),
+                    gib_text,
+                    data_col_width,
+                )
 
             bar = _make_bar(
                 _bytes_to_gib(dtype_metadata.bytes_count),
@@ -265,3 +276,97 @@ def print_report(
         )
 
     _print_divider(data_col_width + 1, "bottom")
+
+
+def print_report_for_gguf(
+    model_id: str,
+    revision: str,
+    gguf_files: Dict[str, GGUFMetadata],
+    ignore_table_width: bool = False,
+) -> None:
+    centered_rows = [
+        "INFERENCE MEMORY ESTIMATE FOR",
+        f"https://hf.co/{model_id} @ {revision}",
+    ]
+    first_cache = list(gguf_files.values())[0].kv_cache_info
+    if first_cache is not None:
+        centered_rows.append(
+            f"w/ max-model-len={first_cache.max_model_len}, batch-size={first_cache.batch_size}"
+        )
+
+    for filename, gguf_metadata in gguf_files.items():
+        centered_rows.append(filename)
+
+        # Adding model names lines to compute current_len
+        transformer = gguf_metadata.components.get("Transformer")
+        if transformer:
+            for _, dtype_metadata in transformer.dtypes.items():
+                if gguf_metadata.kv_cache_info is not None:
+                    total = dtype_metadata.bytes_count + gguf_metadata.kv_cache_info.cache_size
+                    centered_rows.append(
+                        f"{filename} | {_bytes_to_gib(total):.2f} GiB ({_format_short_number(dtype_metadata.param_count)} PARAMS + KV CACHE)"
+                    )
+                else:
+                    centered_rows.append(
+                        f"{filename} | {_bytes_to_gib(dtype_metadata.bytes_count):.2f} GiB ({_format_short_number(dtype_metadata.param_count)} PARAMS)"
+                    )
+
+        # Adding also the KV lines to compute current_len
+        if gguf_metadata.kv_cache_info is not None:
+            cache_size = _bytes_to_gib(gguf_metadata.kv_cache_info.cache_size)
+            name_text = f"KV CACHE ({gguf_metadata.kv_cache_info.cache_dtype})"
+            max_model_len = gguf_metadata.kv_cache_info.max_model_len
+            batch_size = gguf_metadata.kv_cache_info.batch_size
+            total_gibs = _bytes_to_gib(gguf_metadata.bytes_count + gguf_metadata.kv_cache_info.cache_size)
+            gib_text = f"{cache_size:.2f} / {total_gibs:.2f} GiB"
+            kv_extra_info = f"(w/ max-model-len={max_model_len}, batch-size={batch_size})"
+            centered_rows.append(name_text + gib_text + kv_extra_info)
+
+    max_centered_len = max(len(r) for r in centered_rows)
+
+    if max_centered_len > MAX_DATA_LEN and ignore_table_width is False:
+        warnings.warn(
+            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
+        )
+    current_len = min(max_centered_len, MAX_DATA_LEN) if ignore_table_width is False else max_centered_len
+
+    # Header
+    _print_header(current_len)
+    _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
+    _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
+    if first_cache is not None:
+        _print_centered(
+            f"w/ max-model-len={first_cache.max_model_len}, batch-size={first_cache.batch_size}",
+            current_len,
+        )
+    max_name_length = min(max([len(filename) for filename in gguf_files.keys()]), MAX_DATA_LEN)
+    data_col_width = current_len + 2 * BORDERS_AND_PADDING - max_name_length - 5
+    _print_divider(data_col_width + 1, "top", name_len=max_name_length)
+    _print_row("VERSION", f"hf-mem {__version__}", data_col_width, name_len=max_name_length)
+    _print_divider(data_col_width + 1, name_len=max_name_length)
+    for i, (filename, gguf_metadata) in enumerate(gguf_files.items()):
+        transformer = gguf_metadata.components.get("Transformer")
+        if transformer and transformer.dtypes:
+            if gguf_metadata.kv_cache_info is not None:
+                # Print NAME | GiBs ( PARAMS + KV CACHE) rows
+                gib_text = f"{_bytes_to_gib(transformer.bytes_count + gguf_metadata.kv_cache_info.cache_size):.2f} GiB ({_format_short_number(transformer.param_count)} PARAMS + KV CACHE)"
+                _print_row(
+                    filename + " " * (max_name_length - len(filename)),
+                    gib_text,
+                    data_col_width,
+                    name_len=max_name_length,
+                )
+            else:
+                # Print NAME | GiBs ( PARAMS ) rows
+                gib_text = f"{_bytes_to_gib(transformer.bytes_count):.2f} GiB ({_format_short_number(transformer.param_count)} PARAMS)"
+                _print_row(
+                    filename + " " * (max_name_length - len(filename)),
+                    gib_text,
+                    data_col_width,
+                    name_len=max_name_length,
+                )
+
+        if i < len(gguf_files) - 1:
+            _print_divider(data_col_width + 1, name_len=max_name_length)
+        else:
+            _print_divider(data_col_width + 1, "bottom", name_len=max_name_length)

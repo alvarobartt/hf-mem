@@ -47,6 +47,16 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 
 <img src="https://github.com/user-attachments/assets/64eaff88-d395-4d8d-849b-78fb86411dc3" />
 
+## GGUF Files
+
+*.gguf* files will only be listed when no other *.safetensors* files are present in the repository or when using the `--gguf-file` flag followed by a filepath to a GGUF model. For sharded files, the path to any of the individual shards will work. Other flags like `--experimental` or the ones regarding KV cache calculations are also compatible.
+
+```bash
+uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf-file deepseek-llm-7b-chat.Q2_K.gguf --experimental
+```
+
+<img width="1140" height="1065" alt="image" src="https://github.com/user-attachments/assets/9cdcb769-6ca9-4ed9-adaf-630848c94356" />
+
 ## (Optional) Agent Skills
 
 Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](.skills/hf-mem/SKILL.md).
