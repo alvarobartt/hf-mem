@@ -1,21 +1,14 @@
 import json
-import os
 import struct
 from typing import Any, Dict
 
 import httpx
 
-# NOTE: Defines the bytes that will be fetched per safetensors file, but the metadata
-# can indeed be larger than that
+from hf_mem._fetch import REQUEST_TIMEOUT, get_json_file  # noqa: F401
+
+# NOTE: Defines the bytes that will be fetched per safetensors file; the metadata can exceed this
+# limit, in which case a second ranged request fetches the remainder
 MAX_METADATA_SIZE = 100_000
-REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
-
-
-# NOTE: Return type-hint set to `Any`, but it will only be a JSON-compatible object
-async def get_json_file(client: httpx.AsyncClient, url: str, headers: Dict[str, str] | None = None) -> Any:
-    response = await client.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
-    return response.json()
 
 
 async def fetch_safetensors_metadata(

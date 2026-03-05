@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass
 from typing import Any, Dict
 
 from hf_mem._version import __version__
+from hf_mem.gguf.kv_cache import KV_CACHE_FIELD_ENDINGS, compute_gguf_kv_cache_size
 from hf_mem.gguf.types import (
     _PARSERS,
     GGUFDtype,
@@ -13,15 +14,6 @@ from hf_mem.gguf.types import (
     _read_uint64,
 )
 from hf_mem.safetensors.metadata import DtypeMetadata
-
-# NOTE: KV metadata field suffixes used to extract the fields needed for KV cache estimation
-KV_CACHE_FIELD_ENDINGS = [
-    "block_count",
-    "head_count_kv",
-    "head_count",
-    "embedding_length",
-    "context_length",
-]
 
 
 @dataclass
@@ -98,11 +90,14 @@ def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
 def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) -> Dict[str, Any]:
     out = asdict(metadata)
 
+    # NOTE: Convert GGUFDtype enum keys to their string names so the dict is JSON-serializable
     for component in out["components"].values():
         component["dtypes"] = {k.name: v for k, v in component["dtypes"].items()}
 
     out = {"version": __version__, "model_id": model_id, "revision": revision, **out}
 
+    # NOTE: If --experimental, flatten kv_cache_info fields to the top level to match the
+    # safetensors JSON output shape
     if kv_cache_info := out.pop("kv_cache_info"):
         out["max_model_len"] = kv_cache_info["max_model_len"]
         out["cache_size"] = kv_cache_info["cache_size"]
@@ -112,43 +107,13 @@ def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) 
     return out
 
 
-def compute_gguf_kv_cache_size(
-    kv_metadata: Dict[str, Any], kv_cache_dtype: str = "F16", batch_size: int = 1
-) -> int:
-    block_count = kv_metadata["block_count"]
-    head_count_kv = kv_metadata["head_count_kv"]
-    head_count = kv_metadata["head_count"]
-    embedding_length = kv_metadata["embedding_length"]
-    context_length = kv_metadata["context_length"]
-
-    if not all(
-        isinstance(v, int) for v in [block_count, head_count_kv, head_count, embedding_length, context_length]
-    ):
-        raise RuntimeError("KV cache metadata fields must be integers for GGUF KV cache size estimation.")
-
-    if kv_cache_dtype not in GGUFDtype.__members__:
-        raise RuntimeError(
-            f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF KV cache size estimation. Valid options: {list(GGUFDtype.__members__.keys())}."
-        )
-
-    size_per_token = 2 * head_count_kv * (embedding_length // head_count)
-    return int(
-        block_count
-        * size_per_token
-        * context_length
-        * batch_size
-        * GGUFDtypeBitsPerWeight[GGUFDtype[kv_cache_dtype]]
-        / 8.0
-    )
-
-
 def parse_gguf_metadata(
     raw_metadata: bytes,
     experimental: bool = False,
     max_model_len: int | None = None,
     kv_cache_dtype: str = "F16",
     batch_size: int = 1,
-) -> GGUFMetadata:
+) -> "GGUFMetadata":
     # NOTE: Validate the GGUF magic number to fail fast on invalid or truncated files
     if raw_metadata[:4] != b"GGUF":
         raise RuntimeError("Not a valid GGUF file: magic number mismatch.")
@@ -169,7 +134,7 @@ def parse_gguf_metadata(
     kv_cache_info = None
     if experimental:
         # NOTE: Extract only the fields needed for KV cache estimation, matched by suffix to be
-        # model-agnostic (e.g., "llama.block_count" → "block_count")
+        # model-agnostic (e.g. "llama.block_count" → "block_count")
         kv_cache_dict = {
             ending: kv_metadata[key]
             for ending in KV_CACHE_FIELD_ENDINGS
@@ -186,15 +151,13 @@ def parse_gguf_metadata(
                 f"Incomplete KV cache metadata for size estimation. Missing fields: {missing_fields}"
             )
 
-        kv_size = compute_gguf_kv_cache_size(
-            kv_metadata=kv_cache_dict,
-            kv_cache_dtype=kv_cache_dtype,
-            batch_size=batch_size,
-        )
-
         kv_cache_info = GGUFKVCacheInfo(
             max_model_len=kv_cache_dict["context_length"],
-            cache_size=kv_size,
+            cache_size=compute_gguf_kv_cache_size(
+                kv_metadata=kv_cache_dict,
+                kv_cache_dtype=kv_cache_dtype,
+                batch_size=batch_size,
+            ),
             batch_size=batch_size,
             cache_dtype=kv_cache_dtype,
         )

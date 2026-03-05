@@ -2,7 +2,6 @@ from typing import Literal
 
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 14
-MIN_DATA_LEN = 20
 MAX_DATA_LEN = 64
 BORDERS_AND_PADDING = 4
 
