@@ -86,6 +86,7 @@ async def fetch_modules_and_dense_metadata(
 async def run(
     model_id: str,
     revision: str,
+    hf_token: str | None = None,
     # START_KV_CACHE_ARGS
     experimental: bool = False,
     max_model_len: int | None = None,
@@ -96,10 +97,19 @@ async def run(
     ignore_table_width: bool = False,
     gguf_file: str | None = None,
 ) -> Dict[str, Any] | None:
-    headers = {"User-Agent": f"hf-mem/0.4; id={uuid4()}; model_id={model_id}; revision={revision}"}
-    # NOTE: Read from `HF_TOKEN` if provided, then fallback to reading from `$HF_HOME/token`
-    if token := os.getenv("HF_TOKEN"):
+    headers = {
+        "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}"  # type: ignore
+    }
+
+    # NOTE: The Hugging Face Hub token is not only required to read the files for gated / private models, but also
+    # to benefit from more generous request tiers to the Hub
+    if hf_token is not None:
+        headers["Authorization"] = f"Bearer {hf_token}"
+    # NOTE: Read from `HF_TOKEN` if provided
+    elif token := os.getenv("HF_TOKEN"):
         headers["Authorization"] = f"Bearer {token}"
+    # NOTE: If neither the `--hf-token` is provided nor the `HF_TOKEN` is set, then fallback to reading from
+    # `$HF_HOME/token`
     elif "Authorization" not in headers:
         path = os.getenv("HF_HOME", ".cache/huggingface")
         filename = (
@@ -524,8 +534,6 @@ async def run(
                     cache_size *= batch_size
 
     if json_output:
-        from hf_mem import __version__
-
         out = {"version": __version__, "model_id": model_id, "revision": revision, **asdict(metadata)}
         if experimental and cache_size:
             out["max_model_len"] = max_model_len
@@ -566,6 +574,13 @@ def main() -> None:
         "--revision",
         default="main",
         help="Model revision on the Hugging Face Hub",
+    )
+    parser.add_argument(
+        "--hf-token",
+        type=str,
+        default=None,
+        required=False,
+        help="The Hugging Face Hub token to use when sending requests to the Hub. If not provided it will be retrieved from either the `HF_TOKEN` environment variable or from the `.cache/huggingface/token` file if applicable.",
     )
 
     parser.add_argument(
@@ -626,6 +641,7 @@ def main() -> None:
         run(
             model_id=args.model_id,
             revision=args.revision,
+            hf_token=args.hf_token,
             # NOTE: Below are the arguments that affect the KV cache estimation
             experimental=args.experimental,
             max_model_len=args.max_model_len,
