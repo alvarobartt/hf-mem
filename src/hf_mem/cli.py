@@ -411,7 +411,20 @@ async def run(
                     warnings.warn(
                         f"Given that `--model-id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
                     )
-                    config = config["text_config"]
+                    text_config = config["text_config"]
+
+                    if referenced_model := text_config.get("_name_or_path"):
+                        referenced_url = (
+                            f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
+                        )
+                        warnings.warn(
+                            f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
+                        )
+                        referenced_config = await get_json_file(client, referenced_url, headers)
+                        referenced_config.update(text_config)
+                        text_config = referenced_config
+
+                    config = text_config
 
                 if max_model_len is None:
                     max_model_len = config.get(
