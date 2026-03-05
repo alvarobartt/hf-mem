@@ -5,7 +5,7 @@ import re
 import warnings
 from dataclasses import asdict
 from functools import reduce
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import uuid4
 
 import httpx
@@ -15,7 +15,7 @@ from hf_mem.gguf.fetch import fetch_gguf_with_semaphore
 from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, gguf_metadata_to_json, merge_shards
 from hf_mem.gguf.print import print_gguf_files_report, print_gguf_report
 from hf_mem.safetensors.fetch import fetch_modules_and_dense_metadata, fetch_safetensors_metadata, get_json_file
-from hf_mem.safetensors.metadata import SafetensorsMetadata, parse_safetensors_metadata
+from hf_mem.safetensors.metadata import parse_safetensors_metadata
 from hf_mem.safetensors.print import print_safetensors_report
 from hf_mem.safetensors.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
@@ -76,9 +76,6 @@ async def run(
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
-    # NOTE: GGUF support only applies if:
-    # 1. The `--gguf-file` flag is set.
-    # 2. No Safetensors files are found and at least one gguf file is found
     gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
     has_safetensors = any(
         f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths
@@ -142,7 +139,7 @@ async def run(
                     parse_kv_cache=parse_kv_cache,
                     shard_pattern=shard_pattern,
                     max_model_len=max_model_len,
-                    kv_cache_dtype=kv_cache_dtype,
+                    kv_cache_dtype=kv_cache_dtype or "auto",
                     batch_size=batch_size,
                     headers=headers,
                 )
@@ -154,7 +151,7 @@ async def run(
         gguf_files: Dict[str, GGUFMetadata] = {}
         for path, metadata, shard_pattern in results:
             if shard_pattern:
-                # NOTE: Ex: base_name = Kimi-K2.5-BF16.gguf
+                # NOTE: e.g., `base_name` is `Kimi-K2.5-BF16.gguf`
                 base_name = shard_pattern.group(1) + ".gguf"
                 if base_name in gguf_files:
                     gguf_files[base_name] = merge_shards(gguf_files[base_name], metadata)

@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from hf_mem._print import (
     BORDERS_AND_PADDING,
@@ -21,7 +21,7 @@ def print_gguf_report(
     model_id: str,
     revision: str,
     metadata: GGUFMetadata,
-    cache: Optional[Dict[str, Any]] = None,
+    cache: Dict[str, Any] | None = None,
     ignore_table_width: bool = False,
 ) -> None:
     combined_total = metadata.bytes_count + cache["cache_size"] if cache else metadata.bytes_count
@@ -128,7 +128,6 @@ def print_gguf_report(
             gib_text = (
                 f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
             )
-            # NOTE: dtype is a GGUFDtype enum — use .name to get the string label
             _print_row(
                 dtype.name.upper() + " " * (max_length - len(dtype.name)),
                 gib_text,

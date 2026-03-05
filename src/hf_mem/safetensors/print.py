@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from hf_mem._print import (
     BORDERS_AND_PADDING,
@@ -12,7 +12,6 @@ from hf_mem._print import (
     _print_divider,
     _print_header,
     _print_row,
-    _print_with_color,
 )
 from hf_mem._version import __version__
 from hf_mem.safetensors.metadata import SafetensorsMetadata
@@ -22,7 +21,7 @@ def print_safetensors_report(
     model_id: str,
     revision: str,
     metadata: SafetensorsMetadata,
-    cache: Optional[Dict[str, Any]] = None,
+    cache: Dict[str, Any] | None = None,
     ignore_table_width: bool = False,
 ) -> None:
     combined_total = metadata.bytes_count + cache["cache_size"] if cache else metadata.bytes_count

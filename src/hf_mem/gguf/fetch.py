@@ -2,7 +2,7 @@ import asyncio
 import os
 import re
 import struct
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 import httpx
 
@@ -18,12 +18,12 @@ async def fetch_gguf_metadata(
     client: httpx.AsyncClient,
     url: str,
     experimental: bool = False,
-    max_model_len: Optional[int] = None,
+    max_model_len: int | None = None,
     kv_cache_dtype: str = "F16",
     batch_size: int = 1,
-    headers: Optional[Dict[str, str]] = None,
-) -> GGUFMetadata:
-    # NOTE: `auto` falls back to F16 for GGUF files as there's no config.json to infer dtype from
+    headers: Dict[str, str] | None = None,
+) -> GGUFMetadata | None:
+    # NOTE: `auto` falls back to F16 for GGUF files as there's no `config.json` to infer dtype from
     if kv_cache_dtype == "auto":
         kv_cache_dtype = "F16"
 
@@ -41,7 +41,6 @@ async def fetch_gguf_metadata(
                 kv_cache_dtype=kv_cache_dtype,
                 batch_size=batch_size,
             )
-
         except (struct.error, UnicodeDecodeError):
             if size == SIZES[-1]:
                 raise RuntimeError(
@@ -56,14 +55,14 @@ async def fetch_gguf_with_semaphore(
     revision: str,
     path: str,
     parse_kv_cache: bool,
-    shard_pattern: Optional[re.Match],
-    max_model_len: Optional[int] = None,
+    shard_pattern: re.Match | None,
+    max_model_len: int | None = None,
     kv_cache_dtype: str = "F16",
     batch_size: int = 1,
-    headers: Optional[Dict[str, str]] = None,
-) -> Tuple[str, GGUFMetadata, Optional[re.Match]]:
+    headers: Dict[str, str] | None = None,
+) -> Tuple[str, GGUFMetadata | None, re.Match | None]:
     async with semaphore:
-        f_url = f"https://huggingface.co/{model_id}/resolve/{revision}/{str(path)}"
+        f_url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}"
         metadata = await fetch_gguf_metadata(
             client=client,
             url=f_url,

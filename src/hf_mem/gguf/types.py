@@ -3,7 +3,7 @@ from enum import IntEnum
 from typing import Any, Callable, Dict
 
 
-# --- GGUF weight dtype enum ---
+# REFERENCE: https://huggingface.co/docs/hub/en/gguf#quantization-types
 class GGUFDtype(IntEnum):
     F32 = 0
     F16 = 1
@@ -87,7 +87,6 @@ GGUFDtypeBitsPerWeight: Dict[GGUFDtype, float] = {
 }
 
 
-# --- GGUF metadata value type enum (used in KV metadata pairs) ---
 class GGUFMetadataDtype(IntEnum):
     UINT8 = 0
     INT8 = 1
@@ -102,9 +101,6 @@ class GGUFMetadataDtype(IntEnum):
     UINT64 = 10
     INT64 = 11
     FLOAT64 = 12
-
-
-# --- Low-level binary readers for each GGUF metadata value type ---
 
 
 def _read_string(raw_metadata: bytes, offset: int) -> tuple[str, int]:
@@ -193,7 +189,7 @@ def _read_array(raw_metadata: bytes, offset: int) -> tuple[list[Any], int]:
     return value, offset
 
 
-# NOTE: Dispatch table mapping GGUFMetadataDtype integer values to their reader functions
+# NOTE: Dispatch table mapping `GGUFMetadataDtype` integer values to their reader functions
 _PARSERS: Dict[GGUFMetadataDtype, Callable] = {
     GGUFMetadataDtype.UINT8: _read_uint8,
     GGUFMetadataDtype.INT8: _read_int8,

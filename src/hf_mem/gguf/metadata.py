@@ -1,7 +1,7 @@
 import math
 import struct
 from dataclasses import asdict, dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from hf_mem._version import __version__
 from hf_mem.gguf.types import (
@@ -36,7 +36,7 @@ class GGUFKVCacheInfo:
     max_model_len: int
     cache_size: int
     batch_size: int
-    cache_dtype: Optional[str] = None
+    cache_dtype: str | None = None
 
 
 @dataclass
@@ -44,7 +44,7 @@ class GGUFMetadata:
     components: Dict[str, GGUFComponentMetadata]
     param_count: int
     bytes_count: int
-    kv_cache_info: Optional[GGUFKVCacheInfo] = None
+    kv_cache_info: GGUFKVCacheInfo | None = None
 
 
 def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
@@ -83,8 +83,8 @@ def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
         else:
             merged_components[component_name] = comp2  # type: ignore[assignment]
 
-    # NOTE: KV cache info is the same for all shards — prefer earlier shards since metadata
-    # can get dropped after the first shard
+    # NOTE: KV cache info is the same for all shards, prefer earlier shards since metadata can get dropped after
+    # the first shard
     kv_cache_info = shard1.kv_cache_info or shard2.kv_cache_info
 
     return GGUFMetadata(
@@ -97,27 +97,23 @@ def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
 
 def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) -> Dict[str, Any]:
     out = asdict(metadata)
-    # NOTE: Convert GGUFDtype enum keys to their string names so the dict is JSON-serializable
+
     for component in out["components"].values():
         component["dtypes"] = {k.name: v for k, v in component["dtypes"].items()}
+
     out = {"version": __version__, "model_id": model_id, "revision": revision, **out}
 
-    # NOTE: If --experimental, flatten kv_cache_info fields to the top level to match the
-    # safetensors JSON output shape
-    if out.get("kv_cache_info") is not None:
-        out["max_model_len"] = out["kv_cache_info"]["max_model_len"]
-        out["cache_size"] = out["kv_cache_info"]["cache_size"]
-        out["batch_size"] = out["kv_cache_info"]["batch_size"]
-        out["cache_dtype"] = out["kv_cache_info"]["cache_dtype"]
-    out.pop("kv_cache_info", None)
+    if kv_cache_info := out.pop("kv_cache_info"):
+        out["max_model_len"] = kv_cache_info["max_model_len"]
+        out["cache_size"] = kv_cache_info["cache_size"]
+        out["batch_size"] = kv_cache_info["batch_size"]
+        out["cache_dtype"] = kv_cache_info["cache_dtype"]
 
     return out
 
 
 def compute_gguf_kv_cache_size(
-    kv_metadata: Dict[str, Any],
-    kv_cache_dtype: str = "F16",
-    batch_size: int = 1,
+    kv_metadata: Dict[str, Any], kv_cache_dtype: str = "F16", batch_size: int = 1
 ) -> int:
     block_count = kv_metadata["block_count"]
     head_count_kv = kv_metadata["head_count_kv"]
@@ -149,7 +145,7 @@ def compute_gguf_kv_cache_size(
 def parse_gguf_metadata(
     raw_metadata: bytes,
     experimental: bool = False,
-    max_model_len: Optional[int] = None,
+    max_model_len: int | None = None,
     kv_cache_dtype: str = "F16",
     batch_size: int = 1,
 ) -> GGUFMetadata:
@@ -206,17 +202,18 @@ def parse_gguf_metadata(
     # NOTE: Parse tensor info — only name, shape, and dtype are needed; raw tensor data is not fetched
     component = GGUFComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
     for _ in range(tensor_count):
-        name, offset = _read_string(raw_metadata, offset)
+        _, offset = _read_string(raw_metadata, offset)
         n_dimensions, offset = _read_uint32(raw_metadata, offset)
         dimensions = []
         for _ in range(n_dimensions):
             dim, offset = _read_uint64(raw_metadata, offset)
             dimensions.append(dim)
         tensor_type, offset = _read_uint32(raw_metadata, offset)
-        _tensor_offset, offset = _read_uint64(raw_metadata, offset)
+        _, offset = _read_uint64(raw_metadata, offset)
 
         param_count = math.prod(dimensions)
         bytes_count = int(GGUFDtypeBitsPerWeight[GGUFDtype(tensor_type)] / 8.0 * param_count)
+
         if GGUFDtype(tensor_type) in component.dtypes:
             dtype_meta = component.dtypes[GGUFDtype(tensor_type)]
             dtype_meta.param_count += param_count

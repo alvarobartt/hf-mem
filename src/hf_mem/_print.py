@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Literal
 
 MIN_NAME_LEN = 5
 MAX_NAME_LEN = 14
@@ -44,7 +44,7 @@ def _print_centered(text: str, current_len: int) -> None:
 
 def _print_divider(
     current_len: int,
-    side: Optional[Literal["top", "top-continue", "mid", "bottom", "bottom-continue"]] = None,
+    side: Literal["top", "top-continue", "mid", "bottom", "bottom-continue"] | None = None,
     name_len: int = MAX_NAME_LEN,
 ) -> None:
     match side:
