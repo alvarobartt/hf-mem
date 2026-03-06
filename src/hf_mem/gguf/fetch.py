@@ -45,7 +45,7 @@ async def fetch_gguf_metadata(
         except (struct.error, UnicodeDecodeError):
             if size >= _MAX_FETCH_SIZE:
                 raise RuntimeError(
-                    f"Failed to parse GGUF metadata from {url} — metadata section exceeds {_MAX_FETCH_SIZE // 1_000_000} MB."
+                    f"Failed to parse GGUF metadata from {url}, the metadata section exceeds {_MAX_FETCH_SIZE // 1_000_000} MB."
                 )
             # NOTE: Double on each retry until the full metadata section fits within the fetched range
             size = min(size * 2, _MAX_FETCH_SIZE)

@@ -3,7 +3,7 @@ from typing import Any, Dict
 from hf_mem.gguf.types import GGUFDtype, GGUFDtypeBitsPerWeight
 
 # NOTE: KV metadata field suffixes used to extract the fields needed for KV cache estimation;
-# matched by suffix so they work across all model families (e.g. "llama.block_count" → "block_count")
+# matched by suffix so they work across all model families (e.g. "llama.block_count" -> "block_count")
 KV_CACHE_FIELD_ENDINGS = [
     "block_count",
     "head_count_kv",

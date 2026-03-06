@@ -6,7 +6,7 @@ license: mit
 
 # hf-mem
 
-Estimates inference memory (model weights + optional KV cache) for models on the Hugging Face Hub using HTTP Range requests — no weights are downloaded.
+Estimates inference memory (model weights + optional KV cache) for models on the Hugging Face Hub using HTTP Range requests; no weights are downloaded.
 
 ## When to use
 
@@ -21,7 +21,7 @@ Estimates inference memory (model weights + optional KV cache) for models on the
 
 ## Safetensors models
 
-Auto-detected when the repo contains `model.safetensors`, `model.safetensors.index.json`, or `model_index.json`. Covers Transformers, Diffusers, and Sentence Transformers — no extra flags needed.
+Auto-detected when the repo contains `model.safetensors`, `model.safetensors.index.json`, or `model_index.json`. Covers Transformers, Diffusers, and Sentence Transformers; no extra flags needed.
 
 ```bash
 uvx hf-mem --model-id <org/model>
@@ -68,6 +68,6 @@ uvx hf-mem --model-id unsloth/Qwen3.5-397B-A17B-GGUF \
 
 ## Errors
 
-- **HTTP 401** — model is gated or private; provide `HF_TOKEN` or `--hf-token`
-- **HTTP 404** — model ID not found on the Hub
-- **RuntimeError** — no supported weight format found, or `--gguf-file` path doesn't match any file in the repo
+- **HTTP 401**: the model is gated or private; provide `HF_TOKEN` or `--hf-token`.
+- **HTTP 404**: the model ID not found on the Hub.
+- **RuntimeError**: no supported weight format found, or `--gguf-file` path doesn't match any file in the repository.

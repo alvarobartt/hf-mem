@@ -122,7 +122,6 @@ def parse_gguf_metadata(
     metadata_kv_count = struct.unpack("<Q", raw_metadata[16:24])[0]
     offset = 24
 
-    # NOTE: Parse KV metadata pairs — these hold model configuration fields used for KV cache estimation
     kv_metadata: Dict[str, Any] = {}
     for _ in range(metadata_kv_count):
         key, offset = _read_string(raw_metadata, offset)
@@ -134,7 +133,7 @@ def parse_gguf_metadata(
     kv_cache_info = None
     if experimental:
         # NOTE: Extract only the fields needed for KV cache estimation, matched by suffix to be
-        # model-agnostic (e.g. "llama.block_count" → "block_count")
+        # model-agnostic (e.g. "llama.block_count" -> "block_count")
         kv_cache_dict = {
             ending: kv_metadata[key]
             for ending in KV_CACHE_FIELD_ENDINGS
@@ -162,7 +161,6 @@ def parse_gguf_metadata(
             cache_dtype=kv_cache_dtype,
         )
 
-    # NOTE: Parse tensor info — only name, shape, and dtype are needed; raw tensor data is not fetched
     component = GGUFComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
     for _ in range(tensor_count):
         _, offset = _read_string(raw_metadata, offset)
