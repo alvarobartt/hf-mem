@@ -5,13 +5,10 @@ from hf_mem.safetensors.metadata import SafetensorsMetadata
 from hf_mem.safetensors.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 
+# NOTE: Only full-attention (global) layers grow the KV cache with max_model_len; meaning
+# that only those contribute to a KV cache that scales with the context length, whereas the sliding
+# window layers reuse a fixed-size buffer and are excluded from the estimation.
 def _resolve_num_attention_layers(config: Dict[str, Any]) -> int:
-    """Return the number of full-attention (global) layers that grow the KV cache with max_model_len.
-
-    Models with hybrid attention mix full attention and sliding window attention layers. Only the
-    full attention layers contribute to a KV cache that scales with the context length; sliding
-    window layers reuse a fixed-size buffer and are therefore excluded from the estimate.
-    """
     num_hidden_layers: int = config["num_hidden_layers"]
 
     # NOTE: Gemma3-style hybrid attention: every N-th layer (0-indexed where `i % N == N-1`)
@@ -21,12 +18,11 @@ def _resolve_num_attention_layers(config: Dict[str, Any]) -> int:
     if "sliding_window_pattern" in config:
         return num_hidden_layers // config["sliding_window_pattern"]
 
-    # NOTE: Some models provide an explicit list of layer types — count the non-sliding-window ones.
-    # Known string values for full attention vary by architecture.
+    # NOTE: Some models provide an explicit list of layer types, so we need to count the non-sliding-window ones.
     if "layer_types" in config:
         return sum(1 for t in config["layer_types"] if t in {"attention", "full_attention", "global_attention"})
 
-    # NOTE: Default — assume all layers use full attention (standard MHA / GQA without SWA).
+    # NOTE: By default assume all layers use full attention (standard MHA / GQA without SWA).
     return num_hidden_layers
 
 
@@ -36,7 +32,6 @@ def resolve_kv_cache_dtype(
     metadata: SafetensorsMetadata,
     model_id: str,
 ) -> str:
-    """Resolve the effective KV cache dtype string (a `SafetensorsDtypes` value) from the CLI flag and config."""
     if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
         return kv_cache_dtype.upper().replace("FP8", "F8")  # type: ignore[union-attr]
 
@@ -116,10 +111,6 @@ def compute_safetensors_kv_cache_size(
     max_model_len: int,
     batch_size: int = 1,
 ) -> int:
-    """Compute the KV cache memory requirement in bytes for a Safetensors model.
-
-    Reference: https://gist.github.com/alvarobartt/1097ca1b07c66fd71470937d599c2072
-    """
     hidden_size: int = config["hidden_size"]
     num_attention_heads: int = config["num_attention_heads"]
 
@@ -127,7 +118,7 @@ def compute_safetensors_kv_cache_size(
     # set to a smaller value in GQA / MQA
     num_key_value_heads: int = config.get("num_key_value_heads", num_attention_heads)
 
-    # NOTE: Use head_dim directly if specified in the config; some models (e.g. Qwen3) set
+    # NOTE: Use `head_dim` directly if specified in the config; some models (e.g. Qwen3) set
     # hidden_size and num_attention_heads independently from the actual per-head size,
     # making the fallback `hidden_size // num_attention_heads` incorrect for those models
     head_dim: int = config.get("head_dim", hidden_size // num_attention_heads)
