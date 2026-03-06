@@ -5,11 +5,11 @@
 > [!WARNING]
 > `hf-mem` is still experimental and therefore subject to major changes across releases, so please keep in mind that breaking changes may occur until v1.0.0.
 
-`hf-mem` is a CLI to estimate inference memory requirements for Hugging Face models, written in Python. `hf-mem` is lightweight, only depends on `httpx`, as it pulls the [Safetensors](https://github.com/huggingface/safetensors) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests). It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
+`hf-mem` is a CLI to estimate inference memory requirements for Hugging Face models, written in Python. `hf-mem` is lightweight, only depends on `httpx`, as it pulls the [Safetensors](https://github.com/huggingface/safetensors) and / or [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests). It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
 
-`hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers) and [Sentence Transformers](https://github.com/huggingface/sentence-transformers) models, as well as any model that contains [Safetensors](https://github.com/huggingface/safetensors) compatible weights.
+`hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers) and [Sentence Transformers](https://github.com/huggingface/sentence-transformers) models, or really any model as long as it contains any of [Safetensors](https://github.com/huggingface/safetensors) or [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) weights.
 
-Read more information about `hf-mem` in [this short-form post](https://alvarobartt.com/hf-mem).
+Read more information about `hf-mem` in [this short-form post](https://alvarobartt.com/hf-mem), but note it's not up-to-date as it was written in January 2026.
 
 ## Usage
 
@@ -55,15 +55,22 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf-file deepseek-llm-7b-chat.Q2_K.gguf --experimental
 ```
 
-<img width="1140" height="1065" alt="image" src="https://github.com/user-attachments/assets/9cdcb769-6ca9-4ed9-adaf-630848c94356" />
+<img src="https://github.com/user-attachments/assets/9cdcb769-6ca9-4ed9-adaf-630848c94356" />
 
 ## (Optional) Agent Skills
 
-Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](.skills/hf-mem/SKILL.md).
+Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](SKILL.md), e.g., `.claude/skills/hf-mem/SKILL.md`.
 
 More information can be found at [Anthropic Agent Skills and how to use them](https://github.com/anthropics/skills).
 
 ## References
 
+### Technical
+
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
+- [GGUF File format](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)
+- [GGUF on the Hugging Face Hub](https://huggingface.co/docs/hub/en/gguf)
+
+### Visual
+
 - [usgraphics - TR-100 Machine Report](https://github.com/usgraphics/usgc-machine-report)
