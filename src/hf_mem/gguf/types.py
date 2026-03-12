@@ -45,7 +45,6 @@ class GGUFDtype(IntEnum):
     # IQ4_NL_4_8 = 37
     # IQ4_NL_8_8 = 38
     MXFP4 = 39
-    COUNT = 40  # NOTE: For exhaustivity, not used as a real dtype
 
 
 # NOTE: Bits-per-weight for each GGUF dtype, used to compute byte sizes without storing all tensor data
