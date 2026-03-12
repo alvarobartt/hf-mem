@@ -4,21 +4,12 @@ from hf_mem.gguf.types import GGUFDtype, GGUFDtypeBitsPerWeight
 
 # NOTE: KV metadata field suffixes used to extract the fields needed for KV cache estimation;
 # matched by suffix so they work across all model families (e.g. "llama.block_count" -> "block_count")
-KV_CACHE_FIELD_ENDINGS = [
-    "block_count",
-    "head_count_kv",
-    "head_count",
-    "embedding_length",
-    "context_length",
-]
+KV_CACHE_FIELD_ENDINGS = ["block_count", "head_count_kv", "head_count", "embedding_length", "context_length"]
 
 
 def compute_gguf_kv_cache_size(
-    kv_metadata: Dict[str, Any],
-    kv_cache_dtype: str = "F16",
-    batch_size: int = 1,
+    kv_metadata: Dict[str, Any], kv_cache_dtype: str = "F16", batch_size: int = 1
 ) -> int:
-    """Compute the KV cache memory requirement in bytes for a GGUF model."""
     block_count = kv_metadata["block_count"]
     head_count_kv = kv_metadata["head_count_kv"]
     head_count = kv_metadata["head_count"]

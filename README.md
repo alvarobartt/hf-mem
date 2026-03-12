@@ -13,7 +13,9 @@ Read more information about `hf-mem` in [this short-form post](https://alvarobar
 
 ## Usage
 
-### Transformers
+### CLI (Recommended)
+
+#### Transformers
 
 ```bash
 uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
@@ -21,7 +23,7 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
 
 <img src="https://github.com/user-attachments/assets/530f8b14-a415-4fd6-9054-bcd81cafae09" />
 
-### Diffusers
+#### Diffusers
 
 ```bash
 uvx hf-mem --model-id Qwen/Qwen-Image
@@ -29,13 +31,26 @@ uvx hf-mem --model-id Qwen/Qwen-Image
 
 <img src="https://github.com/user-attachments/assets/cd4234ec-bdcc-4db4-8b01-0ac9b5cd390c" />
 
-### Sentence Transformers
+#### Sentence Transformers
 
 ```bash
 uvx hf-mem --model-id google/embeddinggemma-300m
 ```
 
 <img src="https://github.com/user-attachments/assets/a52c464b-a6c1-446d-9921-68aaefb9df88" />
+
+### Python
+
+You can also run it programmatically with Python as:
+
+```python
+import asyncio
+
+from hf_mem import run
+
+result = asyncio.run(run(model_id="MiniMaxAI/MiniMax-M2", experimental=True))
+# Result(model_id='MiniMaxAI/MiniMax-M2', revision='main', safetensors=SafetensorsMetadata(components={'Transformer': ComponentMetadata(dtypes={'F32': DtypeMetadata(param_count=62654720, bytes_count=250618880), 'F8_E4M3': DtypeMetadata(param_count=227410968576, bytes_count=227410968576), 'BF16': DtypeMetadata(param_count=1230021632, bytes_count=2460043264)}, param_count=228703644928, bytes_count=230121630720)}, param_count=228703644928, bytes_count=230121630720), gguf_files=None, gguf_file=None, kv_cache=KvCache(max_model_len=196608, cache_size=24964497408, batch_size=1, cache_dtype='F8_E4M3'))
+```
 
 ## Experimental
 

@@ -1,9 +1,8 @@
 import asyncio
-import json
 import os
 import re
 import warnings
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from functools import reduce
 from typing import Any, Dict, List, Tuple
 from uuid import uuid4
@@ -14,16 +13,60 @@ from hf_mem._fetch import get_json_file
 from hf_mem._version import __version__
 from hf_mem.gguf.fetch import fetch_gguf_with_semaphore
 from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, gguf_metadata_to_json, merge_shards
-from hf_mem.gguf.print import print_gguf_files_report, print_gguf_report
 from hf_mem.safetensors.fetch import fetch_modules_and_dense_metadata, fetch_safetensors_metadata
 from hf_mem.safetensors.kv_cache import compute_safetensors_kv_cache_size, resolve_kv_cache_dtype
-from hf_mem.safetensors.metadata import parse_safetensors_metadata
-from hf_mem.safetensors.print import print_safetensors_report
+from hf_mem.safetensors.metadata import SafetensorsMetadata, parse_safetensors_metadata
 
 MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4)))
 
 # NOTE: Shard filename pattern, e.g. "Kimi-K2.5-BF16-00001-of-00046.gguf"
 _SHARD_PATTERN = re.compile(r"(.+)-(\d+)-of-(\d+)\.gguf$")
+
+
+@dataclass
+class KvCache:
+    max_model_len: int
+    cache_size: int
+    batch_size: int
+    cache_dtype: str
+
+
+@dataclass
+class Result:
+    model_id: str
+    revision: str
+    # NOTE: Exactly one of `safetensors` or `gguf_files` is set
+    safetensors: SafetensorsMetadata | None = None
+    gguf_files: Dict[str, GGUFMetadata] | None = None
+    gguf_file: str | None = None
+    # NOTE: Only set when `experimental=True` and the model supports KV cache estimation (Safetensors only);
+    # for GGUF models the KV cache info is embedded inside `GGUFMetadata.kv_cache_info`
+    kv_cache: KvCache | None = None
+
+    def to_json(self) -> Dict[str, Any] | List[Dict[str, Any]]:
+        if self.safetensors is not None:
+            out: Dict[str, Any] = {
+                "version": __version__,
+                "model_id": self.model_id,
+                "revision": self.revision,
+                **asdict(self.safetensors),
+            }
+            if self.kv_cache is not None:
+                out["max_model_len"] = self.kv_cache.max_model_len
+                out["batch_size"] = self.kv_cache.batch_size
+                out["cache_size"] = self.kv_cache.cache_size
+                out["cache_dtype"] = self.kv_cache.cache_dtype
+            return out
+
+        if self.gguf_files is not None:
+            records = [
+                gguf_metadata_to_json(model_id=filename, revision=self.revision, metadata=gguf_metadata)
+                for filename, gguf_metadata in self.gguf_files.items()
+            ]
+            # NOTE: When a single file was requested, return a dict rather than a one-element list
+            return records[0] if self.gguf_file is not None else records
+
+        raise RuntimeError("Result has neither `safetensors` nor `gguf_files` set.")
 
 
 def _collect_gguf_results(
@@ -45,20 +88,16 @@ def _collect_gguf_results(
 
 async def run(
     model_id: str,
-    revision: str,
+    revision: str = "main",
     hf_token: str | None = None,
-    # START_KV_CACHE_ARGS
     experimental: bool = False,
     max_model_len: int | None = None,
     batch_size: int = 1,
     kv_cache_dtype: str | None = None,
-    # END_KV_CACHE_ARGS
-    json_output: bool = False,
-    ignore_table_width: bool = False,
     gguf_file: str | None = None,
-) -> Dict[str, Any] | None:
-    headers = {
-        "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}"  # type: ignore
+) -> Result:
+    headers: Dict[str, str] = {
+        "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}"
     }
 
     # NOTE: The Hugging Face Hub token is not only required to read the files for gated / private models, but also
@@ -107,7 +146,6 @@ async def run(
             f"Both Safetensors and GGUF files have been found for {model_id} @ {revision}, if you want to estimate any of the GGUF file sizes, please use the `--gguf-file` flag with the path to the specific GGUF file. GGUF files found: {gguf_paths}."
         )
 
-    # START_GGUF
     if gguf:
         if kv_cache_dtype not in GGUFDtype.__members__ and kv_cache_dtype != "auto":
             raise RuntimeError(
@@ -160,45 +198,14 @@ async def run(
                 )
             )
 
-        gguf_files = _collect_gguf_results(await asyncio.gather(*tasks))
+        return Result(
+            model_id=model_id,
+            revision=revision,
+            gguf_files=_collect_gguf_results(await asyncio.gather(*tasks)),
+            gguf_file=gguf_file,
+        )
 
-        if json_output:
-            records = [
-                gguf_metadata_to_json(model_id=filename, revision=revision, metadata=gguf_metadata)
-                for filename, gguf_metadata in gguf_files.items()
-            ]
-            print(json.dumps(records[0] if gguf_file else records))
-        else:
-            if gguf_file:
-                gguf_metadata = list(gguf_files.values())[0]
-                cache = (
-                    {
-                        "max_model_len": gguf_metadata.kv_cache_info.max_model_len,
-                        "cache_size": gguf_metadata.kv_cache_info.cache_size,
-                        "batch_size": gguf_metadata.kv_cache_info.batch_size,
-                        "cache_dtype": gguf_metadata.kv_cache_info.cache_dtype,
-                    }
-                    if experimental and gguf_metadata.kv_cache_info is not None
-                    else None
-                )
-                print_gguf_report(
-                    model_id=list(gguf_files.keys())[0],
-                    revision=revision,
-                    metadata=gguf_metadata,
-                    cache=cache,
-                    ignore_table_width=ignore_table_width,
-                )
-            else:
-                print_gguf_files_report(
-                    model_id=model_id,
-                    revision=revision,
-                    gguf_files=gguf_files,
-                    ignore_table_width=ignore_table_width,
-                )
-        return
-    # END_GGUF
-    # START_SAFETENSORS
-    elif "model.safetensors" in file_paths:
+    if "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
         raw_metadata = await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
@@ -312,7 +319,7 @@ async def run(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` FILES HAVE BEEN FOUND"
         )
 
-    cache_size = None
+    kv_cache: KvCache | None = None
     if experimental and "config.json" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
         config: Dict[str, Any] = await get_json_file(client, url, headers)
@@ -322,7 +329,7 @@ async def run(
             for arch in config.get("architectures", [])
         ):
             warnings.warn(
-                "`--experimental` was provided, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` not `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then remove the `--experimental` flag from the command to suppress this warning."
+                "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
             )
         else:
             if (
@@ -330,7 +337,7 @@ async def run(
                 and "text_config" in config
             ):
                 warnings.warn(
-                    f"Given that `--model-id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
+                    f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
                 )
                 text_config = config["text_config"]
 
@@ -353,55 +360,34 @@ async def run(
 
             if max_model_len is None:
                 warnings.warn(
-                    "Either the `--max-model-len` was not set, is not available in `config.json` with the any of the keys: `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+                    "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
                 )
-
-            if not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):  # type: ignore
+            elif not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
                 warnings.warn(
-                    f"`config.json` doesn't contain all the keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {config.keys()}."  # type: ignore
+                    f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
+                )
+            else:
+                cache_dtype = resolve_kv_cache_dtype(
+                    config=config,
+                    kv_cache_dtype=kv_cache_dtype,
+                    metadata=metadata,
+                    model_id=model_id,
+                )
+                kv_cache = KvCache(
+                    max_model_len=max_model_len,
+                    cache_size=compute_safetensors_kv_cache_size(
+                        config=config,
+                        cache_dtype=cache_dtype,
+                        max_model_len=max_model_len,
+                        batch_size=batch_size,
+                    ),
+                    batch_size=batch_size,
+                    cache_dtype=cache_dtype,
                 )
 
-            cache_dtype = resolve_kv_cache_dtype(
-                config=config,
-                kv_cache_dtype=kv_cache_dtype,
-                metadata=metadata,
-                model_id=model_id,
-            )
-            cache_size = compute_safetensors_kv_cache_size(
-                config=config,
-                cache_dtype=cache_dtype,
-                max_model_len=max_model_len,  # type: ignore[arg-type]
-                batch_size=batch_size,
-            )
-
-    if json_output:
-        out = {"version": __version__, "model_id": model_id, "revision": revision, **asdict(metadata)}
-        if experimental and cache_size:
-            out["max_model_len"] = max_model_len
-            out["batch_size"] = batch_size
-            out["cache_size"] = cache_size
-            out["cache_dtype"] = cache_dtype  # type: ignore
-        print(json.dumps(out))
-    else:
-        # TODO: Use a `KvCache` dataclass instead and make sure that the JSON output is aligned
-        if experimental and cache_size:
-            print_safetensors_report(
-                model_id=model_id,
-                revision=revision,
-                metadata=metadata,
-                cache={
-                    "max_model_len": max_model_len,
-                    "cache_size": cache_size,
-                    "batch_size": batch_size,
-                    "cache_dtype": cache_dtype,  # type: ignore
-                },
-                ignore_table_width=ignore_table_width,
-            )
-        else:
-            print_safetensors_report(
-                model_id=model_id,
-                revision=revision,
-                metadata=metadata,
-                ignore_table_width=ignore_table_width,
-            )
-    # END_SAFETENSORS
+    return Result(
+        model_id=model_id,
+        revision=revision,
+        safetensors=metadata,
+        kv_cache=kv_cache,
+    )
