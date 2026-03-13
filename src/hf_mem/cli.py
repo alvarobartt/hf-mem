@@ -5,7 +5,7 @@ import warnings
 
 from hf_mem.gguf.print import print_gguf_files_report, print_gguf_report
 from hf_mem.gguf.types import GGUFDtype
-from hf_mem.run import Result, run
+from hf_mem.run import Result, arun
 from hf_mem.safetensors.print import print_safetensors_report
 
 KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
@@ -122,7 +122,7 @@ def main() -> None:
         )
 
     result = asyncio.run(
-        run(
+        arun(
             model_id=args.model_id,
             revision=args.revision,
             hf_token=args.hf_token,

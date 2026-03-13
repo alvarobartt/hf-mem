@@ -167,7 +167,7 @@ def _collect_gguf_results(
     return gguf_files
 
 
-async def run(
+async def arun(
     model_id: str,
     revision: str = "main",
     hf_token: str | None = None,
@@ -212,7 +212,6 @@ async def run(
         http2=True,
         follow_redirects=True,
     )
-
     url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
@@ -512,4 +511,38 @@ async def run(
         details=details,
         safetensors=metadata,
         kv_cache_metadata=kv_cache_cls,
+    )
+
+
+def run(
+    model_id: str,
+    revision: str = "main",
+    hf_token: str | None = None,
+    experimental: bool = False,
+    max_model_len: int | None = None,
+    batch_size: int = 1,
+    kv_cache_dtype: str = "auto",
+    gguf_file: str | None = None,
+    details: bool = False,
+) -> Result:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(
+            arun(
+                model_id=model_id,
+                revision=revision,
+                hf_token=hf_token,
+                experimental=experimental,
+                max_model_len=max_model_len,
+                batch_size=batch_size,
+                kv_cache_dtype=kv_cache_dtype,
+                gguf_file=gguf_file,
+                details=details,
+            )
+        )
+
+    raise RuntimeError(
+        "`hf_mem.run(...)` is synchronous and cannot be used from an active event loop. "
+        "Use `await hf_mem.run.arun(...)` instead."
     )

@@ -44,12 +44,21 @@ uvx hf-mem --model-id google/embeddinggemma-300m
 You can also run it programmatically with Python as:
 
 ```python
-import asyncio
-
 from hf_mem import run
 
-result = asyncio.run(run(model_id="MiniMaxAI/MiniMax-M2", experimental=True))
-# Result(model_id='MiniMaxAI/MiniMax-M2', revision='main', safetensors=SafetensorsMetadata(components={'Transformer': ComponentMetadata(dtypes={'F32': DtypeMetadata(param_count=62654720, bytes_count=250618880), 'F8_E4M3': DtypeMetadata(param_count=227410968576, bytes_count=227410968576), 'BF16': DtypeMetadata(param_count=1230021632, bytes_count=2460043264)}, param_count=228703644928, bytes_count=230121630720)}, param_count=228703644928, bytes_count=230121630720), gguf_files=None, gguf_file=None, kv_cache=KvCache(max_model_len=196608, cache_size=24964497408, batch_size=1, cache_dtype='F8_E4M3'))
+result = run(model_id="MiniMaxAI/MiniMax-M2", experimental=True)
+print(result)
+# Result(model_id='MiniMaxAI/MiniMax-M2', revision='main', filename=None, memory=230121630720, kv_cache=24964497408, total_memory=255086128128, details=False)
+```
+
+If you're already inside an async application, use `arun(...)` instead:
+
+```python
+from hf_mem import arun
+
+result = await arun(model_id="MiniMaxAI/MiniMax-M2", experimental=True)
+print(result)
+# Result(model_id='MiniMaxAI/MiniMax-M2', revision='main', filename=None, memory=230121630720, kv_cache=24964497408, total_memory=255086128128, details=False)
 ```
 
 ## Experimental
