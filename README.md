@@ -21,7 +21,7 @@ Read more information about `hf-mem` in [this short-form post](https://alvarobar
 uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
 ```
 
-<img src="https://github.com/user-attachments/assets/530f8b14-a415-4fd6-9054-bcd81cafae09" />
+<img src="https://github.com/user-attachments/assets/545be630-4485-41ac-ba8d-2aedbbed8835" />
 
 #### Diffusers
 
@@ -29,7 +29,7 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
 uvx hf-mem --model-id Qwen/Qwen-Image
 ```
 
-<img src="https://github.com/user-attachments/assets/cd4234ec-bdcc-4db4-8b01-0ac9b5cd390c" />
+<img src="https://github.com/user-attachments/assets/7a260369-26b2-48e1-a97b-f18cc72f7475" />
 
 #### Sentence Transformers
 
@@ -37,7 +37,7 @@ uvx hf-mem --model-id Qwen/Qwen-Image
 uvx hf-mem --model-id google/embeddinggemma-300m
 ```
 
-<img src="https://github.com/user-attachments/assets/a52c464b-a6c1-446d-9921-68aaefb9df88" />
+<img src="https://github.com/user-attachments/assets/aef1ddd8-96c2-4944-83e2-57171ff6ac7a" />
 
 ### Python
 
@@ -69,7 +69,7 @@ By enabling the `--experimental` flag, you can enable the KV Cache memory estima
 uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 ```
 
-<img src="https://github.com/user-attachments/assets/64eaff88-d395-4d8d-849b-78fb86411dc3" />
+<img src="https://github.com/user-attachments/assets/ec0ef39d-0323-4616-bba5-6a18ffee211c" />
 
 ## GGUF
 
@@ -79,7 +79,7 @@ If the repository contains GGUF model weights, those will be listed by default (
 uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --experimental
 ```
 
-<TODO>
+<img src="https://github.com/user-attachments/assets/b5514d35-f9c4-4a07-a719-a0185ff1dd9f" />
 
 Or if you want to only get the estimation on a given file:
 
@@ -87,7 +87,7 @@ Or if you want to only get the estimation on a given file:
 uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf-file deepseek-llm-7b-chat.Q2_K.gguf --experimental
 ```
 
-<img src="https://github.com/user-attachments/assets/393ef7af-0fa9-421f-99cb-fee37f77ec65" />
+<img src="https://github.com/user-attachments/assets/e32ad635-05e5-4b33-b35b-3e689215dedd" />
 
 ## (Optional) Agent Skills
 
