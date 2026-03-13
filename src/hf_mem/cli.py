@@ -11,14 +11,13 @@ from hf_mem.safetensors.print import print_safetensors_report
 KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
 
 
-def _print_result(result: Result, ignore_table_width: bool = False) -> None:
+def _print_result(result: Result) -> None:
     if result.safetensors is not None:
         print_safetensors_report(
             model_id=result.model_id,
             revision=result.revision,
             metadata=result.safetensors,
             kv_cache=result.kv_cache_metadata,
-            ignore_table_width=ignore_table_width,
         )
         return
 
@@ -30,7 +29,6 @@ def _print_result(result: Result, ignore_table_width: bool = False) -> None:
                 revision=result.revision,
                 metadata=result.gguf_files[result.filename],
                 kv_cache=result.gguf_files[result.filename].kv_cache,
-                ignore_table_width=ignore_table_width,
             )
         else:
             print_gguf_files_report(
@@ -39,7 +37,6 @@ def _print_result(result: Result, ignore_table_width: bool = False) -> None:
                 gguf_files=result.gguf_files,
                 memory=result.memory,  # type: ignore[arg-type]
                 kv_cache=result.kv_cache,  # type: ignore[arg-type]
-                ignore_table_width=ignore_table_width,
             )
 
 
@@ -94,7 +91,7 @@ def main() -> None:
     parser.add_argument(
         "--ignore-table-width",
         action="store_true",
-        help="Whether to ignore the maximum recommended table width, in case the `--model-id` and/or `--revision` cause a row overflow when printing those.",
+        help="Deprecated: table width now auto-expands when needed, so this flag is ignored.",
     )
     parser.add_argument(
         "--gguf-file",
@@ -112,6 +109,11 @@ def main() -> None:
     if args.experimental:
         warnings.warn(
             "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
+        )
+
+    if args.ignore_table_width:
+        warnings.warn(
+            "`--ignore-table-width` is deprecated and has no effect; table width auto-expands when needed by default."
         )
 
     if args.kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
@@ -136,4 +138,4 @@ def main() -> None:
     if args.json_output:
         print(json.dumps(result.to_json()))
     else:
-        _print_result(result, ignore_table_width=args.ignore_table_width)
+        _print_result(result)

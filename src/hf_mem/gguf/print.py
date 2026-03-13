@@ -10,6 +10,7 @@ from hf_mem._print import (
     _make_bar,
     _print_centered,
     _print_divider,
+    _print_full_divider,
     _print_header,
     _print_row,
 )
@@ -24,14 +25,13 @@ def print_gguf_report(
     revision: str,
     metadata: GGUFMetadata,
     kv_cache: KvCache | None = None,
-    ignore_table_width: bool = False,
 ) -> None:
     combined_total = metadata.bytes_count + kv_cache.cache_size if kv_cache else metadata.bytes_count
 
     centered_rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
-        f"FOR FILE {filename}",
+        f"FOR `{filename}`",
     ]
     if kv_cache:
         centered_rows.append(f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}")
@@ -72,27 +72,24 @@ def print_gguf_report(
     min_width_for_data = MAX_NAME_LEN + max_data_len + 5
     max_len = max(max_centered_len, min_width_for_data)
 
-    if max_len > MAX_DATA_LEN and ignore_table_width is False:
+    if max_len > MAX_DATA_LEN:
         warnings.warn(
-            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
+            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views."
         )
 
-    current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
+    current_len = max_len
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - MAX_NAME_LEN - 5
 
-    _print_header(current_len)
+    _print_header(current_len, badge=f"hf-mem v{__version__}")
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
-    _print_centered(f"FOR FILE {filename}", current_len)
+    _print_centered(f"FOR `{filename}`", current_len)
     if kv_cache:
         _print_centered(
             f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}",
             current_len,
         )
     _print_divider(data_col_width + 1, "top")
-
-    _print_row("VERSION", f"hf-mem {__version__}", data_col_width)
-    _print_divider(data_col_width + 1)
 
     if kv_cache:
         total_text = f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
@@ -180,14 +177,9 @@ def print_gguf_files_report(
     gguf_files: Dict[str, GGUFMetadata],
     memory: Dict[str, int],
     kv_cache: Dict[str, int] | None = None,
-    ignore_table_width: bool = False,
 ) -> None:
-    # NOTE: All GGUF files in the same repo share the same architecture, so param count and
-    # KV cache config are taken from the first entry as representative for all
-    first_meta = next(iter(gguf_files.values()))
-    kv_cache_config: KvCache | None = first_meta.kv_cache
+    kv_cache_config = next((meta.kv_cache for meta in gguf_files.values() if meta.kv_cache is not None), None)
 
-    # NOTE: Build the rows that determine the minimum required table width
     centered_rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
@@ -197,40 +189,43 @@ def print_gguf_files_report(
             f"w/ max-model-len={kv_cache_config.max_model_len}, batch-size={kv_cache_config.batch_size}"
         )
 
-    # NOTE: Pre-compute GiB strings to measure max data column width
-    param_text = _format_short_number(first_meta.param_count)
-    file_gib_rows = []
+    file_rows = []
     for filename, meta in gguf_files.items():
         transformer = meta.components.get("Transformer")
-        if transformer:
-            total_bytes = memory[filename] + (kv_cache[filename] if kv_cache else 0)
-            suffix = " (WEIGHTS + KV CACHE)" if kv_cache else ""
-            file_gib_rows.append((filename, f"{_bytes_to_gib(total_bytes):.2f} GiB{suffix}"))
+        if not transformer:
+            continue
 
-    params_data = f"{param_text} PARAMS"
-    kv_data = (
-        f"{_bytes_to_gib(kv_cache_config.cache_size):.2f} GiB ({kv_cache_config.max_model_len * kv_cache_config.batch_size} TOKENS)"
-        if kv_cache_config
-        else None
-    )
+        weights_bytes = memory[filename]
+        kv_cache_bytes = kv_cache.get(filename, 0) if kv_cache else 0
+        total_bytes = weights_bytes + kv_cache_bytes
+        details = f"{_bytes_to_gib(total_bytes):.2f} GiB"
+        if kv_cache_bytes:
+            details += (
+                f" ({_bytes_to_gib(weights_bytes):.2f} GiB WEIGHTS + "
+                f"{_bytes_to_gib(kv_cache_bytes):.2f} GiB KV)"
+            )
+
+        file_rows.append((filename, details, total_bytes))
+
+    max_total_bytes = max(total_bytes for _, _, total_bytes in file_rows)
 
     max_name_length = min(max(len(fn) for fn in gguf_files.keys()), MAX_DATA_LEN)
-    all_data_texts = [params_data] + ([kv_data] if kv_data else []) + [gib for _, gib in file_gib_rows]
+    all_data_texts = [details for _, details, _ in file_rows]
     max_data_text_len = max(len(t) for t in all_data_texts)
 
     min_width_for_data = max_name_length + max_data_text_len + 5
-    max_centered_len = max(len(r) for r in centered_rows)
+    max_centered_len = max(max(len(r) for r in centered_rows), len("FILES"))
     max_len = max(max_centered_len, min_width_for_data)
 
-    if max_len > MAX_DATA_LEN and ignore_table_width is False:
+    if max_len > MAX_DATA_LEN:
         warnings.warn(
-            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
+            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views."
         )
 
-    current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
+    current_len = max_len
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - max_name_length - 5
 
-    _print_header(current_len)
+    _print_header(current_len, badge=f"hf-mem v{__version__}")
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
     if kv_cache_config is not None:
@@ -238,29 +233,19 @@ def print_gguf_files_report(
             f"w/ max-model-len={kv_cache_config.max_model_len}, batch-size={kv_cache_config.batch_size}",
             current_len,
         )
-    _print_divider(data_col_width + 1, "top", name_len=max_name_length)
-    _print_row("VERSION", f"hf-mem {__version__}", data_col_width, name_len=max_name_length)
-    _print_divider(data_col_width + 1, name_len=max_name_length)
-
-    # NOTE: Show param count and (optionally) KV cache config once before the file listing,
-    # so each file row only needs to show the byte total without repeating the same info
-    _print_row("PARAMS", params_data, data_col_width, name_len=max_name_length)
-    if kv_data is not None:
-        _print_divider(data_col_width + 1, name_len=max_name_length)
-        _print_row("KV CACHE", kv_data, data_col_width, name_len=max_name_length)
-
-    # NOTE: "top" divider acts as a visual section break between the header metadata rows
-    # above and the per-file listing below
+    _print_full_divider(current_len, "top")
+    _print_centered("FILES", current_len)
     _print_divider(data_col_width + 1, "top", name_len=max_name_length)
 
-    for i, (filename, gib_text) in enumerate(file_gib_rows):
+    for i, (filename, details, total_bytes) in enumerate(file_rows):
+        _print_row(" " * max_name_length, details, data_col_width, name_len=max_name_length)
         _print_row(
-            filename + " " * (max_name_length - len(filename)),
-            gib_text,
+            filename,
+            _make_bar(total_bytes, max_total_bytes, data_col_width),
             data_col_width,
             name_len=max_name_length,
         )
-        if i < len(file_gib_rows) - 1:
+        if i < len(file_rows) - 1:
             _print_divider(data_col_width + 1, name_len=max_name_length)
         else:
             _print_divider(data_col_width + 1, "bottom", name_len=max_name_length)

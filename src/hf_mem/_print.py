@@ -24,9 +24,14 @@ def _print_with_color(content: str) -> None:
     print(f"\x1b[38;2;244;183;63m{content}\x1b[0m")
 
 
-def _print_header(current_len: int) -> None:
+def _print_header(current_len: int, badge: str | None = None) -> None:
     length = current_len + 2 * BORDERS_AND_PADDING + 2
-    top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
+    if badge:
+        badge_text = f" {badge} "
+        fill_len = max(0, length - 2 - len(badge_text))
+        top = BOX["tl"] + (BOX["tsep"] * fill_len) + badge_text + BOX["tr"]
+    else:
+        top = BOX["tl"] + (BOX["tsep"] * (length - 2)) + BOX["tr"]
     _print_with_color(top)
 
     bottom = BOX["lm"] + (BOX["bsep"] * (length - 2)) + BOX["rm"]
@@ -69,6 +74,27 @@ def _print_divider(
     line += BOX["ht"] * data_col_inner
     line += right
     _print_with_color(line)
+
+
+def _print_full_divider(
+    current_len: int,
+    side: Literal["top", "top-continue", "bottom", "bottom-continue", "mid"] | None = None,
+) -> None:
+    total_inner = current_len + 2 * BORDERS_AND_PADDING
+
+    match side:
+        case "top":
+            left, right = BOX["lm"], BOX["rm"]
+        case "top-continue":
+            left, right = BOX["lm"], BOX["rm"]
+        case "bottom":
+            left, right = BOX["bl"], BOX["br"]
+        case "bottom-continue":
+            left, right = BOX["lm"], BOX["rm"]
+        case _:
+            left, right = BOX["lm"], BOX["rm"]
+
+    _print_with_color(left + BOX["ht"] * total_inner + right)
 
 
 def _format_name(name: str, max_len: int = MAX_NAME_LEN) -> str:

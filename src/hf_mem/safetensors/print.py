@@ -22,7 +22,6 @@ def print_safetensors_report(
     revision: str,
     metadata: SafetensorsMetadata,
     kv_cache: KvCache | None = None,
-    ignore_table_width: bool = False,
 ) -> None:
     combined_total = metadata.bytes_count + kv_cache.cache_size if kv_cache else metadata.bytes_count
 
@@ -69,15 +68,15 @@ def print_safetensors_report(
     min_width_for_data = MAX_NAME_LEN + max_data_len + 5
     max_len = max(max_centered_len, min_width_for_data)
 
-    if max_len > MAX_DATA_LEN and ignore_table_width is False:
+    if max_len > MAX_DATA_LEN:
         warnings.warn(
-            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views. If you'd like to ignore the limit, then provide the `--ignore-table-width` flag to ignore the {MAX_DATA_LEN} width limit, to simply accommodate to whatever the longest text length is."
+            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views."
         )
 
-    current_len = min(max_len, MAX_DATA_LEN) if ignore_table_width is False else max_len
+    current_len = max_len
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - MAX_NAME_LEN - 5
 
-    _print_header(current_len)
+    _print_header(current_len, badge=f"hf-mem v{__version__}")
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
     if kv_cache:
@@ -86,9 +85,6 @@ def print_safetensors_report(
             current_len,
         )
     _print_divider(data_col_width + 1, "top")
-
-    _print_row("VERSION", f"hf-mem {__version__}", data_col_width)
-    _print_divider(data_col_width + 1)
 
     if kv_cache:
         total_text = f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
