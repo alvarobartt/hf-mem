@@ -1,3 +1,4 @@
-from importlib.metadata import version
+from hf_mem._version import __version__
+from hf_mem.run import KvCache, Result, arun, run
 
-__version__ = version("hf-mem")
+__all__ = ["__version__", "run", "arun", "Result", "KvCache"]
