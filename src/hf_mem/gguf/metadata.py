@@ -3,6 +3,7 @@ import struct
 from dataclasses import asdict, dataclass
 from typing import Any, Dict
 
+from hf_mem._types import KvCache
 from hf_mem._version import __version__
 from hf_mem.gguf.kv_cache import KV_CACHE_FIELD_ENDINGS, compute_gguf_kv_cache_size
 from hf_mem.gguf.types import (
@@ -24,19 +25,11 @@ class GGUFComponentMetadata:
 
 
 @dataclass
-class GGUFKVCacheInfo:
-    max_model_len: int
-    cache_size: int
-    batch_size: int
-    cache_dtype: str | None = None
-
-
-@dataclass
 class GGUFMetadata:
     components: Dict[str, GGUFComponentMetadata]
     param_count: int
     bytes_count: int
-    kv_cache_info: GGUFKVCacheInfo | None = None
+    kv_cache: KvCache | None = None
 
 
 def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
@@ -75,15 +68,15 @@ def merge_shards(shard1: GGUFMetadata, shard2: GGUFMetadata) -> GGUFMetadata:
         else:
             merged_components[component_name] = comp2  # type: ignore[assignment]
 
-    # NOTE: KV cache info is the same for all shards, prefer earlier shards since metadata can get dropped after
-    # the first shard
-    kv_cache_info = shard1.kv_cache_info or shard2.kv_cache_info
+    # NOTE: KV cache info is the same for all shards — prefer earlier shards since metadata can
+    # get dropped after the first shard
+    kv_cache = shard1.kv_cache or shard2.kv_cache
 
     return GGUFMetadata(
         components=merged_components,
         param_count=shard1.param_count + shard2.param_count,
         bytes_count=shard1.bytes_count + shard2.bytes_count,
-        kv_cache_info=kv_cache_info,
+        kv_cache=kv_cache,
     )
 
 
@@ -96,13 +89,13 @@ def gguf_metadata_to_json(model_id: str, revision: str, metadata: GGUFMetadata) 
 
     out = {"version": __version__, "model_id": model_id, "revision": revision, **out}
 
-    # NOTE: If --experimental, flatten kv_cache_info fields to the top level to match the
+    # NOTE: If --experimental, flatten kv_cache fields to the top level to match the
     # safetensors JSON output shape
-    if kv_cache_info := out.pop("kv_cache_info"):
-        out["max_model_len"] = kv_cache_info["max_model_len"]
-        out["cache_size"] = kv_cache_info["cache_size"]
-        out["batch_size"] = kv_cache_info["batch_size"]
-        out["cache_dtype"] = kv_cache_info["cache_dtype"]
+    if kv_cache := out.pop("kv_cache"):
+        out["max_model_len"] = kv_cache["max_model_len"]
+        out["cache_size"] = kv_cache["cache_size"]
+        out["batch_size"] = kv_cache["batch_size"]
+        out["cache_dtype"] = kv_cache["cache_dtype"]
 
     return out
 
@@ -130,7 +123,7 @@ def parse_gguf_metadata(
         value, offset = _PARSERS[value_type](raw_metadata, offset)
         kv_metadata[key] = value
 
-    kv_cache_info = None
+    kv_cache = None
     if experimental:
         # NOTE: Extract only the fields needed for KV cache estimation, matched by suffix to be
         # model-agnostic (e.g. "llama.block_count" -> "block_count")
@@ -150,7 +143,7 @@ def parse_gguf_metadata(
                 f"Incomplete KV cache metadata for size estimation. Missing fields: {missing_fields}"
             )
 
-        kv_cache_info = GGUFKVCacheInfo(
+        kv_cache = KvCache(
             max_model_len=kv_cache_dict["context_length"],
             cache_size=compute_gguf_kv_cache_size(
                 kv_metadata=kv_cache_dict,
@@ -191,5 +184,5 @@ def parse_gguf_metadata(
         components={"Transformer": component},
         param_count=component.param_count,
         bytes_count=component.bytes_count,
-        kv_cache_info=kv_cache_info,
+        kv_cache=kv_cache,
     )

@@ -1,5 +1,4 @@
 import warnings
-from typing import Any, Dict
 
 from hf_mem._print import (
     BORDERS_AND_PADDING,
@@ -13,6 +12,7 @@ from hf_mem._print import (
     _print_header,
     _print_row,
 )
+from hf_mem._types import KvCache
 from hf_mem._version import __version__
 from hf_mem.safetensors.metadata import SafetensorsMetadata
 
@@ -21,33 +21,33 @@ def print_safetensors_report(
     model_id: str,
     revision: str,
     metadata: SafetensorsMetadata,
-    cache: Dict[str, Any] | None = None,
+    kv_cache: KvCache | None = None,
     ignore_table_width: bool = False,
 ) -> None:
-    combined_total = metadata.bytes_count + cache["cache_size"] if cache else metadata.bytes_count
+    combined_total = metadata.bytes_count + kv_cache.cache_size if kv_cache else metadata.bytes_count
 
     centered_rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
         f"https://hf.co/{model_id} @ {revision}",
     ]
-    if cache:
-        centered_rows.append(f"w/ max-model-len={cache['max_model_len']}, batch-size={cache['batch_size']}")
+    if kv_cache:
+        centered_rows.append(f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}")
     for name, nested_metadata in metadata.components.items():
         if len(metadata.components) > 1:
             centered_rows.append(
                 f"{name.upper()} ({_format_short_number(nested_metadata.param_count)} PARAMS, {_bytes_to_gib(nested_metadata.bytes_count):.2f} GiB)"
             )
-        elif cache:
+        elif kv_cache:
             centered_rows.append(
                 f"MODEL ({_format_short_number(nested_metadata.param_count)} PARAMS, {_bytes_to_gib(nested_metadata.bytes_count):.2f} GiB)"
             )
-    if cache:
+    if kv_cache:
         centered_rows.append(
-            f"KV CACHE ({cache['max_model_len'] * cache['batch_size']} TOKENS, {_bytes_to_gib(cache['cache_size']):.2f} GiB)"
+            f"KV CACHE ({kv_cache.max_model_len * kv_cache.batch_size} TOKENS, {_bytes_to_gib(kv_cache.cache_size):.2f} GiB)"
         )
 
     data_rows = []
-    if cache:
+    if kv_cache:
         data_rows.append(
             f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
         )
@@ -56,12 +56,12 @@ def print_safetensors_report(
             f"{_bytes_to_gib(metadata.bytes_count):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS)"
         )
     for _, nested_metadata in metadata.components.items():
-        for dtype, dtype_metadata in nested_metadata.dtypes.items():
+        for _, dtype_metadata in nested_metadata.dtypes.items():
             data_rows.append(
                 f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
             )
-    if cache:
-        data_rows.append(f"{_bytes_to_gib(cache['cache_size']):.2f} / {_bytes_to_gib(combined_total):.2f} GiB")
+    if kv_cache:
+        data_rows.append(f"{_bytes_to_gib(kv_cache.cache_size):.2f} / {_bytes_to_gib(combined_total):.2f} GiB")
 
     max_centered_len = max(len(r) for r in centered_rows)
     max_data_len = max(len(r) for r in data_rows)
@@ -80,9 +80,9 @@ def print_safetensors_report(
     _print_header(current_len)
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
     _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
-    if cache:
+    if kv_cache:
         _print_centered(
-            f"w/ max-model-len={cache['max_model_len']}, batch-size={cache['batch_size']}",
+            f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}",
             current_len,
         )
     _print_divider(data_col_width + 1, "top")
@@ -90,7 +90,7 @@ def print_safetensors_report(
     _print_row("VERSION", f"hf-mem {__version__}", data_col_width)
     _print_divider(data_col_width + 1)
 
-    if cache:
+    if kv_cache:
         total_text = f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
         total_bar = _make_bar(combined_total, combined_total, data_col_width)
         _print_row("TOTAL MEMORY", total_text, data_col_width)
@@ -110,7 +110,7 @@ def print_safetensors_report(
                 current_len,
             )
             _print_divider(data_col_width + 1, "top")
-        elif cache:
+        elif kv_cache:
             _print_divider(data_col_width + 1, "top-continue")
             _print_centered(
                 f"MODEL ({_format_short_number(value.param_count)} PARAMS, {_bytes_to_gib(value.bytes_count):.2f} GiB)",
@@ -149,24 +149,24 @@ def print_safetensors_report(
             if idx < len(value.dtypes) - 1:
                 _print_divider(data_col_width + 1)
 
-    if cache:
+    if kv_cache:
         _print_divider(data_col_width + 1, "top-continue")
         _print_centered(
-            f"KV CACHE ({cache['max_model_len'] * cache['batch_size']} TOKENS, {_bytes_to_gib(cache['cache_size']):.2f} GiB)",
+            f"KV CACHE ({kv_cache.max_model_len * kv_cache.batch_size} TOKENS, {_bytes_to_gib(kv_cache.cache_size):.2f} GiB)",
             current_len,
         )
         _print_divider(data_col_width + 1, "top")
 
-        kv_text = f"{_bytes_to_gib(cache['cache_size']):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+        kv_text = f"{_bytes_to_gib(kv_cache.cache_size):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
         _print_row(
-            cache["cache_dtype"].upper() + " " * (max_length - len(cache["cache_dtype"])),  # type: ignore
+            kv_cache.cache_dtype.upper() + " " * (max_length - len(kv_cache.cache_dtype)),  # type: ignore[operator]
             kv_text,
             data_col_width,
         )
 
-        kv_bar = _make_bar(cache["cache_size"], combined_total, data_col_width)
+        kv_bar = _make_bar(kv_cache.cache_size, combined_total, data_col_width)
         _print_row(
-            f"{cache['max_model_len'] * cache['batch_size']} TOKENS",
+            f"{kv_cache.max_model_len * kv_cache.batch_size} TOKENS",
             kv_bar,
             data_col_width,
         )

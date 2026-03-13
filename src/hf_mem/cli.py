@@ -13,43 +13,23 @@ KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "
 
 def _print_result(result: Result, ignore_table_width: bool = False) -> None:
     if result.safetensors is not None:
-        cache = (
-            {
-                "max_model_len": result.kv_cache.max_model_len,
-                "cache_size": result.kv_cache.cache_size,
-                "batch_size": result.kv_cache.batch_size,
-                "cache_dtype": result.kv_cache.cache_dtype,
-            }
-            if result.kv_cache is not None
-            else None
-        )
         print_safetensors_report(
             model_id=result.model_id,
             revision=result.revision,
             metadata=result.safetensors,
-            cache=cache,
+            kv_cache=result.kv_cache_metadata,
             ignore_table_width=ignore_table_width,
         )
         return
 
     if result.gguf_files is not None:
-        if result.gguf_file is not None:
-            gguf_metadata = list(result.gguf_files.values())[0]
-            cache = (
-                {
-                    "max_model_len": gguf_metadata.kv_cache_info.max_model_len,
-                    "cache_size": gguf_metadata.kv_cache_info.cache_size,
-                    "batch_size": gguf_metadata.kv_cache_info.batch_size,
-                    "cache_dtype": gguf_metadata.kv_cache_info.cache_dtype,
-                }
-                if gguf_metadata.kv_cache_info is not None
-                else None
-            )
+        if result.filename is not None:
             print_gguf_report(
-                model_id=list(result.gguf_files.keys())[0],
+                model_id=result.model_id,
+                filename=result.filename,
                 revision=result.revision,
-                metadata=gguf_metadata,
-                cache=cache,
+                metadata=result.gguf_files[result.filename],
+                kv_cache=result.gguf_files[result.filename].kv_cache,
                 ignore_table_width=ignore_table_width,
             )
         else:
@@ -57,6 +37,8 @@ def _print_result(result: Result, ignore_table_width: bool = False) -> None:
                 model_id=result.model_id,
                 revision=result.revision,
                 gguf_files=result.gguf_files,
+                memory=result.memory,  # type: ignore[arg-type]
+                kv_cache=result.kv_cache,  # type: ignore[arg-type]
                 ignore_table_width=ignore_table_width,
             )
 
@@ -118,7 +100,12 @@ def main() -> None:
         "--gguf-file",
         type=str,
         default=None,
-        help="Specific GGUF file to estimate. If not provided, all GGUF files found in the repo will be estimated. Only the file name is required, not the full path.",
+        help="Specific GGUF file to estimate. If not provided, all GGUF files found in the repo will be estimated. The path within the repo is required (e.g. Q4_K_M/model-Q4_K_M.gguf).",
+    )
+    parser.add_argument(
+        "--details",
+        action="store_true",
+        help="Include per-component dtype and parameter breakdowns in JSON output (`--json-output` only).",
     )
     args = parser.parse_args()
 
@@ -142,6 +129,7 @@ def main() -> None:
             batch_size=args.batch_size,
             kv_cache_dtype=args.kv_cache_dtype,
             gguf_file=args.gguf_file,
+            details=args.details,
         )
     )
 

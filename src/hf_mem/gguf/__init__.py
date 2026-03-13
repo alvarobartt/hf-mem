@@ -1,8 +1,8 @@
+from hf_mem._types import KvCache
 from hf_mem.gguf.fetch import fetch_gguf_metadata, fetch_gguf_with_semaphore
 from hf_mem.gguf.kv_cache import KV_CACHE_FIELD_ENDINGS, compute_gguf_kv_cache_size
 from hf_mem.gguf.metadata import (
     GGUFComponentMetadata,
-    GGUFKVCacheInfo,
     GGUFMetadata,
     gguf_metadata_to_json,
     merge_shards,
@@ -18,7 +18,7 @@ __all__ = [
     "GGUFMetadataDtype",
     # metadata
     "GGUFComponentMetadata",
-    "GGUFKVCacheInfo",
+    "KvCache",
     "GGUFMetadata",
     "parse_gguf_metadata",
     "merge_shards",
