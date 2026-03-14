@@ -6,9 +6,10 @@ import warnings
 from hf_mem.gguf.print import print_gguf_files_report, print_gguf_report
 from hf_mem.gguf.types import GGUFDtype
 from hf_mem.run import Result, arun
+from hf_mem.safetensors.kv_cache import KV_CACHE_DTYPE_CHOICES
 from hf_mem.safetensors.print import print_safetensors_report
 
-KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
+VALID_KV_CACHE_DTYPES = set(KV_CACHE_DTYPE_CHOICES) | set(GGUFDtype.__members__.keys())
 
 
 def _print_result(result: Result) -> None:
@@ -116,9 +117,9 @@ def main() -> None:
             "`--ignore-table-width` is deprecated and has no effect; table width auto-expands when needed by default."
         )
 
-    if args.kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
+    if args.kv_cache_dtype not in VALID_KV_CACHE_DTYPES:
         raise RuntimeError(
-            f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {KV_CACHE_DTYPE_CHOICES}."
+            f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {VALID_KV_CACHE_DTYPES}."
         )
 
     result = asyncio.run(

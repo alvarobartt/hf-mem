@@ -4,6 +4,8 @@ from typing import Any, Dict
 from hf_mem.safetensors.metadata import SafetensorsMetadata
 from hf_mem.safetensors.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
+KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
+
 
 # NOTE: Only full-attention (global) layers grow the KV cache with max_model_len; meaning
 # that only those contribute to a KV cache that scales with the context length, whereas the sliding
@@ -32,6 +34,12 @@ def resolve_kv_cache_dtype(
     metadata: SafetensorsMetadata,
     model_id: str,
 ) -> str:
+    if kv_cache_dtype and kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
+        raise RuntimeError(
+            f"Provided `--kv_cache_dtype={kv_cache_dtype}` which is not valid for Safetensors models. "
+            f"Valid options for Safetensors models are: {KV_CACHE_DTYPE_CHOICES}. "
+            f"Note that GGUF-specific dtypes (e.g. F16, F32, Q4_K) are only valid when estimating GGUF files via `--gguf-file`. "
+        )
     if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
         return kv_cache_dtype.upper().replace("FP8", "F8")  # type: ignore[union-attr]
 
@@ -101,7 +109,8 @@ def resolve_kv_cache_dtype(
         return torch_dtype_to_safetensors_dtype(_cache_dtype)
 
     raise RuntimeError(
-        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but it needs to be any of `auto`, `bfloat16`, `fp8`, `fp8_ds_mla`, `fp8_e4m3`, `fp8_e5m2` or `fp8_inc`. If `--kv-cache-dtype=auto` (or unset), then the `config.json` should either contain the `torch_dtype` or `dtype` fields set; or if quantized, then `quantization_config` needs to be set and contain the key `quant_method` with value `fp8` (as none of `fp32`, `fp16` or `bf16` is considered within the `quantization_config`), and optionally also contain `fmt` set to any valid FP8 format as `float8_e4m3` or `float8_e4m3fn`."
+        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but the KV cache dtype could not be resolved from `config.json`. "
+        f"The `config.json` should either contian the `torch_dtype` or `dtype` fields set; or if quantized, then the `quantization_config` needs to be set and contain the key `quant_method`."
     )
 
 
