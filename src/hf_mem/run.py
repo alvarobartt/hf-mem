@@ -10,10 +10,11 @@ from uuid import uuid4
 import httpx
 
 from hf_mem._fetch import get_json_file
+from hf_mem._local import list_local_files, read_gguf_bytes, read_local_json, read_safetensors_header
 from hf_mem._types import KvCache
 from hf_mem._version import __version__
 from hf_mem.gguf.fetch import fetch_gguf_with_semaphore
-from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, merge_shards
+from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, merge_shards, parse_gguf_metadata
 from hf_mem.safetensors.fetch import fetch_modules_and_dense_metadata, fetch_safetensors_metadata
 from hf_mem.safetensors.kv_cache import compute_safetensors_kv_cache_size, resolve_kv_cache_dtype
 from hf_mem.safetensors.metadata import SafetensorsMetadata, parse_safetensors_metadata
@@ -178,6 +179,350 @@ async def arun(
     gguf_file: str | None = None,
     details: bool = False,
 ) -> Result:
+    # --- Local path detection ---
+    is_local = (os.sep in model_id or model_id.startswith(".")) and os.path.exists(model_id)
+
+    if is_local:
+        model_id = os.path.abspath(model_id)
+        revision = "local"
+
+        if os.path.isfile(model_id):
+            if model_id.endswith(".safetensors"):
+                raw_metadata = read_safetensors_header(model_id)
+                metadata = parse_safetensors_metadata({"Transformer": raw_metadata})
+                return Result(
+                    model_id=model_id,
+                    revision=revision,
+                    filename=None,
+                    memory=metadata.bytes_count,
+                    kv_cache=None,
+                    total_memory=metadata.bytes_count,
+                    details=details,
+                    safetensors=metadata,
+                )
+            elif model_id.endswith(".gguf"):
+                _kv_dtype = "F16" if kv_cache_dtype == "auto" else kv_cache_dtype
+                raw_bytes = read_gguf_bytes(model_id)
+                gguf_meta = parse_gguf_metadata(
+                    raw_metadata=raw_bytes,
+                    experimental=experimental,
+                    max_model_len=max_model_len,
+                    kv_cache_dtype=_kv_dtype,
+                    batch_size=batch_size,
+                )
+                filename = os.path.basename(model_id)
+                kv_bytes = gguf_meta.kv_cache.cache_size if gguf_meta.kv_cache is not None else None
+                return Result(
+                    model_id=model_id,
+                    revision=revision,
+                    filename=filename,
+                    memory=gguf_meta.bytes_count,
+                    kv_cache=kv_bytes,
+                    total_memory=gguf_meta.bytes_count + (kv_bytes or 0),
+                    details=details,
+                    gguf_files={filename: gguf_meta},
+                )
+            else:
+                raise RuntimeError(
+                    f"Unsupported local file type: {model_id}. Only .safetensors and .gguf files are supported."
+                )
+
+        elif not os.path.isdir(model_id):
+            raise RuntimeError(f"Local path exists but is neither a file nor a directory: {model_id}")
+
+        # --- Local directory path ---
+        file_paths = list_local_files(model_id)
+
+        gguf_paths = [f for f in file_paths if f.endswith(".gguf")]
+        has_safetensors = any(
+            f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths
+        )
+        gguf = gguf_file is not None or (gguf_paths and not has_safetensors)
+
+        if not gguf and (has_safetensors and gguf_paths):
+            warnings.warn(
+                f"Both Safetensors and GGUF files have been found in {model_id}, if you want to estimate any of the GGUF file sizes, please use the `--gguf-file` flag with the path to the specific GGUF file. GGUF files found: {gguf_paths}."
+            )
+
+        if gguf:
+            if kv_cache_dtype not in GGUFDtype.__members__ and kv_cache_dtype != "auto":
+                raise RuntimeError(
+                    f"--kv-cache-dtype={kv_cache_dtype} not recognized for GGUF files. Valid options: {list(GGUFDtype.__members__.keys())} or `auto`."
+                )
+
+            if not gguf_paths:
+                raise RuntimeError(f"No GGUF files found in {model_id}.")
+
+            if gguf_file:
+                if prefix_match := re.match(r"(.+)-\d+-of-\d+\.gguf$", gguf_file):
+                    prefix = prefix_match.group(1)
+                    gguf_paths = [
+                        path
+                        for path in gguf_paths
+                        if re.match(rf"{re.escape(prefix)}-\d+-of-\d+\.gguf$", str(path))
+                    ]
+                else:
+                    gguf_paths = [path for path in gguf_paths if str(path).endswith(gguf_file)]
+                    if len(gguf_paths) > 1:
+                        raise RuntimeError(
+                            f"Multiple GGUF files named `{gguf_file}` found in {model_id}."
+                        )
+
+                if not gguf_paths:
+                    raise RuntimeError(f"No GGUF file matching `{gguf_file}` found in {model_id}.")
+
+            results: List[Tuple[str, GGUFMetadata, re.Match | None]] = []
+            for path in gguf_paths:
+                shard_pattern = _SHARD_PATTERN.match(str(path))
+                parse_kv_cache = experimental and (not shard_pattern or int(shard_pattern.group(2)) == 1)
+
+                _kv_dtype = "F16" if kv_cache_dtype == "auto" else kv_cache_dtype
+
+                raw_bytes = read_gguf_bytes(os.path.join(model_id, path))
+                gguf_meta = parse_gguf_metadata(
+                    raw_metadata=raw_bytes,
+                    experimental=parse_kv_cache,
+                    max_model_len=max_model_len,
+                    kv_cache_dtype=_kv_dtype,
+                    batch_size=batch_size,
+                )
+                results.append((str(path), gguf_meta, shard_pattern))
+
+            gguf_files_dict = _collect_gguf_results(results)
+
+            if gguf_file is not None:
+                single_filename = next(iter(gguf_files_dict))
+                gguf_meta = gguf_files_dict[single_filename]
+                kv_bytes = gguf_meta.kv_cache.cache_size if gguf_meta.kv_cache is not None else None
+                return Result(
+                    model_id=model_id,
+                    revision=revision,
+                    filename=single_filename,
+                    memory=gguf_meta.bytes_count,
+                    kv_cache=kv_bytes,
+                    total_memory=gguf_meta.bytes_count + (kv_bytes or 0),
+                    details=details,
+                    gguf_files=gguf_files_dict,
+                )
+            else:
+                memory_dict: Dict[str, int] = {fn: m.bytes_count for fn, m in gguf_files_dict.items()}
+                has_kv = any(m.kv_cache is not None for m in gguf_files_dict.values())
+                kv_dict: Union[Dict[str, int], None] = (
+                    {fn: m.kv_cache.cache_size for fn, m in gguf_files_dict.items() if m.kv_cache is not None}
+                    if has_kv
+                    else None
+                )
+                first_file = next(iter(gguf_files_dict))
+                warnings.warn(
+                    f"Multiple GGUF files found — `total_memory` is not set for multi-file results. "
+                    f"For a single-file estimate pass `gguf_file='{first_file}'` (library) or "
+                    f"`--gguf-file {first_file}` (CLI)."
+                )
+                return Result(
+                    model_id=model_id,
+                    revision=revision,
+                    filename=None,
+                    memory=memory_dict,
+                    kv_cache=kv_dict,
+                    total_memory=None,
+                    details=details,
+                    gguf_files=gguf_files_dict,
+                )
+
+        # --- Local safetensors directory ---
+        elif "model.safetensors" in file_paths:
+            raw_metadata = read_safetensors_header(os.path.join(model_id, "model.safetensors"))
+
+            if "config_sentence_transformers.json" in file_paths:
+                dense_metadata = {}
+                if "modules.json" in file_paths:
+                    modules = read_local_json(os.path.join(model_id, "modules.json"))
+                    for module in modules:
+                        if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
+                            path = module["path"]
+                            dense_metadata[path] = read_safetensors_header(
+                                os.path.join(model_id, path, "model.safetensors")
+                            )
+                raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
+            else:
+                raw_metadata = {"Transformer": raw_metadata}
+
+            metadata = parse_safetensors_metadata(raw_metadata)
+
+        elif "model.safetensors.index.json" in file_paths:
+            files_index = read_local_json(os.path.join(model_id, "model.safetensors.index.json"))
+            shard_filenames = set(files_index["weight_map"].values())
+
+            raw_metadata_list = {}
+            for shard_filename in shard_filenames:
+                shard_metadata = read_safetensors_header(os.path.join(model_id, shard_filename))
+                raw_metadata_list.update(shard_metadata)
+
+            raw_metadata = raw_metadata_list
+
+            if "config_sentence_transformers.json" in file_paths:
+                dense_metadata = {}
+                if "modules.json" in file_paths:
+                    modules = read_local_json(os.path.join(model_id, "modules.json"))
+                    for module in modules:
+                        if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
+                            path = module["path"]
+                            dense_metadata[path] = read_safetensors_header(
+                                os.path.join(model_id, path, "model.safetensors")
+                            )
+                raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
+            else:
+                raw_metadata = {"Transformer": raw_metadata}
+
+            metadata = parse_safetensors_metadata(raw_metadata)
+
+        elif "model_index.json" in file_paths:
+            files_index = read_local_json(os.path.join(model_id, "model_index.json"))
+            paths = {k for k, _ in files_index.items() if not k.startswith("_")}
+
+            raw_metadata = {}
+            for path in paths:
+                if os.path.join(path, "diffusion_pytorch_model.safetensors") in file_paths:
+                    raw_metadata[path] = read_safetensors_header(
+                        os.path.join(model_id, path, "diffusion_pytorch_model.safetensors")
+                    )
+                elif os.path.join(path, "model.safetensors") in file_paths:
+                    raw_metadata[path] = read_safetensors_header(
+                        os.path.join(model_id, path, "model.safetensors")
+                    )
+                elif os.path.join(path, "diffusion_pytorch_model.safetensors.index.json") in file_paths:
+                    idx = read_local_json(
+                        os.path.join(model_id, path, "diffusion_pytorch_model.safetensors.index.json")
+                    )
+                    component_metadata = {}
+                    for shard_filename in set(idx["weight_map"].values()):
+                        shard_metadata = read_safetensors_header(
+                            os.path.join(model_id, path, shard_filename)
+                        )
+                        component_metadata.update(shard_metadata)
+                    raw_metadata[path] = component_metadata
+                elif os.path.join(path, "model.safetensors.index.json") in file_paths:
+                    idx = read_local_json(
+                        os.path.join(model_id, path, "model.safetensors.index.json")
+                    )
+                    component_metadata = {}
+                    for shard_filename in set(idx["weight_map"].values()):
+                        shard_metadata = read_safetensors_header(
+                            os.path.join(model_id, path, shard_filename)
+                        )
+                        component_metadata.update(shard_metadata)
+                    raw_metadata[path] = component_metadata
+
+            metadata = parse_safetensors_metadata(raw_metadata)
+
+        else:
+            raise RuntimeError(
+                f"No recognized model files found in {model_id}. Expected any of: model.safetensors, "
+                "model.safetensors.index.json, model_index.json, or .gguf files."
+            )
+
+        # --- Local KV cache estimation (safetensors path) ---
+        kv_cache_cls: KvCache | None = None
+        if experimental and "config.json" in file_paths:
+            config: Dict[str, Any] = read_local_json(os.path.join(model_id, "config.json"))
+
+            if not any(
+                arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
+                for arch in config.get("architectures", [])
+            ):
+                warnings.warn(
+                    "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
+                )
+            else:
+                if (
+                    any(arch.__contains__("ForConditionalGeneration") for arch in config["architectures"])
+                    and "text_config" in config
+                ):
+                    warnings.warn(
+                        f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
+                    )
+                    text_config = config["text_config"]
+
+                    # On-demand HTTP client for referenced remote config
+                    if referenced_model := text_config.get("_name_or_path"):
+                        warnings.warn(
+                            f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
+                        )
+                        _headers: Dict[str, str] = {}
+                        if hf_token is not None:
+                            _headers["Authorization"] = f"Bearer {hf_token}"
+                        elif token := os.getenv("HF_TOKEN"):
+                            _headers["Authorization"] = f"Bearer {token}"
+                        elif "Authorization" not in _headers:
+                            _path = os.getenv("HF_HOME", ".cache/huggingface")
+                            _filename = (
+                                os.path.join(os.path.expanduser("~"), _path, "token")
+                                if not os.path.isabs(_path)
+                                else os.path.join(_path, "token")
+                            )
+                            if os.path.exists(_filename):
+                                with open(_filename, "r", encoding="utf-8") as f:
+                                    _headers["Authorization"] = f"Bearer {f.read().strip()}"
+
+                        _client = httpx.AsyncClient(
+                            timeout=httpx.Timeout(30.0),
+                            http2=True,
+                            follow_redirects=True,
+                        )
+                        referenced_url = f"https://huggingface.co/{referenced_model}/resolve/main/config.json"
+                        referenced_config = await get_json_file(_client, referenced_url, _headers)
+                        await _client.aclose()
+                        referenced_config.update(text_config)
+                        text_config = referenced_config
+
+                    config = text_config
+
+                if max_model_len is None:
+                    max_model_len = config.get(
+                        "max_position_embeddings",
+                        config.get("n_positions", config.get("max_seq_len", max_model_len)),
+                    )
+
+                if max_model_len is None:
+                    warnings.warn(
+                        "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+                    )
+                elif not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
+                    warnings.warn(
+                        f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
+                    )
+                else:
+                    cache_dtype = resolve_kv_cache_dtype(
+                        config=config,
+                        kv_cache_dtype=kv_cache_dtype,
+                        metadata=metadata,
+                        model_id=model_id,
+                    )
+                    kv_cache_cls = KvCache(
+                        max_model_len=max_model_len,
+                        cache_size=compute_safetensors_kv_cache_size(
+                            config=config,
+                            cache_dtype=cache_dtype,
+                            max_model_len=max_model_len,
+                            batch_size=batch_size,
+                        ),
+                        batch_size=batch_size,
+                        cache_dtype=cache_dtype,
+                    )
+
+        kv_bytes = kv_cache_cls.cache_size if kv_cache_cls is not None else None
+        return Result(
+            model_id=model_id,
+            revision=revision,
+            filename=None,
+            memory=metadata.bytes_count,
+            kv_cache=kv_bytes,
+            total_memory=metadata.bytes_count + (kv_bytes or 0),
+            details=details,
+            safetensors=metadata,
+            kv_cache_metadata=kv_cache_cls,
+        )
+
     headers: Dict[str, str] = {
         "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}"
     }
