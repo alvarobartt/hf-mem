@@ -253,9 +253,7 @@ async def arun(
                     )
 
             if not gguf_paths:
-                raise RuntimeError(
-                    f"No GGUF file matching `{gguf_file}` found for {model_id} @ {revision}."
-                )
+                raise RuntimeError(f"No GGUF file matching `{gguf_file}` found for {model_id} @ {revision}.")
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
         tasks = []
@@ -407,7 +405,9 @@ async def arun(
                     for f in set(files_index["weight_map"].values())
                 ]
             elif f"{path}/model.safetensors.index.json" in file_paths:
-                url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
+                url = (
+                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
+                )
                 files_index = await get_json_file(client=client, url=url, headers=headers)
                 path_urls[path] = [
                     f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
@@ -464,9 +464,7 @@ async def arun(
                 text_config = config["text_config"]
 
                 if referenced_model := text_config.get("_name_or_path"):
-                    referenced_url = (
-                        f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
-                    )
+                    referenced_url = f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
                     warnings.warn(
                         f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
                     )
