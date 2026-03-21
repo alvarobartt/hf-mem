@@ -280,12 +280,12 @@ async def arun(
             )
 
         gguf_files_dict = _collect_gguf_results(await asyncio.gather(*tasks))
+        await client.aclose()
 
         if gguf_file is not None:
             single_filename = next(iter(gguf_files_dict))
             gguf_meta = gguf_files_dict[single_filename]
             kv_bytes = gguf_meta.kv_cache.cache_size if gguf_meta.kv_cache is not None else None
-            await client.aclose()
             return Result(
                 model_id=model_id,
                 revision=revision,
@@ -310,7 +310,6 @@ async def arun(
                 f"For a single-file estimate pass `gguf_file='{first_file}'` (library) or "
                 f"`--gguf-file {first_file}` (CLI)."
             )
-            await client.aclose()
             return Result(
                 model_id=model_id,
                 revision=revision,
