@@ -280,6 +280,7 @@ async def arun(
             )
 
         gguf_files_dict = _collect_gguf_results(await asyncio.gather(*tasks))
+        await client.aclose()
 
         if gguf_file is not None:
             single_filename = next(iter(gguf_files_dict))
@@ -329,7 +330,9 @@ async def arun(
                 {}
                 if "modules.json" not in file_paths
                 else await fetch_modules_and_dense_metadata(
-                    client=client, url=f"https://huggingface.co/{model_id}/resolve/{revision}", headers=headers
+                    client=client,
+                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                    headers=headers,
                 )
             )
             raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
@@ -367,7 +370,9 @@ async def arun(
                 {}
                 if "modules.json" not in file_paths
                 else await fetch_modules_and_dense_metadata(
-                    client=client, url=f"https://huggingface.co/{model_id}/resolve/{revision}", headers=headers
+                    client=client,
+                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                    headers=headers,
                 )
             )
             raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
@@ -430,6 +435,7 @@ async def arun(
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
 
     else:
+        await client.aclose()
         raise RuntimeError(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` FILES HAVE BEEN FOUND"
         )
@@ -500,6 +506,7 @@ async def arun(
                     cache_dtype=cache_dtype,
                 )
 
+    await client.aclose()
     kv_bytes = kv_cache_cls.cache_size if kv_cache_cls is not None else None
     return Result(
         model_id=model_id,
