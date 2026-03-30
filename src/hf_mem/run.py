@@ -216,7 +216,10 @@ async def arun(
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
-    gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
+    # NOTE: Exclude the `mmproj-*` files as those are the multimodal projection and not the language model
+    # weights per se, so excluding those from the estimation (especifically when `--experimental`)
+    # See https://github.com/alvarobartt/hf-mem/issues/47
+    gguf_paths = [f for f in file_paths if str(f).endswith(".gguf") and not f.__contains__("mmproj-")]
     has_safetensors = any(
         f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths
     )
