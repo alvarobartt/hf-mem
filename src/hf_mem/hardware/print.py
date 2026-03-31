@@ -16,7 +16,7 @@ from hf_mem.hardware.catalog import list_profiles
 from hf_mem.hardware.types import FitnessResult
 
 
-def print_fitness_report(fitness: FitnessResult) -> None:
+def print_fitness_report(fitness: FitnessResult, *, extended: bool = False) -> None:
     profile = fitness.profile
     total_vram_gib = _bytes_to_gib(profile.total_vram_bytes)
     gpu_count = len(profile.gpus)
@@ -88,30 +88,55 @@ def print_fitness_report(fitness: FitnessResult) -> None:
 
     # Quantization estimates
     if fitness.quantization_options:
-        _print_divider(data_col_width + 1, side="top-continue")
-        _print_centered("QUANTIZATION ESTIMATES", current_len)
-        _print_divider(data_col_width + 1, side="top")
+        if extended:
+            _print_divider(data_col_width + 1, side="top-continue")
+            _print_centered("QUANTIZATION ESTIMATES", current_len)
+            _print_divider(data_col_width + 1, side="top")
 
-        # Find max lengths for alignment within the quant section
-        max_qname_len = max(len(q.name) for q in fitness.quantization_options)
-        bpw_labels = [f"{q.bits_per_weight}b" for q in fitness.quantization_options]
-        max_bpw_len = max(len(l) for l in bpw_labels)
+            # Find max lengths for alignment within the quant section
+            max_qname_len = max(len(q.name) for q in fitness.quantization_options)
+            bpw_labels = [f"{q.bits_per_weight}b" for q in fitness.quantization_options]
+            max_bpw_len = max(len(l) for l in bpw_labels)
 
-        for i, q in enumerate(fitness.quantization_options):
-            est_gib = _bytes_to_gib(q.estimated_total_bytes)
-            label = "FITS" if q.fits else "NO"
-            if q.gpu_count_needed > 1 and q.fits:
-                label = f"FITS ({q.gpu_count_needed} GPUs)"
+            for i, q in enumerate(fitness.quantization_options):
+                est_gib = _bytes_to_gib(q.estimated_total_bytes)
+                label = "FITS" if q.fits else "NO"
+                if q.gpu_count_needed > 1 and q.fits:
+                    label = f"FITS ({q.gpu_count_needed} GPUs)"
 
-            padded_name = q.name + " " * (max_qname_len - len(q.name))
-            _print_row(padded_name, f"{est_gib:.2f} GiB  {label}", data_col_width)
+                padded_name = q.name + " " * (max_qname_len - len(q.name))
+                _print_row(padded_name, f"{est_gib:.2f} GiB  {label}", data_col_width)
 
-            bar = _make_bar(q.estimated_total_bytes, profile.total_vram_bytes, data_col_width)
-            bpw_label = bpw_labels[i] + " " * (max_bpw_len - len(bpw_labels[i]))
-            _print_row(bpw_label, bar, data_col_width)
+                bar = _make_bar(q.estimated_total_bytes, profile.total_vram_bytes, data_col_width)
+                bpw_label = bpw_labels[i] + " " * (max_bpw_len - len(bpw_labels[i]))
+                _print_row(bpw_label, bar, data_col_width)
 
-            if i < len(fitness.quantization_options) - 1:
+                if i < len(fitness.quantization_options) - 1:
+                    _print_divider(data_col_width + 1)
+        else:
+            # Compact mode: show only the minimum quantization required to fit
+            # (first entry that fits = highest quality / least aggressive quantization)
+            min_quant = next((q for q in fitness.quantization_options if q.fits), None)
+            if min_quant is not None:
                 _print_divider(data_col_width + 1)
+                est_gib = _bytes_to_gib(min_quant.estimated_total_bytes)
+                gpu_note = f" ({min_quant.gpu_count_needed} GPUs)" if min_quant.gpu_count_needed > 1 else ""
+                _print_row(
+                    "MIN QUANT",
+                    f"{min_quant.name} ({min_quant.bits_per_weight}b) — {est_gib:.2f} GiB{gpu_note}",
+                    data_col_width,
+                )
+                bar = _make_bar(min_quant.estimated_total_bytes, profile.total_vram_bytes, data_col_width)
+                _print_row(f"{min_quant.bits_per_weight}b", bar, data_col_width)
+            else:
+                _print_divider(data_col_width + 1)
+                most_aggressive = min(fitness.quantization_options, key=lambda q: q.estimated_total_bytes)
+                est_gib = _bytes_to_gib(most_aggressive.estimated_total_bytes)
+                _print_row(
+                    "MIN QUANT",
+                    f"Does not fit even at {most_aggressive.name} ({est_gib:.2f} GiB)",
+                    data_col_width,
+                )
 
     # Notes
     if fitness.notes:

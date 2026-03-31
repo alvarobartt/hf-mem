@@ -105,6 +105,11 @@ def main() -> None:
         action="store_true",
         help="Include per-component dtype and parameter breakdowns in JSON output (`--json-output` only).",
     )
+    parser.add_argument(
+        "--extended",
+        action="store_true",
+        help="Show the full quantization estimates table in the hardware fitness report. Without this flag, only the minimum quantization required to fit the model is shown.",
+    )
 
     parser.add_argument(
         "--hardware",
@@ -192,4 +197,4 @@ def main() -> None:
         _print_result(result)
         if fitness is not None:
             print()
-            print_fitness_report(fitness)
+            print_fitness_report(fitness, extended=args.extended)
