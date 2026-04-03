@@ -1,6 +1,6 @@
 ---
 name: hf-mem
-description: CLI to estimate the required memory to load either Safetensors or GGUF model weights for inference from the Hugging Face Hub
+description: CLI to estimate the required VRAM / GPU memory to load Safetensors or GGUF model weights for inference from the Hugging Face Hub. Use when the user asks about memory requirements, RAM usage, model size, or whether a model fits on a given GPU.
 license: mit
 ---
 
