@@ -88,7 +88,7 @@ wheels = [
 
 [[package]]
 name = "hf-mem"
-version = "0.5.0"
+version = "0.5.2"
 source = { editable = "." }
 dependencies = [
     { name = "httpx", extra = ["http2"] },

@@ -561,7 +561,10 @@ async def arun(
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
-    gguf_paths = [f for f in file_paths if str(f).endswith(".gguf")]
+    # NOTE: Exclude the `mmproj-*` files as those are the multimodal projection and not the language model
+    # weights per se, so excluding those from the estimation (especifically when `--experimental`)
+    # See https://github.com/alvarobartt/hf-mem/issues/47
+    gguf_paths = [f for f in file_paths if str(f).endswith(".gguf") and not f.__contains__("mmproj-")]
     has_safetensors = any(
         f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths
     )
@@ -625,6 +628,7 @@ async def arun(
             )
 
         gguf_files_dict = _collect_gguf_results(await asyncio.gather(*tasks))
+        await client.aclose()
 
         if gguf_file is not None:
             single_filename = next(iter(gguf_files_dict))
@@ -674,7 +678,9 @@ async def arun(
                 {}
                 if "modules.json" not in file_paths
                 else await fetch_modules_and_dense_metadata(
-                    client=client, url=f"https://huggingface.co/{model_id}/resolve/{revision}", headers=headers
+                    client=client,
+                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                    headers=headers,
                 )
             )
             raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
@@ -712,7 +718,9 @@ async def arun(
                 {}
                 if "modules.json" not in file_paths
                 else await fetch_modules_and_dense_metadata(
-                    client=client, url=f"https://huggingface.co/{model_id}/resolve/{revision}", headers=headers
+                    client=client,
+                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                    headers=headers,
                 )
             )
             raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
@@ -775,6 +783,7 @@ async def arun(
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
 
     else:
+        await client.aclose()
         raise RuntimeError(
             "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` FILES HAVE BEEN FOUND"
         )
@@ -845,6 +854,7 @@ async def arun(
                     cache_dtype=cache_dtype,
                 )
 
+    await client.aclose()
     kv_bytes = kv_cache_cls.cache_size if kv_cache_cls is not None else None
     return Result(
         model_id=model_id,

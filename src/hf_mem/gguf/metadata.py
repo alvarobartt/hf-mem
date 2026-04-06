@@ -133,7 +133,6 @@ def parse_gguf_metadata(
             for key in kv_metadata
             if key.endswith(ending)
         }
-
         if max_model_len is not None:
             kv_cache_dict["context_length"] = max_model_len
 
