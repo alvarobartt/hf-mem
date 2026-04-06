@@ -4,7 +4,7 @@ import re
 import warnings
 from dataclasses import dataclass, field
 from functools import reduce
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, List, Tuple, Union
 from uuid import uuid4
 
 import httpx
@@ -168,6 +168,190 @@ def _collect_gguf_results(
     return gguf_files
 
 
+def _resolve_hf_token(hf_token: str | None) -> Dict[str, str]:
+    """Resolve HuggingFace Hub token into an Authorization header dict.
+
+    Resolution order: explicit param -> HF_TOKEN env var -> $HF_HOME/token file.
+    Returns a dict with the Authorization key, or empty dict if no token found.
+    """
+    if hf_token is not None:
+        return {"Authorization": f"Bearer {hf_token}"}
+    if token := os.getenv("HF_TOKEN"):
+        return {"Authorization": f"Bearer {token}"}
+    hf_home = os.getenv("HF_HOME", ".cache/huggingface")
+    token_path = (
+        os.path.join(os.path.expanduser("~"), hf_home, "token")
+        if not os.path.isabs(hf_home)
+        else os.path.join(hf_home, "token")
+    )
+    if os.path.exists(token_path):
+        with open(token_path, "r", encoding="utf-8") as f:
+            return {"Authorization": f"Bearer {f.read().strip()}"}
+    return {}
+
+
+def _filter_gguf_paths(
+    gguf_paths: List[str],
+    gguf_file: str,
+    label: str,
+) -> List[str]:
+    """Filter GGUF file paths by the user's --gguf-file selection.
+
+    `label` provides context for error messages, e.g. "in /path/to/dir"
+    or "for model/id @ main".
+    """
+    # NOTE: Check if it's a sharded file (e.g. model-00001-of-00046.gguf)
+    if prefix_match := re.match(r"(.+)-\d+-of-\d+\.gguf$", gguf_file):
+        prefix = prefix_match.group(1)
+        gguf_paths = [
+            path for path in gguf_paths if re.match(rf"{re.escape(prefix)}-\d+-of-\d+\.gguf$", str(path))
+        ]
+    else:
+        gguf_paths = [path for path in gguf_paths if str(path).endswith(gguf_file)]
+        if len(gguf_paths) > 1:
+            raise RuntimeError(f"Multiple GGUF files named `{gguf_file}` found {label}.")
+
+    if not gguf_paths:
+        raise RuntimeError(f"No GGUF file matching `{gguf_file}` found {label}.")
+    return gguf_paths
+
+
+def _build_gguf_result(
+    model_id: str,
+    revision: str,
+    gguf_file: str | None,
+    gguf_files_dict: Dict[str, GGUFMetadata],
+    details: bool,
+) -> Result:
+    """Build a Result from a collected gguf_files_dict."""
+    if gguf_file is not None:
+        single_filename = next(iter(gguf_files_dict))
+        gguf_meta = gguf_files_dict[single_filename]
+        kv_bytes = gguf_meta.kv_cache.cache_size if gguf_meta.kv_cache is not None else None
+        return Result(
+            model_id=model_id,
+            revision=revision,
+            filename=single_filename,
+            memory=gguf_meta.bytes_count,
+            kv_cache=kv_bytes,
+            total_memory=gguf_meta.bytes_count + (kv_bytes or 0),
+            details=details,
+            gguf_files=gguf_files_dict,
+        )
+
+    memory_dict: Dict[str, int] = {fn: m.bytes_count for fn, m in gguf_files_dict.items()}
+    has_kv = any(m.kv_cache is not None for m in gguf_files_dict.values())
+    kv_dict: Union[Dict[str, int], None] = (
+        {fn: m.kv_cache.cache_size for fn, m in gguf_files_dict.items() if m.kv_cache is not None}
+        if has_kv
+        else None
+    )
+    first_file = next(iter(gguf_files_dict))
+    warnings.warn(
+        f"Multiple GGUF files found — `total_memory` is not set for multi-file results. "
+        f"For a single-file estimate pass `gguf_file='{first_file}'` (library) or "
+        f"`--gguf-file {first_file}` (CLI)."
+    )
+    return Result(
+        model_id=model_id,
+        revision=revision,
+        filename=None,
+        memory=memory_dict,
+        kv_cache=kv_dict,
+        total_memory=None,
+        details=details,
+        gguf_files=gguf_files_dict,
+    )
+
+
+def _wrap_sentence_transformer_metadata(
+    raw_metadata: Dict[str, Any],
+    dense_metadata: Dict[str, Any],
+    is_sentence_transformer: bool,
+) -> Dict[str, Any]:
+    """Wrap safetensors metadata with sentence-transformer or standard component naming."""
+    if is_sentence_transformer:
+        return {"0_Transformer": raw_metadata, **dense_metadata}
+    return {"Transformer": raw_metadata}
+
+
+async def _estimate_safetensors_kv_cache(
+    config: Dict[str, Any],
+    metadata: SafetensorsMetadata,
+    model_id: str,
+    max_model_len: int | None,
+    batch_size: int,
+    kv_cache_dtype: str,
+    get_referenced_config: Callable[[str], Awaitable[Dict[str, Any]]],
+) -> KvCache | None:
+    """Estimate KV cache size from a safetensors model's config.json.
+
+    `get_referenced_config` is an async callable that fetches a referenced model's
+    config.json when the text_config contains `_name_or_path`. This abstracts the
+    difference between the local path (one-off httpx client) and remote path (reuses
+    the existing client).
+    """
+    if not any(
+        "ForCausalLM" in arch or "ForConditionalGeneration" in arch for arch in config.get("architectures", [])
+    ):
+        warnings.warn(
+            "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
+        )
+        return None
+
+    if any("ForConditionalGeneration" in arch for arch in config["architectures"]) and "text_config" in config:
+        warnings.warn(
+            f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
+        )
+        text_config = config["text_config"]
+
+        if referenced_model := text_config.get("_name_or_path"):
+            warnings.warn(
+                f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
+            )
+            referenced_config = await get_referenced_config(referenced_model)
+            referenced_config.update(text_config)
+            text_config = referenced_config
+
+        config = text_config
+
+    if max_model_len is None:
+        max_model_len = config.get(
+            "max_position_embeddings",
+            config.get("n_positions", config.get("max_seq_len", max_model_len)),
+        )
+
+    if max_model_len is None:
+        warnings.warn(
+            "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+        )
+        return None
+
+    if not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
+        warnings.warn(
+            f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
+        )
+        return None
+
+    cache_dtype = resolve_kv_cache_dtype(
+        config=config,
+        kv_cache_dtype=kv_cache_dtype,
+        metadata=metadata,
+        model_id=model_id,
+    )
+    return KvCache(
+        max_model_len=max_model_len,
+        cache_size=compute_safetensors_kv_cache_size(
+            config=config,
+            cache_dtype=cache_dtype,
+            max_model_len=max_model_len,
+            batch_size=batch_size,
+        ),
+        batch_size=batch_size,
+        cache_dtype=cache_dtype,
+    )
+
+
 async def arun(
     model_id: str,
     revision: str = "main",
@@ -254,22 +438,7 @@ async def arun(
                 raise RuntimeError(f"No GGUF files found in {model_id}.")
 
             if gguf_file:
-                if prefix_match := re.match(r"(.+)-\d+-of-\d+\.gguf$", gguf_file):
-                    prefix = prefix_match.group(1)
-                    gguf_paths = [
-                        path
-                        for path in gguf_paths
-                        if re.match(rf"{re.escape(prefix)}-\d+-of-\d+\.gguf$", str(path))
-                    ]
-                else:
-                    gguf_paths = [path for path in gguf_paths if str(path).endswith(gguf_file)]
-                    if len(gguf_paths) > 1:
-                        raise RuntimeError(
-                            f"Multiple GGUF files named `{gguf_file}` found in {model_id}."
-                        )
-
-                if not gguf_paths:
-                    raise RuntimeError(f"No GGUF file matching `{gguf_file}` found in {model_id}.")
+                gguf_paths = _filter_gguf_paths(gguf_paths, gguf_file, f"in {model_id}")
 
             results: List[Tuple[str, GGUFMetadata, re.Match | None]] = []
             for path in gguf_paths:
@@ -290,62 +459,23 @@ async def arun(
 
             gguf_files_dict = _collect_gguf_results(results)
 
-            if gguf_file is not None:
-                single_filename = next(iter(gguf_files_dict))
-                gguf_meta = gguf_files_dict[single_filename]
-                kv_bytes = gguf_meta.kv_cache.cache_size if gguf_meta.kv_cache is not None else None
-                return Result(
-                    model_id=model_id,
-                    revision=revision,
-                    filename=single_filename,
-                    memory=gguf_meta.bytes_count,
-                    kv_cache=kv_bytes,
-                    total_memory=gguf_meta.bytes_count + (kv_bytes or 0),
-                    details=details,
-                    gguf_files=gguf_files_dict,
-                )
-            else:
-                memory_dict: Dict[str, int] = {fn: m.bytes_count for fn, m in gguf_files_dict.items()}
-                has_kv = any(m.kv_cache is not None for m in gguf_files_dict.values())
-                kv_dict: Union[Dict[str, int], None] = (
-                    {fn: m.kv_cache.cache_size for fn, m in gguf_files_dict.items() if m.kv_cache is not None}
-                    if has_kv
-                    else None
-                )
-                first_file = next(iter(gguf_files_dict))
-                warnings.warn(
-                    f"Multiple GGUF files found — `total_memory` is not set for multi-file results. "
-                    f"For a single-file estimate pass `gguf_file='{first_file}'` (library) or "
-                    f"`--gguf-file {first_file}` (CLI)."
-                )
-                return Result(
-                    model_id=model_id,
-                    revision=revision,
-                    filename=None,
-                    memory=memory_dict,
-                    kv_cache=kv_dict,
-                    total_memory=None,
-                    details=details,
-                    gguf_files=gguf_files_dict,
-                )
+            return _build_gguf_result(model_id, revision, gguf_file, gguf_files_dict, details)
 
         # --- Local safetensors directory ---
         elif "model.safetensors" in file_paths:
             raw_metadata = read_safetensors_header(os.path.join(model_id, "model.safetensors"))
 
-            if "config_sentence_transformers.json" in file_paths:
-                dense_metadata = {}
-                if "modules.json" in file_paths:
-                    modules = read_local_json(os.path.join(model_id, "modules.json"))
-                    for module in modules:
-                        if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
-                            path = module["path"]
-                            dense_metadata[path] = read_safetensors_header(
-                                os.path.join(model_id, path, "model.safetensors")
-                            )
-                raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
-            else:
-                raw_metadata = {"Transformer": raw_metadata}
+            is_st = "config_sentence_transformers.json" in file_paths
+            dense_metadata = {}
+            if is_st and "modules.json" in file_paths:
+                modules = read_local_json(os.path.join(model_id, "modules.json"))
+                for module in modules:
+                    if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
+                        dense_path = module["path"]
+                        dense_metadata[dense_path] = read_safetensors_header(
+                            os.path.join(model_id, dense_path, "model.safetensors")
+                        )
+            raw_metadata = _wrap_sentence_transformer_metadata(raw_metadata, dense_metadata, is_st)
 
             metadata = parse_safetensors_metadata(raw_metadata)
 
@@ -360,19 +490,17 @@ async def arun(
 
             raw_metadata = raw_metadata_list
 
-            if "config_sentence_transformers.json" in file_paths:
-                dense_metadata = {}
-                if "modules.json" in file_paths:
-                    modules = read_local_json(os.path.join(model_id, "modules.json"))
-                    for module in modules:
-                        if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
-                            path = module["path"]
-                            dense_metadata[path] = read_safetensors_header(
-                                os.path.join(model_id, path, "model.safetensors")
-                            )
-                raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
-            else:
-                raw_metadata = {"Transformer": raw_metadata}
+            is_st = "config_sentence_transformers.json" in file_paths
+            dense_metadata = {}
+            if is_st and "modules.json" in file_paths:
+                modules = read_local_json(os.path.join(model_id, "modules.json"))
+                for module in modules:
+                    if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
+                        dense_path = module["path"]
+                        dense_metadata[dense_path] = read_safetensors_header(
+                            os.path.join(model_id, dense_path, "model.safetensors")
+                        )
+            raw_metadata = _wrap_sentence_transformer_metadata(raw_metadata, dense_metadata, is_st)
 
             metadata = parse_safetensors_metadata(raw_metadata)
 
@@ -396,20 +524,14 @@ async def arun(
                     )
                     component_metadata = {}
                     for shard_filename in set(idx["weight_map"].values()):
-                        shard_metadata = read_safetensors_header(
-                            os.path.join(model_id, path, shard_filename)
-                        )
+                        shard_metadata = read_safetensors_header(os.path.join(model_id, path, shard_filename))
                         component_metadata.update(shard_metadata)
                     raw_metadata[path] = component_metadata
                 elif os.path.join(path, "model.safetensors.index.json") in file_paths:
-                    idx = read_local_json(
-                        os.path.join(model_id, path, "model.safetensors.index.json")
-                    )
+                    idx = read_local_json(os.path.join(model_id, path, "model.safetensors.index.json"))
                     component_metadata = {}
                     for shard_filename in set(idx["weight_map"].values()):
-                        shard_metadata = read_safetensors_header(
-                            os.path.join(model_id, path, shard_filename)
-                        )
+                        shard_metadata = read_safetensors_header(os.path.join(model_id, path, shard_filename))
                         component_metadata.update(shard_metadata)
                     raw_metadata[path] = component_metadata
 
@@ -426,89 +548,31 @@ async def arun(
         if experimental and "config.json" in file_paths:
             config: Dict[str, Any] = read_local_json(os.path.join(model_id, "config.json"))
 
-            if not any(
-                arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
-                for arch in config.get("architectures", [])
-            ):
-                warnings.warn(
-                    "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
+            async def _get_referenced_config(referenced_model: str) -> Dict[str, Any]:
+                # NOTE: Local path still needs to fetch referenced configs from the Hub,
+                # as _name_or_path refers to a different model (e.g. the text backbone
+                # of a conditional generation model)
+                _headers = _resolve_hf_token(hf_token)
+                _client = httpx.AsyncClient(
+                    timeout=httpx.Timeout(30.0),
+                    http2=True,
+                    follow_redirects=True,
                 )
-            else:
-                if (
-                    any(arch.__contains__("ForConditionalGeneration") for arch in config["architectures"])
-                    and "text_config" in config
-                ):
-                    warnings.warn(
-                        f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
-                    )
-                    text_config = config["text_config"]
+                try:
+                    _url = f"https://huggingface.co/{referenced_model}/resolve/main/config.json"
+                    return await get_json_file(_client, _url, _headers)
+                finally:
+                    await _client.aclose()
 
-                    # On-demand HTTP client for referenced remote config
-                    if referenced_model := text_config.get("_name_or_path"):
-                        warnings.warn(
-                            f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
-                        )
-                        _headers: Dict[str, str] = {}
-                        if hf_token is not None:
-                            _headers["Authorization"] = f"Bearer {hf_token}"
-                        elif token := os.getenv("HF_TOKEN"):
-                            _headers["Authorization"] = f"Bearer {token}"
-                        elif "Authorization" not in _headers:
-                            _path = os.getenv("HF_HOME", ".cache/huggingface")
-                            _filename = (
-                                os.path.join(os.path.expanduser("~"), _path, "token")
-                                if not os.path.isabs(_path)
-                                else os.path.join(_path, "token")
-                            )
-                            if os.path.exists(_filename):
-                                with open(_filename, "r", encoding="utf-8") as f:
-                                    _headers["Authorization"] = f"Bearer {f.read().strip()}"
-
-                        _client = httpx.AsyncClient(
-                            timeout=httpx.Timeout(30.0),
-                            http2=True,
-                            follow_redirects=True,
-                        )
-                        referenced_url = f"https://huggingface.co/{referenced_model}/resolve/main/config.json"
-                        referenced_config = await get_json_file(_client, referenced_url, _headers)
-                        await _client.aclose()
-                        referenced_config.update(text_config)
-                        text_config = referenced_config
-
-                    config = text_config
-
-                if max_model_len is None:
-                    max_model_len = config.get(
-                        "max_position_embeddings",
-                        config.get("n_positions", config.get("max_seq_len", max_model_len)),
-                    )
-
-                if max_model_len is None:
-                    warnings.warn(
-                        "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
-                    )
-                elif not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
-                    warnings.warn(
-                        f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
-                    )
-                else:
-                    cache_dtype = resolve_kv_cache_dtype(
-                        config=config,
-                        kv_cache_dtype=kv_cache_dtype,
-                        metadata=metadata,
-                        model_id=model_id,
-                    )
-                    kv_cache_cls = KvCache(
-                        max_model_len=max_model_len,
-                        cache_size=compute_safetensors_kv_cache_size(
-                            config=config,
-                            cache_dtype=cache_dtype,
-                            max_model_len=max_model_len,
-                            batch_size=batch_size,
-                        ),
-                        batch_size=batch_size,
-                        cache_dtype=cache_dtype,
-                    )
+            kv_cache_cls = await _estimate_safetensors_kv_cache(
+                config=config,
+                metadata=metadata,
+                model_id=model_id,
+                max_model_len=max_model_len,
+                batch_size=batch_size,
+                kv_cache_dtype=kv_cache_dtype,
+                get_referenced_config=_get_referenced_config,
+            )
 
         kv_bytes = kv_cache_cls.cache_size if kv_cache_cls is not None else None
         return Result(
@@ -524,28 +588,9 @@ async def arun(
         )
 
     headers: Dict[str, str] = {
-        "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}"
+        "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}",
+        **_resolve_hf_token(hf_token),
     }
-
-    # NOTE: The Hugging Face Hub token is not only required to read the files for gated / private models, but also
-    # to benefit from more generous request tiers to the Hub
-    if hf_token is not None:
-        headers["Authorization"] = f"Bearer {hf_token}"
-    # NOTE: Read from `HF_TOKEN` if provided
-    elif token := os.getenv("HF_TOKEN"):
-        headers["Authorization"] = f"Bearer {token}"
-    # NOTE: If neither the `--hf-token` is provided nor the `HF_TOKEN` is set, then fallback to reading from
-    # `$HF_HOME/token`
-    elif "Authorization" not in headers:
-        path = os.getenv("HF_HOME", ".cache/huggingface")
-        filename = (
-            os.path.join(os.path.expanduser("~"), path, "token")
-            if not os.path.isabs(path)
-            else os.path.join(path, "token")
-        )
-        if os.path.exists(filename):
-            with open(filename, "r", encoding="utf-8") as f:
-                headers["Authorization"] = f"Bearer {f.read().strip()}"
 
     client = httpx.AsyncClient(
         limits=httpx.Limits(
@@ -585,23 +630,7 @@ async def arun(
             raise RuntimeError(f"No GGUF files found for {model_id} @ {revision}.")
 
         if gguf_file:
-            # NOTE: Check if it's a sharded file (e.g. model-00001-of-00046.gguf)
-            if prefix_match := re.match(r"(.+)-\d+-of-\d+\.gguf$", gguf_file):
-                prefix = prefix_match.group(1)
-                gguf_paths = [
-                    path
-                    for path in gguf_paths
-                    if re.match(rf"{re.escape(prefix)}-\d+-of-\d+\.gguf$", str(path))
-                ]
-            else:
-                gguf_paths = [path for path in gguf_paths if str(path).endswith(gguf_file)]
-                if len(gguf_paths) > 1:
-                    raise RuntimeError(
-                        f"Multiple GGUF files named `{gguf_file}` found for {model_id} @ {revision}."
-                    )
-
-            if not gguf_paths:
-                raise RuntimeError(f"No GGUF file matching `{gguf_file}` found for {model_id} @ {revision}.")
+            gguf_paths = _filter_gguf_paths(gguf_paths, gguf_file, f"for {model_id} @ {revision}")
 
         semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
         tasks = []
@@ -630,64 +659,23 @@ async def arun(
         gguf_files_dict = _collect_gguf_results(await asyncio.gather(*tasks))
         await client.aclose()
 
-        if gguf_file is not None:
-            single_filename = next(iter(gguf_files_dict))
-            gguf_meta = gguf_files_dict[single_filename]
-            kv_bytes = gguf_meta.kv_cache.cache_size if gguf_meta.kv_cache is not None else None
-            return Result(
-                model_id=model_id,
-                revision=revision,
-                filename=single_filename,
-                memory=gguf_meta.bytes_count,
-                kv_cache=kv_bytes,
-                total_memory=gguf_meta.bytes_count + (kv_bytes or 0),
-                details=details,
-                gguf_files=gguf_files_dict,
-            )
-        else:
-            memory_dict: Dict[str, int] = {fn: m.bytes_count for fn, m in gguf_files_dict.items()}
-            has_kv = any(m.kv_cache is not None for m in gguf_files_dict.values())
-            kv_dict: Union[Dict[str, int], None] = (
-                {fn: m.kv_cache.cache_size for fn, m in gguf_files_dict.items() if m.kv_cache is not None}
-                if has_kv
-                else None
-            )
-            first_file = next(iter(gguf_files_dict))
-            warnings.warn(
-                f"Multiple GGUF files found — `total_memory` is not set for multi-file results. "
-                f"For a single-file estimate pass `gguf_file='{first_file}'` (library) or "
-                f"`--gguf-file {first_file}` (CLI)."
-            )
-            return Result(
-                model_id=model_id,
-                revision=revision,
-                filename=None,
-                memory=memory_dict,
-                kv_cache=kv_dict,
-                total_memory=None,
-                details=details,
-                gguf_files=gguf_files_dict,
-            )
+        return _build_gguf_result(model_id, revision, gguf_file, gguf_files_dict, details)
 
     if "model.safetensors" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
         raw_metadata = await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
-        if "config_sentence_transformers.json" in file_paths:
-            dense_metadata = (
-                {}
-                if "modules.json" not in file_paths
-                else await fetch_modules_and_dense_metadata(
-                    client=client,
-                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
-                    headers=headers,
-                )
+        is_st = "config_sentence_transformers.json" in file_paths
+        dense_metadata = (
+            {}
+            if not is_st or "modules.json" not in file_paths
+            else await fetch_modules_and_dense_metadata(
+                client=client,
+                url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                headers=headers,
             )
-            raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
-        else:
-            # NOTE: If the model is a transformers model, then we simply set the component name to `Transformer`, to
-            # make sure that we provide the expected input to the `parse_safetensors_metadata`
-            raw_metadata = {"Transformer": raw_metadata}
+        )
+        raw_metadata = _wrap_sentence_transformer_metadata(raw_metadata, dense_metadata, is_st)
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
 
@@ -713,19 +701,17 @@ async def arun(
         )
         raw_metadata = reduce(lambda acc, m: acc | m, metadata_list, {})
 
-        if "config_sentence_transformers.json" in file_paths:
-            dense_metadata = (
-                {}
-                if "modules.json" not in file_paths
-                else await fetch_modules_and_dense_metadata(
-                    client=client,
-                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
-                    headers=headers,
-                )
+        is_st = "config_sentence_transformers.json" in file_paths
+        dense_metadata = (
+            {}
+            if not is_st or "modules.json" not in file_paths
+            else await fetch_modules_and_dense_metadata(
+                client=client,
+                url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                headers=headers,
             )
-            raw_metadata = {"0_Transformer": raw_metadata, **dense_metadata}
-        else:
-            raw_metadata = {"Transformer": raw_metadata}
+        )
+        raw_metadata = _wrap_sentence_transformer_metadata(raw_metadata, dense_metadata, is_st)
 
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
 
@@ -793,66 +779,19 @@ async def arun(
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
         config: Dict[str, Any] = await get_json_file(client, url, headers)
 
-        if not any(
-            arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
-            for arch in config.get("architectures", [])
-        ):
-            warnings.warn(
-                "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
-            )
-        else:
-            if (
-                any(arch.__contains__("ForConditionalGeneration") for arch in config["architectures"])
-                and "text_config" in config
-            ):
-                warnings.warn(
-                    f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
-                )
-                text_config = config["text_config"]
+        async def _get_referenced_config(referenced_model: str) -> Dict[str, Any]:
+            _url = f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
+            return await get_json_file(client, _url, headers)
 
-                if referenced_model := text_config.get("_name_or_path"):
-                    referenced_url = f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
-                    warnings.warn(
-                        f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
-                    )
-                    referenced_config = await get_json_file(client, referenced_url, headers)
-                    referenced_config.update(text_config)
-                    text_config = referenced_config
-
-                config = text_config
-
-            if max_model_len is None:
-                max_model_len = config.get(
-                    "max_position_embeddings",
-                    config.get("n_positions", config.get("max_seq_len", max_model_len)),
-                )
-
-            if max_model_len is None:
-                warnings.warn(
-                    "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
-                )
-            elif not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
-                warnings.warn(
-                    f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
-                )
-            else:
-                cache_dtype = resolve_kv_cache_dtype(
-                    config=config,
-                    kv_cache_dtype=kv_cache_dtype,
-                    metadata=metadata,
-                    model_id=model_id,
-                )
-                kv_cache_cls = KvCache(
-                    max_model_len=max_model_len,
-                    cache_size=compute_safetensors_kv_cache_size(
-                        config=config,
-                        cache_dtype=cache_dtype,
-                        max_model_len=max_model_len,
-                        batch_size=batch_size,
-                    ),
-                    batch_size=batch_size,
-                    cache_dtype=cache_dtype,
-                )
+        kv_cache_cls = await _estimate_safetensors_kv_cache(
+            config=config,
+            metadata=metadata,
+            model_id=model_id,
+            max_model_len=max_model_len,
+            batch_size=batch_size,
+            kv_cache_dtype=kv_cache_dtype,
+            get_referenced_config=_get_referenced_config,
+        )
 
     await client.aclose()
     kv_bytes = kv_cache_cls.cache_size if kv_cache_cls is not None else None
