@@ -59,7 +59,10 @@ def resolve_kv_cache_dtype(
         _quantization_config = config["quantization_config"]
         _quant_method = _quantization_config["quant_method"]
 
-        if _quant_method != "fp8":  # NOTE: e.g., compressed-tensors for `moonshotai/Kimi-K2.5`
+        if _quant_method not in {
+            "fp8",
+            "modelopt",
+        }:  # NOTE: e.g., compressed-tensors for `moonshotai/Kimi-K2.5`
             raise RuntimeError(
                 f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `quant_method` different than `fp8` i.e., `{_quant_method}`, which is not supported; you should enforce the `--kv-cache-dtype` value to whatever quantization precision it's using, if applicable.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
             )
@@ -75,6 +78,16 @@ def resolve_kv_cache_dtype(
                 )
 
             return torch_dtype_to_safetensors_dtype(_fmt)
+
+        # NOTE: Some quantization methods (e.g. `modelopt` with NVFP4) include an explicit
+        # `kv_cache_scheme` in the `quantization_config`, which specifies the cache precision.
+        _kv_cache_scheme = _quantization_config.get("kv_cache_scheme", None)
+        if (
+            _kv_cache_scheme
+            and _kv_cache_scheme.get("num_bits") == 8
+            and _kv_cache_scheme.get("type") == "float"
+        ):
+            return "F8_E4M3"
 
         # NOTE: If `quant_method` in `quantization_config` is set to `fp8` and `fmt` is not set, then
         # we get the most used `F8_*` Safetensors dtype to map the `quant_method=fp8` to an actual Safetensors
