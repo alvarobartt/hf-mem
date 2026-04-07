@@ -44,7 +44,7 @@ def _print_result(result: Result) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model-id", required=True, help="Model ID on the Hugging Face Hub")
+    parser.add_argument("--model-id", required=False, default=None, help="Model ID on the Hugging Face Hub")
     parser.add_argument(
         "--revision",
         default="main",
@@ -105,7 +105,48 @@ def main() -> None:
         action="store_true",
         help="Include per-component dtype and parameter breakdowns in JSON output (`--json-output` only).",
     )
+    parser.add_argument(
+        "--extended",
+        action="store_true",
+        help="Show the full quantization estimates table in the hardware fitness report. Without this flag, only the minimum quantization required to fit the model is shown.",
+    )
+
+    parser.add_argument(
+        "--hardware",
+        type=str,
+        default=None,
+        help=(
+            "Hardware profile to check fitness against. Options: "
+            "'local' or 'auto' for GPU auto-detection, "
+            "a catalog name (e.g. 'a100-80gb', 'rtx-4090'), "
+            "a cloud instance (e.g. 'aws:p4d.24xlarge', 'azure:standard_nc24ads_a100_v4'), "
+            "a multiplier (e.g. '4x a100-80gb'), "
+            "or a bare VRAM size (e.g. '24'). "
+            "Use --list-hardware to see all built-in profiles."
+        ),
+    )
+    parser.add_argument(
+        "--hardware-file",
+        type=str,
+        default=None,
+        help='Path to a JSON file describing custom hardware. Schema: {"name": "...", "gpus": [{"name": "...", "vram_gb": N}]}.',
+    )
+    parser.add_argument(
+        "--list-hardware",
+        action="store_true",
+        help="List all built-in hardware profiles and exit.",
+    )
+
     args = parser.parse_args()
+
+    if args.list_hardware:
+        from hf_mem.hardware.print import print_catalog
+
+        print_catalog()
+        return
+
+    if args.model_id is None:
+        parser.error("--model-id is required (unless using --list-hardware)")
 
     if args.experimental:
         warnings.warn(
@@ -136,7 +177,24 @@ def main() -> None:
         )
     )
 
+    # Hardware fitness check (when --hardware or --hardware-file is provided)
+    fitness = None
+    if args.hardware or args.hardware_file:
+        from hf_mem.hardware.fitness import check_fitness
+        from hf_mem.hardware.print import print_fitness_report
+        from hf_mem.hardware.resolve import resolve_hardware
+
+        profile = resolve_hardware(hardware=args.hardware, hardware_file=args.hardware_file)
+        if profile is not None:
+            fitness = check_fitness(result, profile)
+
     if args.json_output:
-        print(json.dumps(result.to_json()))
+        output = result.to_json()
+        if fitness is not None:
+            output["fitness"] = fitness.to_json()
+        print(json.dumps(output))
     else:
         _print_result(result)
+        if fitness is not None:
+            print()
+            print_fitness_report(fitness, extended=args.extended)

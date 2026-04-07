@@ -39,6 +39,8 @@ class Result:
     kv_cache: Union[int, Dict[str, int], None]
     # `total_memory` is memory + kv_cache for single-file results; None for multi-GGUF
     total_memory: int | None
+    # `param_count` mirrors the shape of `memory` — scalar for single-file, dict for multi-GGUF
+    param_count: Union[int, Dict[str, int], None] = None
 
     # NOTE: When True, to_json() enriches `memory` and `kv_cache` with per-component /
     # per-dtype breakdowns rather than bare byte counts
@@ -57,6 +59,7 @@ class Result:
             out["memory"] = self.memory
             out["kv_cache"] = self.kv_cache
             out["total_memory"] = self.total_memory
+            out["param_count"] = self.param_count
             return out
 
         if self.safetensors is not None:
@@ -147,6 +150,7 @@ class Result:
                 )
 
         out["total_memory"] = self.total_memory
+        out["param_count"] = self.param_count
         return out
 
 
@@ -296,6 +300,7 @@ async def arun(
                 memory=gguf_meta.bytes_count,
                 kv_cache=kv_bytes,
                 total_memory=gguf_meta.bytes_count + (kv_bytes or 0),
+                param_count=gguf_meta.param_count,
                 details=details,
                 gguf_files=gguf_files_dict,
             )
@@ -320,6 +325,7 @@ async def arun(
                 memory=memory_dict,
                 kv_cache=kv_dict,
                 total_memory=None,
+                param_count={fn: m.param_count for fn, m in gguf_files_dict.items()},
                 details=details,
                 gguf_files=gguf_files_dict,
             )
@@ -518,6 +524,7 @@ async def arun(
         memory=metadata.bytes_count,
         kv_cache=kv_bytes,
         total_memory=metadata.bytes_count + (kv_bytes or 0),
+        param_count=metadata.param_count,
         details=details,
         safetensors=metadata,
         kv_cache_metadata=kv_cache_cls,
