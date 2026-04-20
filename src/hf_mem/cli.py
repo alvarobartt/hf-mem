@@ -44,7 +44,11 @@ def _print_result(result: Result) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--model-id", required=True, help="Model ID on the Hugging Face Hub")
+    parser.add_argument(
+        "--model-id",
+        required=True,
+        help="Model ID on the Hugging Face Hub (e.g. meta-llama/Llama-3) or a local path to a .safetensors/.gguf file or a model directory (e.g. ./my-model/). Local paths must contain a path separator (use ./ prefix for relative paths).",
+    )
     parser.add_argument(
         "--revision",
         default="main",
