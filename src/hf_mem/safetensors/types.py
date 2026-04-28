@@ -11,6 +11,7 @@ SafetensorsDtypes = Literal[
     "BF16",
     "I16",
     "U16",
+    "F8_E8M0",
     "F8_E5M2",  # NOTE: Only CUDA +11.8
     "F8_E4M3",  # NOTE: CUDA +11.8 and AMD ROCm
     "I8",
