@@ -104,7 +104,7 @@ def resolve_kv_cache_dtype(
             # `FP8_DS_MLA` or `FP8_INC` are provided... to prevent raising an exception
             if not cache_dtype:
                 raise RuntimeError(
-                    f"The `config.json` file for `--model-id={model_id}` contains `quantization_config={_quantization_config}` but the `quant_method=fp8` whereas any tensor in the model weights is set to any of `F8_E4M3` nor `F8_E5M2`, which means that the `F8_` format for the Safetensors dtype cannot be inferred; so you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
+                    f"The `config.json` file for `--model-id={model_id}` contains `quantization_config={_quantization_config}` with `quant_method={_quant_method}`, but none of the tensors in the model weights use `F8_E4M3` or `F8_E5M2`, so the `F8_` format for the Safetensors dtype cannot be inferred. You might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
                 )
             return cache_dtype
 
