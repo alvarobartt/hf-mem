@@ -97,7 +97,14 @@ More information can be found at [Anthropic Agent Skills and how to use them](ht
 
 ## Extensions
 
-Optionally, you can also add `hf-mem` as an extension to the Hugging Face Hub CLI, so as to unify all the Hugging Face CLIs around the `hf ...` entrypoint. To add `hf-mem` as an extension, all you need to do is run `pip install huggingface_hub --upgrade` and then `hf extensions add alvarobartt/hf-mem`, which will install `hf-mem` to be used as `hf mem ...` along with the rest of Hugging Face extensions you have installed, that you can list via `hf extensions list`. More information can be found in [the Hugging Face Hub CLI documentation](https://huggingface.co/docs/huggingface_hub/en/guides/cli-extensions#how-python-extensions-are-installed).
+Optionally, you can also add `hf-mem` as an extension to the Hugging Face Hub CLI, to include `hf-mem` as an entrypoint under the `hf` CLI. First you need to install the Hugging Face CLI, `hf`, as explained in [Hugging Face CLI - "Getting started"](https://huggingface.co/docs/huggingface_hub/en/guides/cli).To add `hf-mem` as an extension, all you need to do is run:
+
+```bash
+hf extensions add alvarobartt/hf-mem
+```
+More information can be found at [Hugging Face Hub CLI - "How Python extensions are installed"](https://huggingface.co/docs/huggingface_hub/en/guides/cli-extensions#how-python-extensions-are-installed).
+
+Once installed, you can use `hf-mem` via `hf` as `hf mem ...` along with the rest of Hugging Face extensions you have installed (which you can list via `hf extensions list`).
 
 ## References
 
