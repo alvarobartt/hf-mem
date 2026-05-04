@@ -89,20 +89,19 @@ uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf-file deepseek-ll
 
 <img src="https://github.com/user-attachments/assets/e32ad635-05e5-4b33-b35b-3e689215dedd" />
 
-## (Optional) Agent Skills
+## Skills
 
 Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](skills/hf-mem/SKILL.md), e.g., `.claude/skills/hf-mem/SKILL.md`.
 
 More information can be found at [Anthropic Agent Skills and how to use them](https://github.com/anthropics/skills).
 
-## References
+## Extensions
 
-### Technical
+Optionally, you can also add `hf-mem` as an extension to the Hugging Face Hub CLI, so as to unify all the Hugging Face CLIs around the `hf ...` entrypoint. To add `hf-mem` as an extension, all you need to do is run `pip install huggingface_hub --upgrade` and then `hf extensions add alvarobartt/hf-mem`, which will install `hf-mem` to be used as `hf mem ...` along with the rest of Hugging Face extensions you have installed, that you can list via `hf extensions list`. More information can be found in [the Hugging Face Hub CLI documentation](https://huggingface.co/docs/huggingface_hub/en/guides/cli-extensions#how-python-extensions-are-installed).
+
+## References
 
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
 - [GGUF File format](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)
 - [GGUF on the Hugging Face Hub](https://huggingface.co/docs/hub/en/gguf)
-
-### Visual
-
 - [usgraphics - TR-100 Machine Report](https://github.com/usgraphics/usgc-machine-report)
