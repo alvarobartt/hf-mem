@@ -1,4 +1,4 @@
-<img src="https://github.com/user-attachments/assets/509a8244-8a91-4051-b337-41b7b2fe0e2f" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/hf-mem.png" />
 
 ---
 
@@ -21,7 +21,7 @@ Read more information about `hf-mem` in [this short-form post](https://alvarobar
 uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
 ```
 
-<img src="https://github.com/user-attachments/assets/545be630-4485-41ac-ba8d-2aedbbed8835" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/transformers.png" />
 
 #### Diffusers
 
@@ -29,7 +29,7 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
 uvx hf-mem --model-id Qwen/Qwen-Image
 ```
 
-<img src="https://github.com/user-attachments/assets/7a260369-26b2-48e1-a97b-f18cc72f7475" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/diffusers.png" />
 
 #### Sentence Transformers
 
@@ -37,7 +37,7 @@ uvx hf-mem --model-id Qwen/Qwen-Image
 uvx hf-mem --model-id google/embeddinggemma-300m
 ```
 
-<img src="https://github.com/user-attachments/assets/aef1ddd8-96c2-4944-83e2-57171ff6ac7a" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/sentence-transformers.png" />
 
 ### Python
 
@@ -69,7 +69,7 @@ By enabling the `--experimental` flag, you can enable the KV Cache memory estima
 uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 ```
 
-<img src="https://github.com/user-attachments/assets/ec0ef39d-0323-4616-bba5-6a18ffee211c" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/experimental.png" />
 
 ## GGUF
 
@@ -79,7 +79,7 @@ If the repository contains GGUF model weights, those will be listed by default (
 uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --experimental
 ```
 
-<img src="https://github.com/user-attachments/assets/b5514d35-f9c4-4a07-a719-a0185ff1dd9f" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/gguf.png" />
 
 Or if you want to only get the estimation on a given file:
 
@@ -87,22 +87,28 @@ Or if you want to only get the estimation on a given file:
 uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --gguf-file deepseek-llm-7b-chat.Q2_K.gguf --experimental
 ```
 
-<img src="https://github.com/user-attachments/assets/e32ad635-05e5-4b33-b35b-3e689215dedd" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/gguf-file.png" />
 
-## (Optional) Agent Skills
+## Skills
 
 Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](skills/hf-mem/SKILL.md), e.g., `.claude/skills/hf-mem/SKILL.md`.
 
 More information can be found at [Anthropic Agent Skills and how to use them](https://github.com/anthropics/skills).
 
-## References
+## Extensions
 
-### Technical
+Optionally, you can also add `hf-mem` as an extension to the Hugging Face Hub CLI under `hf` as `hf mem ...`. First you need to install `hf` as explained in [Hugging Face CLI - "Getting started"](https://huggingface.co/docs/huggingface_hub/en/guides/cli). To add `hf-mem` as an extension, all you need to do is run:
+
+```bash
+hf extensions add alvarobartt/hf-mem
+```
+More information can be found at [Hugging Face Hub CLI - "How Python extensions are installed"](https://huggingface.co/docs/huggingface_hub/en/guides/cli-extensions#how-python-extensions-are-installed).
+
+Once installed, you can use `hf-mem` via `hf` as `hf mem ...` along with the rest of Hugging Face extensions you have installed (which you can list via `hf extensions list`).
+
+## References
 
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
 - [GGUF File format](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)
 - [GGUF on the Hugging Face Hub](https://huggingface.co/docs/hub/en/gguf)
-
-### Visual
-
 - [usgraphics - TR-100 Machine Report](https://github.com/usgraphics/usgc-machine-report)

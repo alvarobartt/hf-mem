@@ -313,6 +313,10 @@ async def _estimate_safetensors_kv_cache(
             referenced_config.update(text_config)
             text_config = referenced_config
 
+        for key in ("dtype", "torch_dtype", "quantization_config"):
+            if key in config and key not in text_config:
+                text_config[key] = config[key]
+
         config = text_config
 
     if max_model_len is None:

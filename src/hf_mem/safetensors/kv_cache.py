@@ -59,61 +59,72 @@ def resolve_kv_cache_dtype(
         _quantization_config = config["quantization_config"]
         _quant_method = _quantization_config["quant_method"]
 
-        if _quant_method not in {
-            "fp8",
-            "modelopt",
-        }:  # NOTE: e.g., compressed-tensors for `moonshotai/Kimi-K2.5`
+        if _quant_method in {"fp8", "modelopt"}:
+            _fmt = _quantization_config.get("fmt", _quantization_config.get("format", None))
+            if _fmt:
+                if not _fmt.startswith("float8_"):
+                    _fmt = f"float8_{_fmt}"
+
+                if _fmt not in TorchDtypes.__args__:
+                    raise RuntimeError(
+                        f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `fmt` (or `format`) value of `{_fmt}` that's not supported (should be any of {TorchDtypes.__args__}), you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
+                    )
+
+                return torch_dtype_to_safetensors_dtype(_fmt)
+
+            # NOTE: Some quantization methods (e.g. `modelopt` with NVFP4) include an explicit
+            # `kv_cache_scheme` in the `quantization_config`, which specifies the cache precision.
+            _kv_cache_scheme = _quantization_config.get("kv_cache_scheme", None)
+            if (
+                _kv_cache_scheme
+                and _kv_cache_scheme.get("num_bits") == 8
+                and _kv_cache_scheme.get("type") == "float"
+            ):
+                return "F8_E4M3"
+
+            # NOTE: If `quant_method` in `quantization_config` is set to `fp8` and `fmt` is not set, then
+            # we get the most used `F8_*` Safetensors dtype to map the `quant_method=fp8` to an actual Safetensors
+            # dtype, as `F8` is not a valid dtype neither on PyTorch nor on Safetensors, as we need to append
+            # the scheme / format.
+            # SAFETY: As per the snippets above, if `_fmt` is None we assume that `_quant_method=fp8`
+            cache_dtype = max(
+                (
+                    l := [
+                        d
+                        for c in metadata.components.values()
+                        for d in c.dtypes.keys()
+                        if d in {"F8_E5M2", "F8_E4M3"}
+                    ]
+                ),
+                key=l.count,
+                default=None,
+            )
+
+            # TODO: Not sure if we should default to `F8_E4M3` as a reasonable default as when `FP8`,
+            # `FP8_DS_MLA` or `FP8_INC` are provided... to prevent raising an exception
+            if not cache_dtype:
+                raise RuntimeError(
+                    f"The `config.json` file for `--model-id={model_id}` contains `quantization_config={_quantization_config}` with `quant_method={_quant_method}`, but none of the tensors in the model weights use `F8_E4M3` or `F8_E5M2`, so the `F8_` format for the Safetensors dtype cannot be inferred. You might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
+                )
+            return cache_dtype
+
+        # NOTE: For `compressed-tensors`, check if there's an explicit `kv_cache_scheme` in the config;
+        # if not, the KV cache is not quantized and we should fall through to the default dtype
+        # resolution below.
+        if _quant_method == "compressed-tensors":
+            _kv_cache_scheme = _quantization_config.get("kv_cache_scheme", None)
+            if _kv_cache_scheme is not None:
+                raise RuntimeError(
+                    f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `kv_cache_scheme` that is not supported; you should enforce the `--kv-cache-dtype` value to whatever quantization precision it's using, if applicable.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
+                )
+
+            warnings.warn(
+                f"The `config.json` for `--model-id={model_id}` contains `quantization_config` with `quant_method=compressed-tensors` but no `kv_cache_scheme`, so the KV cache dtype will be inferred from `torch_dtype` or `dtype` in the config instead."
+            )
+        else:
             raise RuntimeError(
                 f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `quant_method` different than `fp8` i.e., `{_quant_method}`, which is not supported; you should enforce the `--kv-cache-dtype` value to whatever quantization precision it's using, if applicable.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
             )
-
-        _fmt = _quantization_config.get("fmt", _quantization_config.get("format", None))
-        if _fmt:
-            if not _fmt.startswith("float8_"):
-                _fmt = f"float8_{_fmt}"
-
-            if _fmt not in TorchDtypes.__args__:
-                raise RuntimeError(
-                    f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `fmt` (or `format`) value of `{_fmt}` that's not supported (should be any of {TorchDtypes.__args__}), you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
-                )
-
-            return torch_dtype_to_safetensors_dtype(_fmt)
-
-        # NOTE: Some quantization methods (e.g. `modelopt` with NVFP4) include an explicit
-        # `kv_cache_scheme` in the `quantization_config`, which specifies the cache precision.
-        _kv_cache_scheme = _quantization_config.get("kv_cache_scheme", None)
-        if (
-            _kv_cache_scheme
-            and _kv_cache_scheme.get("num_bits") == 8
-            and _kv_cache_scheme.get("type") == "float"
-        ):
-            return "F8_E4M3"
-
-        # NOTE: If `quant_method` in `quantization_config` is set to `fp8` and `fmt` is not set, then
-        # we get the most used `F8_*` Safetensors dtype to map the `quant_method=fp8` to an actual Safetensors
-        # dtype, as `F8` is not a valid dtype neither on PyTorch nor on Safetensors, as we need to append
-        # the scheme / format.
-        # SAFETY: As per the snippets above, if `_fmt` is None we assume that `_quant_method=fp8`
-        cache_dtype = max(
-            (
-                l := [
-                    d
-                    for c in metadata.components.values()
-                    for d in c.dtypes.keys()
-                    if d in {"F8_E5M2", "F8_E4M3"}
-                ]
-            ),
-            key=l.count,
-            default=None,
-        )
-
-        # TODO: Not sure if we should default to `F8_E4M3` as a reasonable default as when `FP8`,
-        # `FP8_DS_MLA` or `FP8_INC` are provided... to prevent raising an exception
-        if not cache_dtype:
-            raise RuntimeError(
-                f"The `config.json` file for `--model-id={model_id}` contains `quantization_config={_quantization_config}` but the `quant_method=fp8` whereas any tensor in the model weights is set to any of `F8_E4M3` nor `F8_E5M2`, which means that the `F8_` format for the Safetensors dtype cannot be inferred; so you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
-            )
-        return cache_dtype
 
     if _cache_dtype := config.get("torch_dtype", None):
         return torch_dtype_to_safetensors_dtype(_cache_dtype)
