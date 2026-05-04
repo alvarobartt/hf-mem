@@ -97,7 +97,7 @@ More information can be found at [Anthropic Agent Skills and how to use them](ht
 
 ## Extensions
 
-Optionally, you can also add `hf-mem` as an extension to the Hugging Face Hub CLI, to include `hf-mem` as an entrypoint under the `hf` CLI. First you need to install the Hugging Face CLI, `hf`, as explained in [Hugging Face CLI - "Getting started"](https://huggingface.co/docs/huggingface_hub/en/guides/cli).To add `hf-mem` as an extension, all you need to do is run:
+Optionally, you can also add `hf-mem` as an extension to the Hugging Face Hub CLI under `hf` as `hf mem ...`. First you need to install `hf` as explained in [Hugging Face CLI - "Getting started"](https://huggingface.co/docs/huggingface_hub/en/guides/cli). To add `hf-mem` as an extension, all you need to do is run:
 
 ```bash
 hf extensions add alvarobartt/hf-mem
