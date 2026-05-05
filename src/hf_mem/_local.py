@@ -3,6 +3,7 @@ import os
 import struct
 from typing import Any, Dict, List
 
+_MAX_HEADER_SIZE = 100_000_000
 _MAX_GGUF_READ_SIZE = 100_000_000
 
 
@@ -14,7 +15,7 @@ def list_local_files(directory: str) -> List[str]:
             full_path = os.path.join(root, f)
             if not os.path.exists(full_path):
                 continue
-            rel_path = os.path.relpath(full_path, directory)
+            rel_path = os.path.relpath(full_path, directory).replace(os.sep, "/")
             file_paths.append(rel_path)
     return file_paths
 
@@ -25,6 +26,8 @@ def read_safetensors_header(filepath: str) -> Dict[str, Any]:
         if len(size_bytes) < 8:
             raise RuntimeError(f"File too small to be a valid safetensors file: {filepath}")
         metadata_size = struct.unpack("<Q", size_bytes)[0]
+        if metadata_size > _MAX_HEADER_SIZE:
+            raise RuntimeError(f"Safetensors header size ({metadata_size} bytes) exceeds limit in {filepath}")
         metadata_bytes = f.read(metadata_size)
         if len(metadata_bytes) < metadata_size:
             raise RuntimeError(

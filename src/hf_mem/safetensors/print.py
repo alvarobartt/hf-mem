@@ -5,6 +5,7 @@ from hf_mem._print import (
     MAX_DATA_LEN,
     MAX_NAME_LEN,
     _bytes_to_gib,
+    _format_model_label,
     _format_short_number,
     _make_bar,
     _print_centered,
@@ -27,7 +28,7 @@ def print_safetensors_report(
 
     centered_rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
-        f"https://hf.co/{model_id} @ {revision}",
+        _format_model_label(model_id, revision),
     ]
     if kv_cache:
         centered_rows.append(f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}")
@@ -78,7 +79,7 @@ def print_safetensors_report(
 
     _print_header(current_len, badge=f"hf-mem v{__version__}")
     _print_centered("INFERENCE MEMORY ESTIMATE FOR", current_len)
-    _print_centered(f"https://hf.co/{model_id} @ {revision}", current_len)
+    _print_centered(_format_model_label(model_id, revision), current_len)
     if kv_cache:
         _print_centered(
             f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}",

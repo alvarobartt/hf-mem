@@ -365,7 +365,8 @@ async def arun(
     gguf_file: str | None = None,
     details: bool = False,
 ) -> Result:
-    is_local = (os.sep in model_id or model_id.startswith(".")) and os.path.exists(model_id)
+    # NOTE: Check for both os.sep and "/" so that forward-slash paths work on Windows
+    is_local = (os.sep in model_id or "/" in model_id or model_id.startswith(".")) and os.path.exists(model_id)
 
     if is_local:
         model_id = os.path.abspath(model_id)
@@ -482,15 +483,15 @@ async def arun(
 
             raw_metadata = {}
             for path in paths:
-                if os.path.join(path, "diffusion_pytorch_model.safetensors") in file_paths:
+                if f"{path}/diffusion_pytorch_model.safetensors" in file_paths:
                     raw_metadata[path] = read_safetensors_header(
                         os.path.join(model_id, path, "diffusion_pytorch_model.safetensors")
                     )
-                elif os.path.join(path, "model.safetensors") in file_paths:
+                elif f"{path}/model.safetensors" in file_paths:
                     raw_metadata[path] = read_safetensors_header(
                         os.path.join(model_id, path, "model.safetensors")
                     )
-                elif os.path.join(path, "diffusion_pytorch_model.safetensors.index.json") in file_paths:
+                elif f"{path}/diffusion_pytorch_model.safetensors.index.json" in file_paths:
                     idx = read_local_json(
                         os.path.join(model_id, path, "diffusion_pytorch_model.safetensors.index.json")
                     )
@@ -499,7 +500,7 @@ async def arun(
                         shard_metadata = read_safetensors_header(os.path.join(model_id, path, shard_filename))
                         component_metadata.update(shard_metadata)
                     raw_metadata[path] = component_metadata
-                elif os.path.join(path, "model.safetensors.index.json") in file_paths:
+                elif f"{path}/model.safetensors.index.json" in file_paths:
                     idx = read_local_json(os.path.join(model_id, path, "model.safetensors.index.json"))
                     component_metadata = {}
                     for shard_filename in set(idx["weight_map"].values()):
