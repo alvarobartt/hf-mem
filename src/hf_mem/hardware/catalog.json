@@ -1,0 +1,412 @@
+{
+  "rtx-3090": {
+    "name": "RTX 3090",
+    "source": "catalog",
+    "gpus": [{"name": "RTX 3090", "vram_gb": 24}]
+  },
+  "rtx-4090": {
+    "name": "RTX 4090",
+    "source": "catalog",
+    "gpus": [{"name": "RTX 4090", "vram_gb": 24}]
+  },
+  "rtx-5090": {
+    "name": "RTX 5090",
+    "source": "catalog",
+    "gpus": [{"name": "RTX 5090", "vram_gb": 32}]
+  },
+  "rtx-a6000": {
+    "name": "RTX A6000",
+    "source": "catalog",
+    "gpus": [{"name": "RTX A6000", "vram_gb": 48}]
+  },
+  "t4-16gb": {
+    "name": "T4 16GB",
+    "source": "catalog",
+    "gpus": [{"name": "T4", "vram_gb": 16}]
+  },
+  "v100-16gb": {
+    "name": "V100 16GB",
+    "source": "catalog",
+    "gpus": [{"name": "V100", "vram_gb": 16}]
+  },
+  "v100-32gb": {
+    "name": "V100 32GB",
+    "source": "catalog",
+    "gpus": [{"name": "V100", "vram_gb": 32}]
+  },
+  "a10-24gb": {
+    "name": "A10 24GB",
+    "source": "catalog",
+    "gpus": [{"name": "A10", "vram_gb": 24}]
+  },
+  "a10g-24gb": {
+    "name": "A10G 24GB",
+    "source": "catalog",
+    "gpus": [{"name": "A10G", "vram_gb": 24}]
+  },
+  "a30-24gb": {
+    "name": "A30 24GB",
+    "source": "catalog",
+    "gpus": [{"name": "A30", "vram_gb": 24}]
+  },
+  "a40-48gb": {
+    "name": "A40 48GB",
+    "source": "catalog",
+    "gpus": [{"name": "A40", "vram_gb": 48}]
+  },
+  "a100-40gb": {
+    "name": "A100 40GB",
+    "source": "catalog",
+    "gpus": [{"name": "A100", "vram_gb": 40}]
+  },
+  "a100-80gb": {
+    "name": "A100 80GB",
+    "source": "catalog",
+    "gpus": [{"name": "A100", "vram_gb": 80}]
+  },
+  "l4-24gb": {
+    "name": "L4 24GB",
+    "source": "catalog",
+    "gpus": [{"name": "L4", "vram_gb": 24}]
+  },
+  "l40-48gb": {
+    "name": "L40 48GB",
+    "source": "catalog",
+    "gpus": [{"name": "L40", "vram_gb": 48}]
+  },
+  "l40s-48gb": {
+    "name": "L40S 48GB",
+    "source": "catalog",
+    "gpus": [{"name": "L40S", "vram_gb": 48}]
+  },
+  "h100-80gb": {
+    "name": "H100 80GB",
+    "source": "catalog",
+    "gpus": [{"name": "H100", "vram_gb": 80}]
+  },
+  "h100-nvl-94gb": {
+    "name": "H100 NVL 94GB",
+    "source": "catalog",
+    "gpus": [{"name": "H100 NVL", "vram_gb": 94}]
+  },
+  "h200-141gb": {
+    "name": "H200 141GB",
+    "source": "catalog",
+    "gpus": [{"name": "H200", "vram_gb": 141}]
+  },
+  "b200-192gb": {
+    "name": "B200 192GB",
+    "source": "catalog",
+    "gpus": [{"name": "B200", "vram_gb": 192}]
+  },
+  "2x-a100-80gb": {
+    "name": "2x A100 80GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80}
+    ]
+  },
+  "4x-a100-80gb": {
+    "name": "4x A100 80GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80}
+    ]
+  },
+  "8x-a100-80gb": {
+    "name": "8x A100 80GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80}
+    ]
+  },
+  "2x-h100-80gb": {
+    "name": "2x H100 80GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80}
+    ]
+  },
+  "4x-h100-80gb": {
+    "name": "4x H100 80GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80}
+    ]
+  },
+  "8x-h100-80gb": {
+    "name": "8x H100 80GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80}
+    ]
+  },
+  "2x-h200-141gb": {
+    "name": "2x H200 141GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141}
+    ]
+  },
+  "4x-h200-141gb": {
+    "name": "4x H200 141GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141}
+    ]
+  },
+  "8x-h200-141gb": {
+    "name": "8x H200 141GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141},
+      {"name": "H200", "vram_gb": 141}
+    ]
+  },
+  "8x-b200-192gb": {
+    "name": "8x B200 192GB",
+    "source": "catalog",
+    "gpus": [
+      {"name": "B200", "vram_gb": 192},
+      {"name": "B200", "vram_gb": 192},
+      {"name": "B200", "vram_gb": 192},
+      {"name": "B200", "vram_gb": 192},
+      {"name": "B200", "vram_gb": 192},
+      {"name": "B200", "vram_gb": 192},
+      {"name": "B200", "vram_gb": 192},
+      {"name": "B200", "vram_gb": 192}
+    ]
+  },
+  "aws:p4d.24xlarge": {
+    "name": "AWS p4d.24xlarge",
+    "source": "cloud",
+    "notes": "AWS",
+    "gpus": [
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40}
+    ]
+  },
+  "aws:p4de.24xlarge": {
+    "name": "AWS p4de.24xlarge",
+    "source": "cloud",
+    "notes": "AWS",
+    "gpus": [
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80}
+    ]
+  },
+  "aws:p5.48xlarge": {
+    "name": "AWS p5.48xlarge",
+    "source": "cloud",
+    "notes": "AWS",
+    "gpus": [
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80}
+    ]
+  },
+  "aws:g5.xlarge": {
+    "name": "AWS g5.xlarge",
+    "source": "cloud",
+    "notes": "AWS",
+    "gpus": [{"name": "A10G", "vram_gb": 24}]
+  },
+  "aws:g5.48xlarge": {
+    "name": "AWS g5.48xlarge",
+    "source": "cloud",
+    "notes": "AWS",
+    "gpus": [
+      {"name": "A10G", "vram_gb": 24},
+      {"name": "A10G", "vram_gb": 24},
+      {"name": "A10G", "vram_gb": 24},
+      {"name": "A10G", "vram_gb": 24},
+      {"name": "A10G", "vram_gb": 24},
+      {"name": "A10G", "vram_gb": 24},
+      {"name": "A10G", "vram_gb": 24},
+      {"name": "A10G", "vram_gb": 24}
+    ]
+  },
+  "aws:g6.xlarge": {
+    "name": "AWS g6.xlarge",
+    "source": "cloud",
+    "notes": "AWS",
+    "gpus": [{"name": "L4", "vram_gb": 24}]
+  },
+  "aws:g6.48xlarge": {
+    "name": "AWS g6.48xlarge",
+    "source": "cloud",
+    "notes": "AWS",
+    "gpus": [
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24}
+    ]
+  },
+  "azure:standard_nc24ads_a100_v4": {
+    "name": "Azure NC24ads A100 v4",
+    "source": "cloud",
+    "notes": "Azure",
+    "gpus": [{"name": "A100", "vram_gb": 80}]
+  },
+  "azure:standard_nc48ads_a100_v4": {
+    "name": "Azure NC48ads A100 v4",
+    "source": "cloud",
+    "notes": "Azure",
+    "gpus": [
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80}
+    ]
+  },
+  "azure:standard_nc96ads_a100_v4": {
+    "name": "Azure NC96ads A100 v4",
+    "source": "cloud",
+    "notes": "Azure",
+    "gpus": [
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80}
+    ]
+  },
+  "azure:standard_nd96isr_h100_v5": {
+    "name": "Azure ND96isr H100 v5",
+    "source": "cloud",
+    "notes": "Azure",
+    "gpus": [
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80}
+    ]
+  },
+  "gcp:a2-highgpu-1g": {
+    "name": "GCP a2-highgpu-1g",
+    "source": "cloud",
+    "notes": "GCP",
+    "gpus": [{"name": "A100", "vram_gb": 40}]
+  },
+  "gcp:a2-highgpu-8g": {
+    "name": "GCP a2-highgpu-8g",
+    "source": "cloud",
+    "notes": "GCP",
+    "gpus": [
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40},
+      {"name": "A100", "vram_gb": 40}
+    ]
+  },
+  "gcp:a2-ultragpu-8g": {
+    "name": "GCP a2-ultragpu-8g",
+    "source": "cloud",
+    "notes": "GCP",
+    "gpus": [
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80},
+      {"name": "A100", "vram_gb": 80}
+    ]
+  },
+  "gcp:a3-highgpu-8g": {
+    "name": "GCP a3-highgpu-8g",
+    "source": "cloud",
+    "notes": "GCP",
+    "gpus": [
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80},
+      {"name": "H100", "vram_gb": 80}
+    ]
+  },
+  "gcp:g2-standard-4": {
+    "name": "GCP g2-standard-4",
+    "source": "cloud",
+    "notes": "GCP",
+    "gpus": [{"name": "L4", "vram_gb": 24}]
+  },
+  "gcp:g2-standard-96": {
+    "name": "GCP g2-standard-96",
+    "source": "cloud",
+    "notes": "GCP",
+    "gpus": [
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24},
+      {"name": "L4", "vram_gb": 24}
+    ]
+  }
+}
