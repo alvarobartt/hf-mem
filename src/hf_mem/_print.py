@@ -129,5 +129,11 @@ def _format_short_number(n: float) -> str:
     return f"{n:.2f}P"
 
 
+def _format_model_label(model_id: str, revision: str) -> str:
+    if revision == "local":
+        return model_id
+    return f"https://hf.co/{model_id} @ {revision}"
+
+
 def _bytes_to_gib(nbytes: int) -> float:
     return nbytes / (1024**3)
