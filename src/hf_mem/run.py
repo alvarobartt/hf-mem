@@ -169,11 +169,6 @@ def _collect_gguf_results(
 
 
 def _resolve_hf_token(hf_token: str | None) -> Dict[str, str]:
-    """Resolve HuggingFace Hub token into an Authorization header dict.
-
-    Resolution order: explicit param -> HF_TOKEN env var -> $HF_HOME/token file.
-    Returns a dict with the Authorization key, or empty dict if no token found.
-    """
     if hf_token is not None:
         return {"Authorization": f"Bearer {hf_token}"}
     if token := os.getenv("HF_TOKEN"):
@@ -195,12 +190,6 @@ def _filter_gguf_paths(
     gguf_file: str,
     label: str,
 ) -> List[str]:
-    """Filter GGUF file paths by the user's --gguf-file selection.
-
-    `label` provides context for error messages, e.g. "in /path/to/dir"
-    or "for model/id @ main".
-    """
-    # NOTE: Check if it's a sharded file (e.g. model-00001-of-00046.gguf)
     if prefix_match := re.match(r"(.+)-\d+-of-\d+\.gguf$", gguf_file):
         prefix = prefix_match.group(1)
         gguf_paths = [
@@ -223,7 +212,6 @@ def _build_gguf_result(
     gguf_files_dict: Dict[str, GGUFMetadata],
     details: bool,
 ) -> Result:
-    """Build a Result from a collected gguf_files_dict."""
     if gguf_file is not None:
         single_filename = next(iter(gguf_files_dict))
         gguf_meta = gguf_files_dict[single_filename]
@@ -269,10 +257,27 @@ def _wrap_sentence_transformer_metadata(
     dense_metadata: Dict[str, Any],
     is_sentence_transformer: bool,
 ) -> Dict[str, Any]:
-    """Wrap safetensors metadata with sentence-transformer or standard component naming."""
     if is_sentence_transformer:
         return {"0_Transformer": raw_metadata, **dense_metadata}
     return {"Transformer": raw_metadata}
+
+
+def _wrap_local_safetensors_metadata(
+    raw_metadata: Dict[str, Any],
+    model_id: str,
+    file_paths: List[str],
+) -> Dict[str, Any]:
+    is_st = "config_sentence_transformers.json" in file_paths
+    dense_metadata: Dict[str, Any] = {}
+    if is_st and "modules.json" in file_paths:
+        modules = read_local_json(os.path.join(model_id, "modules.json"))
+        for module in modules:
+            if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
+                dense_path = module["path"]
+                dense_metadata[dense_path] = read_safetensors_header(
+                    os.path.join(model_id, dense_path, "model.safetensors")
+                )
+    return _wrap_sentence_transformer_metadata(raw_metadata, dense_metadata, is_st)
 
 
 async def _estimate_safetensors_kv_cache(
@@ -284,13 +289,6 @@ async def _estimate_safetensors_kv_cache(
     kv_cache_dtype: str,
     get_referenced_config: Callable[[str], Awaitable[Dict[str, Any]]],
 ) -> KvCache | None:
-    """Estimate KV cache size from a safetensors model's config.json.
-
-    `get_referenced_config` is an async callable that fetches a referenced model's
-    config.json when the text_config contains `_name_or_path`. This abstracts the
-    difference between the local path (one-off httpx client) and remote path (reuses
-    the existing client).
-    """
     if not any(
         "ForCausalLM" in arch or "ForConditionalGeneration" in arch for arch in config.get("architectures", [])
     ):
@@ -367,7 +365,6 @@ async def arun(
     gguf_file: str | None = None,
     details: bool = False,
 ) -> Result:
-    # --- Local path detection ---
     is_local = (os.sep in model_id or model_id.startswith(".")) and os.path.exists(model_id)
 
     if is_local:
@@ -418,10 +415,9 @@ async def arun(
         elif not os.path.isdir(model_id):
             raise RuntimeError(f"Local path exists but is neither a file nor a directory: {model_id}")
 
-        # --- Local directory path ---
         file_paths = list_local_files(model_id)
 
-        gguf_paths = [f for f in file_paths if f.endswith(".gguf")]
+        gguf_paths = [f for f in file_paths if f.endswith(".gguf") and "mmproj-" not in f]
         has_safetensors = any(
             f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths
         )
@@ -444,13 +440,11 @@ async def arun(
             if gguf_file:
                 gguf_paths = _filter_gguf_paths(gguf_paths, gguf_file, f"in {model_id}")
 
+            _kv_dtype = "F16" if kv_cache_dtype == "auto" else kv_cache_dtype
             results: List[Tuple[str, GGUFMetadata, re.Match | None]] = []
             for path in gguf_paths:
                 shard_pattern = _SHARD_PATTERN.match(str(path))
                 parse_kv_cache = experimental and (not shard_pattern or int(shard_pattern.group(2)) == 1)
-
-                _kv_dtype = "F16" if kv_cache_dtype == "auto" else kv_cache_dtype
-
                 raw_bytes = read_gguf_bytes(os.path.join(model_id, path))
                 gguf_meta = parse_gguf_metadata(
                     raw_metadata=raw_bytes,
@@ -465,47 +459,21 @@ async def arun(
 
             return _build_gguf_result(model_id, revision, gguf_file, gguf_files_dict, details)
 
-        # --- Local safetensors directory ---
         elif "model.safetensors" in file_paths:
             raw_metadata = read_safetensors_header(os.path.join(model_id, "model.safetensors"))
-
-            is_st = "config_sentence_transformers.json" in file_paths
-            dense_metadata = {}
-            if is_st and "modules.json" in file_paths:
-                modules = read_local_json(os.path.join(model_id, "modules.json"))
-                for module in modules:
-                    if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
-                        dense_path = module["path"]
-                        dense_metadata[dense_path] = read_safetensors_header(
-                            os.path.join(model_id, dense_path, "model.safetensors")
-                        )
-            raw_metadata = _wrap_sentence_transformer_metadata(raw_metadata, dense_metadata, is_st)
-
+            raw_metadata = _wrap_local_safetensors_metadata(raw_metadata, model_id, file_paths)
             metadata = parse_safetensors_metadata(raw_metadata)
 
         elif "model.safetensors.index.json" in file_paths:
             files_index = read_local_json(os.path.join(model_id, "model.safetensors.index.json"))
             shard_filenames = set(files_index["weight_map"].values())
 
-            raw_metadata_list = {}
+            raw_metadata = {}
             for shard_filename in shard_filenames:
                 shard_metadata = read_safetensors_header(os.path.join(model_id, shard_filename))
-                raw_metadata_list.update(shard_metadata)
+                raw_metadata.update(shard_metadata)
 
-            raw_metadata = raw_metadata_list
-
-            is_st = "config_sentence_transformers.json" in file_paths
-            dense_metadata = {}
-            if is_st and "modules.json" in file_paths:
-                modules = read_local_json(os.path.join(model_id, "modules.json"))
-                for module in modules:
-                    if module.get("type") == "sentence_transformers.models.Dense" and "path" in module:
-                        dense_path = module["path"]
-                        dense_metadata[dense_path] = read_safetensors_header(
-                            os.path.join(model_id, dense_path, "model.safetensors")
-                        )
-            raw_metadata = _wrap_sentence_transformer_metadata(raw_metadata, dense_metadata, is_st)
-
+            raw_metadata = _wrap_local_safetensors_metadata(raw_metadata, model_id, file_paths)
             metadata = parse_safetensors_metadata(raw_metadata)
 
         elif "model_index.json" in file_paths:
@@ -547,15 +515,11 @@ async def arun(
                 "model.safetensors.index.json, model_index.json, or .gguf files."
             )
 
-        # --- Local KV cache estimation (safetensors path) ---
         kv_cache_cls: KvCache | None = None
         if experimental and "config.json" in file_paths:
             config: Dict[str, Any] = read_local_json(os.path.join(model_id, "config.json"))
 
             async def _get_referenced_config(referenced_model: str) -> Dict[str, Any]:
-                # NOTE: Local path still needs to fetch referenced configs from the Hub,
-                # as _name_or_path refers to a different model (e.g. the text backbone
-                # of a conditional generation model)
                 _headers = _resolve_hf_token(hf_token)
                 _client = httpx.AsyncClient(
                     timeout=httpx.Timeout(30.0),
