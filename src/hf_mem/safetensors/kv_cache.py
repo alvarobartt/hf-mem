@@ -7,25 +7,21 @@ from hf_mem.safetensors.types import TorchDtypes, get_safetensors_dtype_bytes, t
 KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
 
 
-# NOTE: Only full-attention (global) layers grow the KV cache with max_model_len; meaning
-# that only those contribute to a KV cache that scales with the context length, whereas the sliding
-# window layers reuse a fixed-size buffer and are excluded from the estimation.
-def _resolve_num_attention_layers(config: Dict[str, Any]) -> int:
+def _resolve_attention_layer_counts(config: Dict[str, Any]) -> tuple[int, int]:
+    """Returns (num_full_attention_layers, num_sliding_window_layers)."""
     num_hidden_layers: int = config["num_hidden_layers"]
 
-    # NOTE: Gemma3-style hybrid attention: every N-th layer (0-indexed where `i % N == N-1`)
-    # is a global attention layer; the rest are sliding window attention layers.
-    # For N=6 and 46 total layers: 46 // 6 = 7 global attention layers.
-    # For N=4 and 60 total layers: 60 // 4 = 15 global attention layers (e.g. Qwen3.5-397B-A17B).
     if "sliding_window_pattern" in config:
-        return num_hidden_layers // config["sliding_window_pattern"]
+        num_full = num_hidden_layers // config["sliding_window_pattern"]
+        return num_full, num_hidden_layers - num_full
 
-    # NOTE: Some models provide an explicit list of layer types, so we need to count the non-sliding-window ones.
     if "layer_types" in config:
-        return sum(1 for t in config["layer_types"] if t in {"attention", "full_attention", "global_attention"})
+        num_full = sum(
+            1 for t in config["layer_types"] if t in {"attention", "full_attention", "global_attention"}
+        )
+        return num_full, num_hidden_layers - num_full
 
-    # NOTE: By default assume all layers use full attention (standard MHA / GQA without SWA).
-    return num_hidden_layers
+    return num_hidden_layers, 0
 
 
 def resolve_kv_cache_dtype(
@@ -156,17 +152,14 @@ def compute_safetensors_kv_cache_size(
     # making the fallback `hidden_size // num_attention_heads` incorrect for those models
     head_dim: int = config.get("head_dim", hidden_size // num_attention_heads)
 
-    # NOTE: For hybrid attention models only full-attention layers grow with max_model_len;
-    # sliding-window layers reuse a fixed-size buffer and are excluded from the estimate
-    num_attention_layers = _resolve_num_attention_layers(config)
+    num_full_layers, num_sliding_layers = _resolve_attention_layer_counts(config)
+    sliding_window: int = config.get("sliding_window", max_model_len)
 
-    return (
-        # NOTE: 2 because it applies to both key and value projections
-        2
-        * num_attention_layers
-        * num_key_value_heads
-        * head_dim
-        * max_model_len
-        * get_safetensors_dtype_bytes(cache_dtype)
-        * batch_size
+    bytes_per_token_per_layer = 2 * num_key_value_heads * head_dim * get_safetensors_dtype_bytes(cache_dtype)
+
+    full_attention_bytes = num_full_layers * max_model_len * bytes_per_token_per_layer * batch_size
+    sliding_window_bytes = (
+        num_sliding_layers * min(sliding_window, max_model_len) * bytes_per_token_per_layer * batch_size
     )
+
+    return full_attention_bytes + sliding_window_bytes
