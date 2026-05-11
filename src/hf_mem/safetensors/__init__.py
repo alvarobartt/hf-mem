@@ -3,7 +3,9 @@ from hf_mem.safetensors.kv_cache import compute_safetensors_kv_cache_size, resol
 from hf_mem.safetensors.metadata import (
     ComponentMetadata,
     DtypeMetadata,
+    MoEMetadata,
     SafetensorsMetadata,
+    parse_moe_metadata,
     parse_safetensors_metadata,
 )
 from hf_mem.safetensors.print import print_safetensors_report
@@ -23,7 +25,9 @@ __all__ = [
     # metadata
     "DtypeMetadata",
     "ComponentMetadata",
+    "MoEMetadata",
     "SafetensorsMetadata",
+    "parse_moe_metadata",
     "parse_safetensors_metadata",
     # fetch
     "get_json_file",
