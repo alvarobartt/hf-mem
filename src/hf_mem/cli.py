@@ -19,6 +19,7 @@ def _print_result(result: Result) -> None:
             revision=result.revision,
             metadata=result.safetensors,
             kv_cache=result.kv_cache_metadata,
+            moe=result.moe_metadata,
         )
         return
 
@@ -61,7 +62,12 @@ def main() -> None:
     parser.add_argument(
         "--experimental",
         action="store_true",
-        help="Whether to enable the experimental KV Cache estimation or not. Only applies to `...ForCausalLM` and `...ForConditionalGeneration` models from Transformers.",
+        help=(
+            "Whether to enable the experimental KV Cache estimation or not. For Safetensors "
+            "MoE Transformers models it also includes a base-model-vs-experts weights "
+            "breakdown. Only applies to `...ForCausalLM` and `...ForConditionalGeneration` "
+            "models from Transformers."
+        ),
     )
     parser.add_argument(
         "--max-model-len",

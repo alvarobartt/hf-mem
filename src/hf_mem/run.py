@@ -16,7 +16,12 @@ from hf_mem.gguf.fetch import fetch_gguf_with_semaphore
 from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, merge_shards
 from hf_mem.safetensors.fetch import fetch_modules_and_dense_metadata, fetch_safetensors_metadata
 from hf_mem.safetensors.kv_cache import compute_safetensors_kv_cache_size, resolve_kv_cache_dtype
-from hf_mem.safetensors.metadata import SafetensorsMetadata, parse_safetensors_metadata
+from hf_mem.safetensors.metadata import (
+    MoEMetadata,
+    SafetensorsMetadata,
+    parse_moe_metadata,
+    parse_safetensors_metadata,
+)
 
 MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4)))
 
@@ -47,6 +52,19 @@ class Result:
     safetensors: SafetensorsMetadata | None = field(default=None, repr=False)
     gguf_files: Dict[str, GGUFMetadata] | None = field(default=None, repr=False)
     kv_cache_metadata: KvCache | None = field(default=None, repr=False)
+    moe_metadata: MoEMetadata | None = field(default=None, repr=False)
+
+    def _component_to_json(self, component: Any) -> Dict[str, Any]:
+        out = {
+            "bytes": component.bytes_count,
+            "param_count": component.param_count,
+        }
+        if self.details:
+            out["dtypes"] = {
+                dtype: {"bytes": dm.bytes_count, "param_count": dm.param_count}
+                for dtype, dm in component.dtypes.items()
+            }
+        return out
 
     def to_json(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {"model_id": self.model_id}
@@ -57,6 +75,17 @@ class Result:
             out["memory"] = self.memory
             out["kv_cache"] = self.kv_cache
             out["total_memory"] = self.total_memory
+            if self.moe_metadata is not None:
+                out["moe"] = {
+                    "base_model": self._component_to_json(self.moe_metadata.base_model),
+                    "expert_count": self.moe_metadata.expert_count,
+                    "experts_total": {
+                        "bytes": self.moe_metadata.expert_bytes_count,
+                        "param_count": self.moe_metadata.expert_param_count,
+                    },
+                    "experts": self._component_to_json(self.moe_metadata.expert_template),
+                    "active_expert_count": self.moe_metadata.active_expert_count,
+                }
             return out
 
         if self.safetensors is not None:
@@ -84,6 +113,17 @@ class Result:
                 if self.kv_cache_metadata is not None
                 else None
             )
+            if self.moe_metadata is not None:
+                out["moe"] = {
+                    "base_model": self._component_to_json(self.moe_metadata.base_model),
+                    "expert_count": self.moe_metadata.expert_count,
+                    "experts_total": {
+                        "bytes": self.moe_metadata.expert_bytes_count,
+                        "param_count": self.moe_metadata.expert_param_count,
+                    },
+                    "experts": self._component_to_json(self.moe_metadata.expert_template),
+                    "active_expert_count": self.moe_metadata.active_expert_count,
+                }
 
         elif self.gguf_files is not None:
             if self.filename is not None:
@@ -444,6 +484,7 @@ async def arun(
         )
 
     kv_cache_cls: KvCache | None = None
+    moe_metadata: MoEMetadata | None = None
     if experimental and "config.json" in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
         config: Dict[str, Any] = await get_json_file(client, url, headers)
@@ -479,6 +520,8 @@ async def arun(
                         text_config[key] = config[key]
 
                 config = text_config
+
+            moe_metadata = parse_moe_metadata(raw_metadata=raw_metadata, config=config)
 
             if max_model_len is None:
                 max_model_len = config.get(
@@ -525,6 +568,7 @@ async def arun(
         details=details,
         safetensors=metadata,
         kv_cache_metadata=kv_cache_cls,
+        moe_metadata=moe_metadata,
     )
 
 
