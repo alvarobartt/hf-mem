@@ -1,6 +1,7 @@
 import warnings
 from typing import Any, Dict, List, Literal
 
+from hf_mem._types import WarmupPeak
 from hf_mem.safetensors.types import get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 ModelClass = Literal[
@@ -107,9 +108,6 @@ def _resolve_num_labels(config: Dict[str, Any]) -> int | None:
     if isinstance(id2label, dict) and len(id2label) > 0:
         return len(id2label)
     return None
-
-
-from hf_mem._types import WarmupPeak
 
 
 def compute_safetensors_warmup_peak(

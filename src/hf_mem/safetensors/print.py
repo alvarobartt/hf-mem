@@ -46,7 +46,7 @@ def print_safetensors_report(
     ]
     if kv_cache:
         centered_rows.append(f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}")
-    elif warmup_peak:
+    if warmup_peak:
         centered_rows.append(
             f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, batch-size={warmup_peak.max_num_seqs}"
         )
@@ -142,7 +142,7 @@ def print_safetensors_report(
             f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}",
             current_len,
         )
-    elif warmup_peak:
+    if warmup_peak:
         _print_centered(
             f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, batch-size={warmup_peak.max_num_seqs}",
             current_len,

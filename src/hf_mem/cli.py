@@ -167,6 +167,12 @@ def main() -> None:
         )
     )
 
+    if result.gguf_files is not None and args.max_num_batched_tokens is not None and args.gguf_file is None:
+        warnings.warn(
+            "`--max-num-batched-tokens` has no effect for GGUF-only repos; "
+            "warmup peak is not computed for GGUF files."
+        )
+
     if args.json_output:
         print(json.dumps(result.to_json()))
     else:
