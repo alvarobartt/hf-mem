@@ -56,18 +56,19 @@ def classify_architecture(architectures: List[str], file_paths: List[str]) -> Mo
     return None
 
 
-def resolve_activation_dtype(config: Dict[str, Any]) -> str | None:
+def resolve_activation_dtype(config: Dict[str, Any]) -> str:
     """Resolve the activation (compute) dtype for the warmup forward pass.
 
-    Returns a Safetensors dtype string (e.g. "BF16", "F16"), or None when it cannot
-    be determined. Caller should warn and skip warmup peak when None is returned.
+    Returns a Safetensors dtype string (e.g. "BF16", "F16", "F32"). Never returns
+    None — falls back to F32 (HuggingFace's default) when no dtype info is found.
 
     Resolution order:
       1. torch_dtype / dtype, if it is a non-quantized dtype.
       2. If torch_dtype / dtype resolves to a quantized dtype (float8_*), assume bf16
          as the dequantized compute dtype.
       3. If quantization_config is present but no torch_dtype/dtype, assume bf16.
-      4. Otherwise None.
+      4. Otherwise F32 — HuggingFace Transformers' default compute dtype when
+         torch_dtype / dtype is absent (common for older BERT-family models).
     """
     _QUANTIZED_TORCH_DTYPES = {"float8_e4m3", "float8_e4m3fn", "float8_e5m2", "int8"}
 
@@ -81,7 +82,9 @@ def resolve_activation_dtype(config: Dict[str, Any]) -> str | None:
     if "quantization_config" in config:
         return "BF16"
 
-    return None
+    # HuggingFace Transformers' default when torch_dtype / dtype absent is float32.
+    # Many older BERT-family / Sentence Transformers models don't set the field at all.
+    return "F32"
 
 
 def _activation_dtype_bytes(dtype: str) -> int:
@@ -138,13 +141,6 @@ def compute_safetensors_warmup_peak(
         return None
 
     activation_dtype = resolve_activation_dtype(config)
-    if activation_dtype is None:
-        warnings.warn(
-            f"Warmup peak estimate skipped for `--model-id={model_id}`: could not resolve "
-            f"the activation dtype from `config.json` (no `torch_dtype`, `dtype`, or "
-            f"`quantization_config` field present)."
-        )
-        return None
 
     required = ("hidden_size", "num_attention_heads")
     missing = [k for k in required if k not in config]
