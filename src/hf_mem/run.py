@@ -46,7 +46,9 @@ class Result:
     # `warmup_peak` is the activation peak during a vLLM/TEI-style warmup forward pass.
     # Only computed for Safetensors when --max-num-batched-tokens is set; None otherwise.
     warmup_peak: int | None
-    # `total_memory` is memory + kv_cache + warmup_peak for single-file results; None for multi-GGUF
+    # `total_memory` is memory + kv_cache + warmup_peak for the Safetensors single-file path;
+    # memory + kv_cache for the GGUF single-file path (warmup_peak is not computed for GGUF);
+    # None for multi-GGUF
     total_memory: int | None
 
     # NOTE: When True, to_json() enriches `memory` and `kv_cache` with per-component /
@@ -528,7 +530,7 @@ async def arun(
             if referenced_model := text_config.get("_name_or_path"):
                 referenced_url = f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
                 warnings.warn(
-                    f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
+                    f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache / warmup peak estimation."
                 )
                 referenced_config = await get_json_file(client, referenced_url, headers)
                 referenced_config.update(text_config)
