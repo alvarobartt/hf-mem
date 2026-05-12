@@ -34,6 +34,7 @@ class MoEMetadata:
     expert_param_count: int
     expert_bytes_count: int
     expert_template: ComponentMetadata
+    expert_display_template: ComponentMetadata
 
 
 def _accumulate_tensor(
@@ -93,6 +94,10 @@ def _components_match(component1: ComponentMetadata, component2: ComponentMetada
     )
 
 
+def _is_expert_weight_tensor(tensor_name: str) -> bool:
+    return tensor_name.endswith(".weight")
+
+
 def parse_moe_metadata(
     raw_metadata: Dict[str, Dict[str, Any]],
     config: Dict[str, Any],
@@ -113,6 +118,7 @@ def parse_moe_metadata(
 
     base_model = ComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
     experts: Dict[int, ComponentMetadata] = {}
+    expert_display_components: Dict[int, ComponentMetadata] = {}
 
     for metadata in raw_metadata.values():
         for tensor_name, value in metadata.items():
@@ -124,6 +130,9 @@ def parse_moe_metadata(
             if expert_id is not None:
                 if expert_id not in experts:
                     experts[expert_id] = ComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
+                    expert_display_components[expert_id] = ComponentMetadata(
+                        dtypes={}, param_count=0, bytes_count=0
+                    )
                 target = experts[expert_id]
 
             _accumulate_tensor(
@@ -131,6 +140,12 @@ def parse_moe_metadata(
                 dtype=value["dtype"],
                 shape=value["shape"],
             )
+            if expert_id is not None and _is_expert_weight_tensor(tensor_name):
+                _accumulate_tensor(
+                    expert_display_components[expert_id],
+                    dtype=value["dtype"],
+                    shape=value["shape"],
+                )
 
     if not experts:
         return None
@@ -153,11 +168,17 @@ def parse_moe_metadata(
     expert_param_count = sum(component.param_count for component in experts.values())
     expert_bytes_count = sum(component.bytes_count for component in experts.values())
     expert_template = experts[observed_ids[0]]
+    expert_display_template = expert_display_components[observed_ids[0]]
     for expert_id in observed_ids[1:]:
         if not _components_match(expert_template, experts[expert_id]):
             raise RuntimeError(
                 "MoE experts inferred from the Safetensors metadata are not uniform, so they "
                 "cannot be summarized as `N x EXPERTS` safely."
+            )
+        if not _components_match(expert_display_template, expert_display_components[expert_id]):
+            raise RuntimeError(
+                "MoE expert weight tensors inferred from the Safetensors metadata are not uniform, "
+                "so their dtype breakdown cannot be summarized as `N x EXPERTS` safely."
             )
     return MoEMetadata(
         base_model=base_model,
@@ -167,6 +188,7 @@ def parse_moe_metadata(
         expert_param_count=expert_param_count,
         expert_bytes_count=expert_bytes_count,
         expert_template=expert_template,
+        expert_display_template=expert_display_template,
     )
 
 

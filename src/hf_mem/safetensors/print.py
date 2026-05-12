@@ -34,6 +34,8 @@ def print_safetensors_report(
 ) -> None:
     combined_total = metadata.bytes_count + kv_cache.cache_size if kv_cache else metadata.bytes_count
     model_total = metadata.bytes_count
+    moe_base_dtypes = _sorted_dtypes(moe.base_model) if moe is not None else []
+    moe_expert_dtypes = _sorted_dtypes(moe.expert_display_template) if moe is not None else []
 
     centered_rows = [
         "INFERENCE MEMORY ESTIMATE FOR",
@@ -76,27 +78,24 @@ def print_safetensors_report(
         data_rows.append(
             f"{_bytes_to_gib(metadata.bytes_count):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS)"
         )
-    for _, nested_metadata in metadata.components.items():
-        for _, dtype_metadata in nested_metadata.dtypes.items():
-            data_rows.append(
-                f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
-            )
     if moe:
         data_rows.append(
             f"{_bytes_to_gib(moe.base_model.bytes_count):.2f} / {_bytes_to_gib(model_total):.2f} GiB"
         )
-        data_rows.append(f"{_bytes_to_gib(moe.expert_bytes_count):.2f} / {_bytes_to_gib(model_total):.2f} GiB")
-        data_rows.append(
-            f"{_bytes_to_gib(moe.expert_template.bytes_count):.2f} / {_bytes_to_gib(model_total):.2f} GiB"
-        )
-        for _, dtype_metadata in _sorted_dtypes(moe.base_model):
+        for _, dtype_metadata in moe_base_dtypes:
             data_rows.append(
                 f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(model_total):.2f} GiB"
             )
-        for _, dtype_metadata in _sorted_dtypes(moe.expert_template):
+        for _, dtype_metadata in moe_expert_dtypes:
             data_rows.append(
                 f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(model_total):.2f} GiB"
             )
+    else:
+        for _, nested_metadata in metadata.components.items():
+            for _, dtype_metadata in nested_metadata.dtypes.items():
+                data_rows.append(
+                    f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+                )
     if kv_cache:
         data_rows.append(f"{_bytes_to_gib(kv_cache.cache_size):.2f} / {_bytes_to_gib(combined_total):.2f} GiB")
 
@@ -146,13 +145,13 @@ def print_safetensors_report(
         if moe and len(metadata.components) == 1:
             max_length = max(
                 len(f"{_format_short_number(dtype_metadata.param_count)} PARAMS")
-                for _, dtype_metadata in _sorted_dtypes(moe.base_model)
+                for _, dtype_metadata in moe_base_dtypes
             )
             max_length = max(
                 max_length,
                 max(
                     len(f"{_format_short_number(dtype_metadata.param_count)} PARAMS")
-                    for _, dtype_metadata in _sorted_dtypes(moe.expert_template)
+                    for _, dtype_metadata in moe_expert_dtypes
                 ),
             )
 
@@ -162,7 +161,7 @@ def print_safetensors_report(
                 current_len,
             )
             _print_divider(data_col_width + 1, "top")
-            for idx, (dtype, dtype_metadata) in enumerate(_sorted_dtypes(moe.base_model)):
+            for idx, (dtype, dtype_metadata) in enumerate(moe_base_dtypes):
                 gib_text = (
                     f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(model_total):.2f} GiB"
                 )
@@ -188,7 +187,7 @@ def print_safetensors_report(
                 current_len,
             )
             _print_divider(data_col_width + 1, "top")
-            for idx, (dtype, dtype_metadata) in enumerate(_sorted_dtypes(moe.expert_template)):
+            for idx, (dtype, dtype_metadata) in enumerate(moe_expert_dtypes):
                 gib_text = (
                     f"{_bytes_to_gib(dtype_metadata.bytes_count):.2f} / {_bytes_to_gib(model_total):.2f} GiB"
                 )
