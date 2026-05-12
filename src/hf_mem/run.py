@@ -10,12 +10,13 @@ from uuid import uuid4
 import httpx
 
 from hf_mem._fetch import get_json_file
-from hf_mem._types import KvCache
+from hf_mem._types import KvCache, WarmupPeak
 from hf_mem._version import __version__
 from hf_mem.gguf.fetch import fetch_gguf_with_semaphore
 from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, merge_shards
 from hf_mem.safetensors.fetch import fetch_modules_and_dense_metadata, fetch_safetensors_metadata
 from hf_mem.safetensors.kv_cache import compute_safetensors_kv_cache_size, resolve_kv_cache_dtype
+from hf_mem.safetensors.warmup_peak import compute_safetensors_warmup_peak
 from hf_mem.safetensors.metadata import (
     MoEMetadata,
     SafetensorsMetadata,
@@ -42,7 +43,10 @@ class Result:
     # `kv_cache` mirrors the shape of `memory` but for the KV cache estimation; None when
     # experimental=False or the model architecture does not support KV cache estimation
     kv_cache: Union[int, Dict[str, int], None]
-    # `total_memory` is memory + kv_cache for single-file results; None for multi-GGUF
+    # `warmup_peak` is the activation peak during a vLLM/TEI-style warmup forward pass.
+    # Only computed for Safetensors when --max-num-batched-tokens is set; None otherwise.
+    warmup_peak: int | None
+    # `total_memory` is memory + kv_cache + warmup_peak for single-file results; None for multi-GGUF
     total_memory: int | None
 
     # NOTE: When True, to_json() enriches `memory` and `kv_cache` with per-component /
@@ -53,6 +57,7 @@ class Result:
     gguf_files: Dict[str, GGUFMetadata] | None = field(default=None, repr=False)
     kv_cache_metadata: KvCache | None = field(default=None, repr=False)
     moe_metadata: MoEMetadata | None = field(default=None, repr=False)
+    warmup_peak_metadata: WarmupPeak | None = field(default=None, repr=False)
 
     def _component_to_json(self, component: Any) -> Dict[str, Any]:
         out = {
@@ -74,6 +79,8 @@ class Result:
         if not self.details:
             out["memory"] = self.memory
             out["kv_cache"] = self.kv_cache
+            if self.warmup_peak is not None:
+                out["warmup_peak"] = self.warmup_peak
             out["total_memory"] = self.total_memory
             if self.moe_metadata is not None:
                 out["moe"] = {
@@ -113,6 +120,13 @@ class Result:
                 if self.kv_cache_metadata is not None
                 else None
             )
+            if self.warmup_peak_metadata is not None:
+                out["warmup_peak"] = {
+                    "bytes": self.warmup_peak_metadata.peak_bytes,
+                    "dtype": self.warmup_peak_metadata.activation_dtype,
+                    "max_num_batched_tokens": self.warmup_peak_metadata.max_num_batched_tokens,
+                    "max_num_seqs": self.warmup_peak_metadata.max_num_seqs,
+                }
             if self.moe_metadata is not None:
                 out["moe"] = {
                     "base_model": self._component_to_json(self.moe_metadata.base_model),
@@ -217,7 +231,13 @@ async def arun(
     kv_cache_dtype: str = "auto",
     gguf_file: str | None = None,
     details: bool = False,
+    max_num_batched_tokens: int | None = None,
 ) -> Result:
+    if max_num_batched_tokens is not None and max_num_batched_tokens <= 0:
+        raise RuntimeError(
+            f"--max-num-batched-tokens must be a positive integer, got {max_num_batched_tokens}."
+        )
+
     headers: Dict[str, str] = {
         "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}"
     }
@@ -335,6 +355,7 @@ async def arun(
                 filename=single_filename,
                 memory=gguf_meta.bytes_count,
                 kv_cache=kv_bytes,
+                warmup_peak=None,
                 total_memory=gguf_meta.bytes_count + (kv_bytes or 0),
                 details=details,
                 gguf_files=gguf_files_dict,
@@ -359,6 +380,7 @@ async def arun(
                 filename=None,
                 memory=memory_dict,
                 kv_cache=kv_dict,
+                warmup_peak=None,
                 total_memory=None,
                 details=details,
                 gguf_files=gguf_files_dict,
@@ -485,90 +507,113 @@ async def arun(
 
     kv_cache_cls: KvCache | None = None
     moe_metadata: MoEMetadata | None = None
-    if experimental and "config.json" in file_paths:
+    warmup_peak_cls: WarmupPeak | None = None
+
+    need_config = (experimental or max_num_batched_tokens is not None) and "config.json" in file_paths
+    if need_config:
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
         config: Dict[str, Any] = await get_json_file(client, url, headers)
 
-        if not any(
-            arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
-            for arch in config.get("architectures", [])
+        # NOTE: For ...ForConditionalGeneration with a text_config, prefer the text config —
+        # same logic as before, just lifted out of the KV-cache-only branch.
+        if (
+            any(arch.__contains__("ForConditionalGeneration") for arch in config.get("architectures", []))
+            and "text_config" in config
         ):
             warnings.warn(
-                "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
+                f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
             )
-        else:
-            if (
-                any(arch.__contains__("ForConditionalGeneration") for arch in config["architectures"])
-                and "text_config" in config
+            text_config = config["text_config"]
+
+            if referenced_model := text_config.get("_name_or_path"):
+                referenced_url = f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
+                warnings.warn(
+                    f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
+                )
+                referenced_config = await get_json_file(client, referenced_url, headers)
+                referenced_config.update(text_config)
+                text_config = referenced_config
+
+            for key in ("dtype", "torch_dtype", "quantization_config"):
+                if key in config and key not in text_config:
+                    text_config[key] = config[key]
+
+            config = text_config
+
+        if experimental:
+            if not any(
+                arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
+                for arch in config.get("architectures", [])
             ):
                 warnings.warn(
-                    f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
-                )
-                text_config = config["text_config"]
-
-                if referenced_model := text_config.get("_name_or_path"):
-                    referenced_url = f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
-                    warnings.warn(
-                        f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
-                    )
-                    referenced_config = await get_json_file(client, referenced_url, headers)
-                    referenced_config.update(text_config)
-                    text_config = referenced_config
-
-                for key in ("dtype", "torch_dtype", "quantization_config"):
-                    if key in config and key not in text_config:
-                        text_config[key] = config[key]
-
-                config = text_config
-
-            moe_metadata = parse_moe_metadata(raw_metadata=raw_metadata, config=config)
-
-            if max_model_len is None:
-                max_model_len = config.get(
-                    "max_position_embeddings",
-                    config.get("n_positions", config.get("max_seq_len", max_model_len)),
-                )
-
-            if max_model_len is None:
-                warnings.warn(
-                    "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
-                )
-            elif not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
-                warnings.warn(
-                    f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
+                    "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
                 )
             else:
-                cache_dtype = resolve_kv_cache_dtype(
-                    config=config,
-                    kv_cache_dtype=kv_cache_dtype,
-                    metadata=metadata,
-                    model_id=model_id,
-                )
-                kv_cache_cls = KvCache(
-                    max_model_len=max_model_len,
-                    cache_size=compute_safetensors_kv_cache_size(
+                moe_metadata = parse_moe_metadata(raw_metadata=raw_metadata, config=config)
+
+                if max_model_len is None:
+                    max_model_len = config.get(
+                        "max_position_embeddings",
+                        config.get("n_positions", config.get("max_seq_len", max_model_len)),
+                    )
+
+                if max_model_len is None:
+                    warnings.warn(
+                        "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
+                    )
+                elif not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
+                    warnings.warn(
+                        f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
+                    )
+                else:
+                    cache_dtype = resolve_kv_cache_dtype(
                         config=config,
-                        cache_dtype=cache_dtype,
+                        kv_cache_dtype=kv_cache_dtype,
+                        metadata=metadata,
+                        model_id=model_id,
+                    )
+                    kv_cache_cls = KvCache(
                         max_model_len=max_model_len,
+                        cache_size=compute_safetensors_kv_cache_size(
+                            config=config,
+                            cache_dtype=cache_dtype,
+                            max_model_len=max_model_len,
+                            batch_size=batch_size,
+                        ),
                         batch_size=batch_size,
-                    ),
-                    batch_size=batch_size,
-                    cache_dtype=cache_dtype,
-                )
+                        cache_dtype=cache_dtype,
+                    )
+
+        if max_num_batched_tokens is not None:
+            warmup_peak_cls = compute_safetensors_warmup_peak(
+                config=config,
+                max_num_batched_tokens=max_num_batched_tokens,
+                batch_size=batch_size,
+                file_paths=file_paths,
+                model_id=model_id,
+            )
+    elif max_num_batched_tokens is not None and "config.json" not in file_paths:
+        warnings.warn(
+            f"`--max-num-batched-tokens` is set but `config.json` is not present for "
+            f"`--model-id={model_id}`; skipping warmup peak estimate."
+        )
 
     await client.aclose()
     kv_bytes = kv_cache_cls.cache_size if kv_cache_cls is not None else None
+    warmup_bytes = warmup_peak_cls.peak_bytes if warmup_peak_cls is not None else None
     return Result(
         model_id=model_id,
         revision=revision,
         filename=None,
         memory=metadata.bytes_count,
         kv_cache=kv_bytes,
-        total_memory=metadata.bytes_count + (kv_bytes or 0),
+        warmup_peak=warmup_bytes,
+        total_memory=metadata.bytes_count + (kv_bytes or 0) + (warmup_bytes or 0),
         details=details,
         safetensors=metadata,
         kv_cache_metadata=kv_cache_cls,
         moe_metadata=moe_metadata,
+        warmup_peak_metadata=warmup_peak_cls,
     )
 
 
@@ -582,6 +627,7 @@ def run(
     kv_cache_dtype: str = "auto",
     gguf_file: str | None = None,
     details: bool = False,
+    max_num_batched_tokens: int | None = None,
 ) -> Result:
     try:
         asyncio.get_running_loop()
@@ -597,6 +643,7 @@ def run(
                 kv_cache_dtype=kv_cache_dtype,
                 gguf_file=gguf_file,
                 details=details,
+                max_num_batched_tokens=max_num_batched_tokens,
             )
         )
 
