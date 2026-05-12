@@ -2,6 +2,7 @@ import warnings
 from typing import Any, Dict, List, Literal
 
 from hf_mem._types import WarmupPeak
+from hf_mem.safetensors.metadata import _get_config_int
 from hf_mem.safetensors.types import get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 ModelClass = Literal[
@@ -88,18 +89,6 @@ def resolve_activation_dtype(config: Dict[str, Any]) -> str:
     return "F32"
 
 
-def _activation_dtype_bytes(dtype: str) -> int:
-    return get_safetensors_dtype_bytes(dtype)
-
-
-def _resolve_intermediate_size(config: Dict[str, Any]) -> int | None:
-    for key in ("intermediate_size", "ffn_dim", "n_inner"):
-        value = config.get(key)
-        if isinstance(value, int) and value > 0:
-            return value
-    return None
-
-
 def _resolve_num_labels(config: Dict[str, Any]) -> int | None:
     value = config.get("num_labels")
     if isinstance(value, int) and value > 0:
@@ -107,6 +96,17 @@ def _resolve_num_labels(config: Dict[str, Any]) -> int | None:
     id2label = config.get("id2label")
     if isinstance(id2label, dict) and len(id2label) > 0:
         return len(id2label)
+    return None
+
+
+def _resolve_vocab_size(config: Dict[str, Any], model_id: str, label: str) -> int | None:
+    vocab_size = config.get("vocab_size")
+    if isinstance(vocab_size, int) and vocab_size > 0:
+        return vocab_size
+    warnings.warn(
+        f"Warmup peak estimate skipped for `--model-id={model_id}`: "
+        f"`config.json` missing `vocab_size` for a {label}."
+    )
     return None
 
 
@@ -149,7 +149,7 @@ def compute_safetensors_warmup_peak(
         )
         return None
 
-    intermediate_size = _resolve_intermediate_size(config)
+    intermediate_size = _get_config_int(config, "intermediate_size", "ffn_dim", "n_inner")
     if intermediate_size is None:
         warnings.warn(
             f"Warmup peak estimate skipped for `--model-id={model_id}`: could not resolve "
@@ -163,18 +163,18 @@ def compute_safetensors_warmup_peak(
     num_key_value_heads: int = config.get("num_key_value_heads", num_attention_heads)
     head_dim: int = config.get("head_dim", hidden_size // num_attention_heads)
 
-    # MoE adjustment: when num_experts_per_tok is present, the FFN transient is
-    # the per-token activation across active experts only.
-    num_experts_per_tok = config.get("num_experts_per_tok") or config.get("num_experts_per_token") or config.get("top_k")
+    # MoE adjustment: when num_experts_per_tok > 1, the FFN transient grows linearly
+    # with the active expert count.
+    num_experts_per_tok = _get_config_int(config, "num_experts_per_tok", "num_experts_per_token", "top_k")
     moe_intermediate_size = config.get("moe_intermediate_size")
-    if isinstance(num_experts_per_tok, int) and num_experts_per_tok > 0:
+    if num_experts_per_tok is not None:
         ffn_width = moe_intermediate_size if isinstance(moe_intermediate_size, int) else intermediate_size
         ffn_multiplier = 2 * num_experts_per_tok
     else:
         ffn_width = intermediate_size
         ffn_multiplier = 2
 
-    d = _activation_dtype_bytes(activation_dtype)
+    d = get_safetensors_dtype_bytes(activation_dtype)
     T = max_num_batched_tokens
     S = min(T, batch_size)
 
@@ -186,21 +186,13 @@ def compute_safetensors_warmup_peak(
     lm_head_spike: int
     match model_class:
         case "causal_lm" | "conditional_gen":
-            vocab_size = config.get("vocab_size")
-            if not isinstance(vocab_size, int) or vocab_size <= 0:
-                warnings.warn(
-                    f"Warmup peak estimate skipped for `--model-id={model_id}`: "
-                    f"`config.json` missing `vocab_size` for a causal LM / VLM."
-                )
+            vocab_size = _resolve_vocab_size(config, model_id, "causal LM / VLM")
+            if vocab_size is None:
                 return None
             lm_head_spike = S * vocab_size * d
         case "masked_lm":
-            vocab_size = config.get("vocab_size")
-            if not isinstance(vocab_size, int) or vocab_size <= 0:
-                warnings.warn(
-                    f"Warmup peak estimate skipped for `--model-id={model_id}`: "
-                    f"`config.json` missing `vocab_size` for a masked LM."
-                )
+            vocab_size = _resolve_vocab_size(config, model_id, "masked LM")
+            if vocab_size is None:
                 return None
             lm_head_spike = T * vocab_size * d  # LM head applied to every token
         case "seq_classification":

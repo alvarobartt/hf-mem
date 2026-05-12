@@ -516,10 +516,12 @@ async def arun(
         url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
         config: Dict[str, Any] = await get_json_file(client, url, headers)
 
-        # NOTE: For ...ForConditionalGeneration with a text_config, prefer the text config —
-        # same logic as before, just lifted out of the KV-cache-only branch.
+        # ForConditionalGeneration nests language model params under text_config; the outer
+        # config is the vision wrapper. Capture the outer architectures before any swap so
+        # the experimental arch check below sees the original list.
+        outer_architectures = config.get("architectures", [])
         if (
-            any(arch.__contains__("ForConditionalGeneration") for arch in config.get("architectures", []))
+            any(arch.__contains__("ForConditionalGeneration") for arch in outer_architectures)
             and "text_config" in config
         ):
             warnings.warn(
@@ -545,7 +547,7 @@ async def arun(
         if experimental:
             if not any(
                 arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
-                for arch in config.get("architectures", [])
+                for arch in outer_architectures
             ):
                 warnings.warn(
                     "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
