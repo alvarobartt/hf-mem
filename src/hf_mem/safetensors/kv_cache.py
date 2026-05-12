@@ -162,7 +162,7 @@ def compute_safetensors_kv_cache_size(
     # per-layer token counts (`max_model_len` for full-attention, `min(sliding_window, max_model_len)`
     # for sliding-window) instead of multiplying a single layer count by `max_model_len`.
     num_full_layers, num_sliding_layers = _resolve_attention_layer_counts(config)
-    sliding_window: int = config.get("sliding_window", max_model_len)
+    sliding_window = config.get("sliding_window") or max_model_len
     total_kv_tokens = num_full_layers * max_model_len + num_sliding_layers * min(sliding_window, max_model_len)
 
     return (
