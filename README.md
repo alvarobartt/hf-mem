@@ -73,6 +73,18 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/experimental.png" />
 
+## Warmup peak memory
+
+By passing `--max-num-batched-tokens`, you can estimate the **peak activation memory** during a single warmup forward pass — analogous to what vLLM measures in its `profile_run` at startup or what TEI measures during its warmup. This is the third memory component reported alongside weights and KV cache, and is included in `total_memory`.
+
+```bash
+uvx hf-mem --model-id meta-llama/Llama-3.1-8B-Instruct --max-num-batched-tokens 8192
+```
+
+This flag is **independent of `--experimental`**: it works for any supported architecture (causal LMs, masked LMs, sequence/token classifiers, base encoders, Sentence Transformers) without needing the experimental gate. The existing `--batch-size` is reused as `max_num_seqs` to size the LM head spike. GGUF files are not supported — the flag is silently ignored when combined with `--gguf-file`.
+
+The estimate models PyTorch's caching-allocator behavior (persistent residual stream + largest transient) from `config.json` fields. It excludes runtime-discovered components such as NCCL buffers and FlashAttention kernel workspaces, so the real-world peak may be 10-30% higher.
+
 ## GGUF
 
 If the repository contains GGUF model weights, those will be listed by default (only if there are no Safetensors weights, otherwise the GGUFs will be ignored) and the memory will be estimated for each one of those; whereas if a specific file is provided, then the memory estimation will be targeted for that given file instead.
