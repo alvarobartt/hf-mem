@@ -104,3 +104,137 @@ def _resolve_num_labels(config: Dict[str, Any]) -> int | None:
     if isinstance(id2label, dict) and len(id2label) > 0:
         return len(id2label)
     return None
+
+
+from hf_mem._types import WarmupPeak
+
+
+def compute_safetensors_warmup_peak(
+    config: Dict[str, Any],
+    max_num_batched_tokens: int,
+    batch_size: int,
+    file_paths: List[str],
+    model_id: str,
+) -> WarmupPeak | None:
+    """Approximate the peak activation memory during one warmup forward pass.
+
+    Models what PyTorch's caching allocator holds: a persistent residual stream
+    of (T × H × d_act), plus the largest transient at any one point in the forward.
+
+    Returns None (with a warning) on any of:
+      - architecture not in the supported taxonomy
+      - required config keys missing
+      - activation dtype unresolvable
+      - classifier architecture without num_labels / id2label
+    """
+    architectures = config.get("architectures", []) or []
+    model_class = classify_architecture(architectures, file_paths)
+    if model_class is None:
+        warnings.warn(
+            f"Warmup peak estimate skipped for `--model-id={model_id}`: architecture(s) "
+            f"{architectures or '<missing>'} not in the supported taxonomy (causal LM, "
+            f"VLM, masked LM, classifier, base encoder / Sentence Transformers)."
+        )
+        return None
+
+    activation_dtype = resolve_activation_dtype(config)
+    if activation_dtype is None:
+        warnings.warn(
+            f"Warmup peak estimate skipped for `--model-id={model_id}`: could not resolve "
+            f"the activation dtype from `config.json` (no `torch_dtype`, `dtype`, or "
+            f"`quantization_config` field present)."
+        )
+        return None
+
+    required = ("hidden_size", "num_attention_heads")
+    missing = [k for k in required if k not in config]
+    if missing:
+        warnings.warn(
+            f"Warmup peak estimate skipped for `--model-id={model_id}`: `config.json` "
+            f"missing required keys: {missing}."
+        )
+        return None
+
+    intermediate_size = _resolve_intermediate_size(config)
+    if intermediate_size is None:
+        warnings.warn(
+            f"Warmup peak estimate skipped for `--model-id={model_id}`: could not resolve "
+            f"the FFN intermediate size from `config.json` (looked for `intermediate_size`, "
+            f"`ffn_dim`, `n_inner`)."
+        )
+        return None
+
+    hidden_size: int = config["hidden_size"]
+    num_attention_heads: int = config["num_attention_heads"]
+    num_key_value_heads: int = config.get("num_key_value_heads", num_attention_heads)
+    head_dim: int = config.get("head_dim", hidden_size // num_attention_heads)
+
+    # MoE adjustment: when num_experts_per_tok is present, the FFN transient is
+    # the per-token activation across active experts only.
+    num_experts_per_tok = config.get("num_experts_per_tok") or config.get("num_experts_per_token") or config.get("top_k")
+    moe_intermediate_size = config.get("moe_intermediate_size")
+    if isinstance(num_experts_per_tok, int) and num_experts_per_tok > 0:
+        ffn_width = moe_intermediate_size if isinstance(moe_intermediate_size, int) else intermediate_size
+        ffn_multiplier = 2 * num_experts_per_tok
+    else:
+        ffn_width = intermediate_size
+        ffn_multiplier = 2
+
+    d = _activation_dtype_bytes(activation_dtype)
+    T = max_num_batched_tokens
+    S = min(T, batch_size)
+
+    residual_stream = T * hidden_size * d
+    attn_transient = T * (num_attention_heads + 2 * num_key_value_heads) * head_dim * d
+    ffn_transient = ffn_multiplier * T * ffn_width * d
+
+    # Terminal "head" spike — model-class-dependent.
+    lm_head_spike: int
+    match model_class:
+        case "causal_lm" | "conditional_gen":
+            vocab_size = config.get("vocab_size")
+            if not isinstance(vocab_size, int) or vocab_size <= 0:
+                warnings.warn(
+                    f"Warmup peak estimate skipped for `--model-id={model_id}`: "
+                    f"`config.json` missing `vocab_size` for a causal LM / VLM."
+                )
+                return None
+            lm_head_spike = S * vocab_size * d
+        case "masked_lm":
+            vocab_size = config.get("vocab_size")
+            if not isinstance(vocab_size, int) or vocab_size <= 0:
+                warnings.warn(
+                    f"Warmup peak estimate skipped for `--model-id={model_id}`: "
+                    f"`config.json` missing `vocab_size` for a masked LM."
+                )
+                return None
+            lm_head_spike = T * vocab_size * d  # LM head applied to every token
+        case "seq_classification":
+            num_labels = _resolve_num_labels(config)
+            if num_labels is None:
+                warnings.warn(
+                    f"Warmup peak estimate skipped for `--model-id={model_id}`: classifier "
+                    f"architecture without `num_labels` or `id2label` in `config.json`."
+                )
+                return None
+            lm_head_spike = S * num_labels * d
+        case "token_classification":
+            num_labels = _resolve_num_labels(config)
+            if num_labels is None:
+                warnings.warn(
+                    f"Warmup peak estimate skipped for `--model-id={model_id}`: classifier "
+                    f"architecture without `num_labels` or `id2label` in `config.json`."
+                )
+                return None
+            lm_head_spike = T * num_labels * d
+        case "base_encoder":
+            lm_head_spike = S * hidden_size * d
+
+    peak_bytes = residual_stream + max(attn_transient, ffn_transient, lm_head_spike)
+
+    return WarmupPeak(
+        max_num_batched_tokens=T,
+        max_num_seqs=S,
+        peak_bytes=peak_bytes,
+        activation_dtype=activation_dtype,
+    )
