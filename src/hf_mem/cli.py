@@ -20,6 +20,7 @@ def _print_result(result: Result) -> None:
             metadata=result.safetensors,
             kv_cache=result.kv_cache_metadata,
             moe=result.moe_metadata,
+            warmup_peak=result.warmup_peak_metadata,
         )
         return
 
