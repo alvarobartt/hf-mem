@@ -80,12 +80,13 @@ def print_safetensors_report(
         ]
         centered_rows.extend(moe_rows)
 
-    data_rows = []
     extras = []
     if kv_cache:
         extras.append("KV CACHE")
     if warmup_peak:
         extras.append("WARMUP PEAK")
+
+    data_rows = []
     if extras:
         data_rows.append(
             f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + {' + '.join(extras)})"
@@ -118,7 +119,9 @@ def print_safetensors_report(
     if kv_cache:
         data_rows.append(f"{_bytes_to_gib(kv_cache.cache_size):.2f} / {_bytes_to_gib(combined_total):.2f} GiB")
     if warmup_peak:
-        data_rows.append(f"{_bytes_to_gib(warmup_peak.peak_bytes):.2f} / {_bytes_to_gib(combined_total):.2f} GiB")
+        data_rows.append(
+            f"{_bytes_to_gib(warmup_peak.peak_bytes):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+        )
 
     max_centered_len = max(len(r) for r in centered_rows)
     max_data_len = max(len(r) for r in data_rows)
@@ -149,15 +152,10 @@ def print_safetensors_report(
         )
     _print_divider(data_col_width + 1, "top")
 
-    if kv_cache or warmup_peak:
-        suffix_parts = []
-        if kv_cache:
-            suffix_parts.append("KV CACHE")
-        if warmup_peak:
-            suffix_parts.append("WARMUP PEAK")
+    if extras:
         total_text = (
             f"{_bytes_to_gib(combined_total):.2f} GiB "
-            f"({_format_short_number(metadata.param_count)} PARAMS + {' + '.join(suffix_parts)})"
+            f"({_format_short_number(metadata.param_count)} PARAMS + {' + '.join(extras)})"
         )
         total_bar = _make_bar(combined_total, combined_total, data_col_width)
         _print_row("TOTAL MEMORY", total_text, data_col_width)

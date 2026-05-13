@@ -14,13 +14,9 @@ ModelClass = Literal[
     "base_encoder",
 ]
 
-# Architecture-suffix → ModelClass. Matching is via `__contains__` (substring),
-# mirroring how run.py already detects ForCausalLM / ForConditionalGeneration.
+# NOTE: Architecture-suffix → ModelClass; matched via substring, mirroring how
+# run.py already detects ForCausalLM / ForConditionalGeneration
 _ARCH_SUFFIX_MAP: list[tuple[str, ModelClass]] = [
-    # Order matters: more specific suffixes must come before less specific ones
-    # so that e.g. `BertForSequenceClassification` matches before `BertModel` would
-    # (it never does here since we only match the listed suffixes, but keep the
-    # discipline for future additions).
     ("ForCausalLM", "causal_lm"),
     ("ForConditionalGeneration", "conditional_gen"),
     ("ForMaskedLM", "masked_lm"),
@@ -31,26 +27,22 @@ _ARCH_SUFFIX_MAP: list[tuple[str, ModelClass]] = [
     ("ForTokenClassification", "token_classification"),
 ]
 
+# NOTE: Safetensors dtypes that are quantized weight storage formats; for the warmup
+# forward pass the activations are dequantized to a higher-precision compute dtype
+_QUANTIZED_SAFETENSORS_DTYPES = {"F8_E4M3", "F8_E5M2", "F8_E8M0", "I8"}
+
 
 def classify_architecture(architectures: List[str], file_paths: List[str]) -> ModelClass | None:
-    """Map HF `config.architectures` to a ModelClass used by the warmup peak formula.
-
-    Returns None when no known suffix is found AND the repo is not a Sentence Transformers
-    model — in that case the caller should warn and skip the warmup peak estimate.
-    """
     for arch in architectures or []:
         for suffix, model_class in _ARCH_SUFFIX_MAP:
             if suffix in arch:
                 return model_class
 
-    # Sentence Transformers and bare `…Model` (e.g. BertModel used as an encoder)
-    # both fall under "base_encoder". Sentence Transformers is identifiable via
-    # the presence of `config_sentence_transformers.json` in the repo.
+    # NOTE: Sentence Transformers repos are identified by `config_sentence_transformers.json`
     if "config_sentence_transformers.json" in file_paths:
         return "base_encoder"
 
-    # Bare `…Model` architectures (e.g. BertModel, RobertaModel, XLMRobertaModel) —
-    # only when the architecture string ends in "Model" without a head suffix.
+    # NOTE: Bare `…Model` architectures (e.g. BertModel) are encoder-only
     for arch in architectures or []:
         if arch.endswith("Model") and "ForCausalLM" not in arch and "ForConditionalGeneration" not in arch:
             return "base_encoder"
@@ -59,43 +51,33 @@ def classify_architecture(architectures: List[str], file_paths: List[str]) -> Mo
 
 
 def resolve_activation_dtype(config: Dict[str, Any]) -> str:
-    """Resolve the activation (compute) dtype for the warmup forward pass.
-
-    Returns a Safetensors dtype string (e.g. "BF16", "F16", "F32"). Never returns
-    None — falls back to F32 (HuggingFace's default) when no dtype info is found.
-
-    Resolution order:
-      1. torch_dtype / dtype, if it is a non-quantized dtype.
-      2. If torch_dtype / dtype resolves to a quantized dtype (float8_*), assume bf16
-         as the dequantized compute dtype.
-      3. If quantization_config is present but no torch_dtype/dtype, assume bf16.
-      4. Otherwise F32 — HuggingFace Transformers' default compute dtype when
-         torch_dtype / dtype is absent (common for older BERT-family models).
-    """
-    _QUANTIZED_TORCH_DTYPES = {"float8_e4m3", "float8_e4m3fn", "float8_e5m2", "int8"}
-
-    raw = config.get("torch_dtype") or config.get("dtype")
-    if isinstance(raw, str):
-        normalized = raw.replace("torch.", "")
-        if normalized in _QUANTIZED_TORCH_DTYPES:
-            return "BF16"  # dequantized compute dtype
-        return torch_dtype_to_safetensors_dtype(normalized)
+    # NOTE: Falls back to F32 (HuggingFace Transformers' default when `torch_dtype` / `dtype`
+    # is absent) for older BERT-family / Sentence Transformers models. For quantized weights,
+    # assume BF16 as the dequantized compute dtype.
+    if raw := (config.get("torch_dtype") or config.get("dtype")):
+        if isinstance(raw, str):
+            resolved = torch_dtype_to_safetensors_dtype(raw)
+            if resolved in _QUANTIZED_SAFETENSORS_DTYPES:
+                return "BF16"
+            return resolved
 
     if "quantization_config" in config:
         return "BF16"
 
-    # HuggingFace Transformers' default when torch_dtype / dtype absent is float32.
-    # Many older BERT-family / Sentence Transformers models don't set the field at all.
     return "F32"
 
 
-def _resolve_num_labels(config: Dict[str, Any]) -> int | None:
+def _resolve_num_labels(config: Dict[str, Any], model_id: str) -> int | None:
     value = config.get("num_labels")
     if isinstance(value, int) and value > 0:
         return value
     id2label = config.get("id2label")
     if isinstance(id2label, dict) and len(id2label) > 0:
         return len(id2label)
+    warnings.warn(
+        f"Warmup peak estimate skipped for `--model-id={model_id}`: classifier "
+        f"architecture without `num_labels` or `id2label` in `config.json`."
+    )
     return None
 
 
@@ -117,17 +99,10 @@ def compute_safetensors_warmup_peak(
     file_paths: List[str],
     model_id: str,
 ) -> WarmupPeak | None:
-    """Approximate the peak activation memory during one warmup forward pass.
-
-    Models what PyTorch's caching allocator holds: a persistent residual stream
-    of (T × H × d_act), plus the largest transient at any one point in the forward.
-
-    Returns None (with a warning) on any of:
-      - architecture not in the supported taxonomy
-      - required config keys missing
-      - activation dtype unresolvable
-      - classifier architecture without num_labels / id2label
-    """
+    # NOTE: Models PyTorch's caching-allocator behavior: a persistent residual stream
+    # of (T × H × d_act), plus the largest transient (attention / FFN / head) at any
+    # one point in the forward. Returns None (with a warning) when the architecture
+    # is unsupported or required config keys are missing.
     architectures = config.get("architectures", []) or []
     model_class = classify_architecture(architectures, file_paths)
     if model_class is None:
@@ -182,7 +157,8 @@ def compute_safetensors_warmup_peak(
     attn_transient = T * (num_attention_heads + 2 * num_key_value_heads) * head_dim * d
     ffn_transient = ffn_multiplier * T * ffn_width * d
 
-    # Terminal "head" spike — model-class-dependent.
+    # NOTE: Terminal head spike — applied to every token for masked LM / token
+    # classification, only the last token of each sequence (S) for the rest.
     lm_head_spike: int
     match model_class:
         case "causal_lm" | "conditional_gen":
@@ -194,23 +170,15 @@ def compute_safetensors_warmup_peak(
             vocab_size = _resolve_vocab_size(config, model_id, "masked LM")
             if vocab_size is None:
                 return None
-            lm_head_spike = T * vocab_size * d  # LM head applied to every token
+            lm_head_spike = T * vocab_size * d
         case "seq_classification":
-            num_labels = _resolve_num_labels(config)
+            num_labels = _resolve_num_labels(config, model_id)
             if num_labels is None:
-                warnings.warn(
-                    f"Warmup peak estimate skipped for `--model-id={model_id}`: classifier "
-                    f"architecture without `num_labels` or `id2label` in `config.json`."
-                )
                 return None
             lm_head_spike = S * num_labels * d
         case "token_classification":
-            num_labels = _resolve_num_labels(config)
+            num_labels = _resolve_num_labels(config, model_id)
             if num_labels is None:
-                warnings.warn(
-                    f"Warmup peak estimate skipped for `--model-id={model_id}`: classifier "
-                    f"architecture without `num_labels` or `id2label` in `config.json`."
-                )
                 return None
             lm_head_spike = T * num_labels * d
         case "base_encoder":

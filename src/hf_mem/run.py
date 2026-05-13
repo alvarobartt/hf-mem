@@ -16,13 +16,13 @@ from hf_mem.gguf.fetch import fetch_gguf_with_semaphore
 from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, merge_shards
 from hf_mem.safetensors.fetch import fetch_modules_and_dense_metadata, fetch_safetensors_metadata
 from hf_mem.safetensors.kv_cache import compute_safetensors_kv_cache_size, resolve_kv_cache_dtype
-from hf_mem.safetensors.warmup_peak import compute_safetensors_warmup_peak
 from hf_mem.safetensors.metadata import (
     MoEMetadata,
     SafetensorsMetadata,
     parse_moe_metadata,
     parse_safetensors_metadata,
 )
+from hf_mem.safetensors.warmup_peak import compute_safetensors_warmup_peak
 
 MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4)))
 
