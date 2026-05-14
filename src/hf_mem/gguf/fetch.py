@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 
 import httpx
 
-from hf_mem._fetch import REQUEST_TIMEOUT
+from hf_mem._fetch import REQUEST_TIMEOUT, quote_revision
 from hf_mem.gguf.metadata import GGUFMetadata, parse_gguf_metadata
 
 # NOTE: Start with 1 MB; this is sufficient for the metadata of most GGUF models.
@@ -67,7 +67,7 @@ async def fetch_gguf_with_semaphore(
     async with semaphore:
         metadata = await fetch_gguf_metadata(
             client=client,
-            url=f"https://huggingface.co/{model_id}/resolve/{revision}/{path}",
+            url=f"https://huggingface.co/{model_id}/resolve/{quote_revision(revision)}/{path}",
             experimental=parse_kv_cache,
             max_model_len=max_model_len,
             kv_cache_dtype=kv_cache_dtype,
