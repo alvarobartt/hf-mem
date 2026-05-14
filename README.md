@@ -75,7 +75,7 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 
 ## Warmup peak memory
 
-By passing `--max-num-batched-tokens`, you can estimate the **peak activation memory** during a single warmup forward pass — analogous to what vLLM measures in its `profile_run` at startup or what TEI measures during its warmup. This is the third memory component reported alongside weights and KV cache, and is included in `total_memory`.
+By passing `--max-num-batched-tokens`, you can also estimate the **peak activation memory** during a single warmup forward pass, analogous to what vLLM measures in its `profile_run` at startup or what Text Embeddings Inference measures during its warmup phase..
 
 ```bash
 uvx hf-mem --model-id meta-llama/Llama-3.1-8B-Instruct --max-num-batched-tokens 8192
