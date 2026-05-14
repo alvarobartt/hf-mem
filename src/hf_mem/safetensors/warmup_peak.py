@@ -11,6 +11,7 @@ ModelClass = Literal[
     "masked_lm",
     "seq_classification",
     "token_classification",
+    "question_answering",
     "base_encoder",
 ]
 
@@ -22,8 +23,10 @@ _ARCH_SUFFIX_MAP: list[tuple[str, ModelClass]] = [
     ("ForMaskedLM", "masked_lm"),
     ("ForPreTraining", "masked_lm"),
     ("ForSequenceClassification", "seq_classification"),
-    ("ForQuestionAnswering", "seq_classification"),
     ("ForMultipleChoice", "seq_classification"),
+    # NOTE: QA heads produce per-token start/end logits (T × 2), not a pooled
+    # (S × num_labels) spike; structurally fixed at 2 outputs (start, end)
+    ("ForQuestionAnswering", "question_answering"),
     ("ForTokenClassification", "token_classification"),
 ]
 
@@ -181,6 +184,8 @@ def compute_safetensors_warmup_peak(
             if num_labels is None:
                 return None
             lm_head_spike = T * num_labels * d
+        case "question_answering":
+            lm_head_spike = T * 2 * d
         case "base_encoder":
             lm_head_spike = S * hidden_size * d
 

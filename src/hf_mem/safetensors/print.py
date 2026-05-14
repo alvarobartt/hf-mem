@@ -48,7 +48,7 @@ def print_safetensors_report(
         centered_rows.append(f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}")
     if warmup_peak:
         centered_rows.append(
-            f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, batch-size={warmup_peak.max_num_seqs}"
+            f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, max-num-seqs={warmup_peak.max_num_seqs}"
         )
     for name, nested_metadata in metadata.components.items():
         if len(metadata.components) > 1:
@@ -147,7 +147,7 @@ def print_safetensors_report(
         )
     if warmup_peak:
         _print_centered(
-            f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, batch-size={warmup_peak.max_num_seqs}",
+            f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, max-num-seqs={warmup_peak.max_num_seqs}",
             current_len,
         )
     _print_divider(data_col_width + 1, "top")
