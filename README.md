@@ -83,7 +83,7 @@ uvx hf-mem --model-id meta-llama/Llama-3.1-8B-Instruct --max-num-batched-tokens 
 
 This flag is **independent of `--experimental`**: it works for any supported architecture (causal LMs, masked LMs, sequence/token classifiers, base encoders, Sentence Transformers) without needing the experimental gate. The existing `--batch-size` is reused as `max_num_seqs` to size the LM head spike. GGUF files are not supported — the flag is silently ignored when combined with `--gguf-file`.
 
-The estimate models PyTorch's caching-allocator behavior (persistent residual stream + largest transient) from `config.json` fields. It excludes runtime-discovered components such as NCCL buffers and FlashAttention kernel workspaces, so the real-world peak may be 10-30% higher.
+This estimation mimics PyTorch's caching-allocator behavior (persistent residual stream + largest transient), inferred from `config.json`. It excludes runtime-discovered components such as NCCL buffers or FlashAttention kernels, among others. Bear that in mind as the real-world peak may be ~10 to 30 percent higher.
 
 ## GGUF
 
