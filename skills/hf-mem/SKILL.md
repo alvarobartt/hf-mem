@@ -13,6 +13,7 @@ Estimates inference memory (model weights + optional KV cache) for models on the
 - User asks how much VRAM or memory a model needs to run
 - User wants to know if a model fits on their GPU or a given instance
 - User references a Hugging Face model ID or URL and asks about inference requirements
+- User asks about activation memory or warmup memory for a model
 
 ## Requirements
 
@@ -43,6 +44,14 @@ Adds KV cache memory on top of weights. Applies to LLMs (`...ForCausalLM`), VLMs
 uvx hf-mem --model-id <org/model> [--gguf-file <path>] \
   --experimental [--max-model-len N] [--batch-size N] \
   [--kv-cache-dtype auto|bfloat16|fp8|fp8_e4m3|fp8_e5m2]
+```
+
+## Warmup peak memory (`--max-num-batched-tokens`)
+
+Estimates peak activation memory during a single warmup forward pass (vLLM `profile_run` / TEI warmup analog). Works for causal LMs, VLMs, masked LMs, sequence/token classifiers, base encoders, and Sentence Transformers. Independent of `--experimental`. Reuses `--batch-size` as `max_num_seqs`. Not supported for GGUF.
+
+```bash
+uvx hf-mem --model-id <org/model> --max-num-batched-tokens 8192 [--batch-size N]
 ```
 
 ## Examples

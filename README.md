@@ -73,6 +73,21 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/experimental.png" />
 
+## Warmup peak memory
+
+By passing `--max-num-batched-tokens`, you can also estimate the **peak activation memory** during a single warmup forward pass, analogous to what vLLM measures in its `profile_run` at startup or what Text Embeddings Inference measures during its warmup phase..
+
+```bash
+uvx hf-mem --model-id meta-llama/Llama-3.1-8B-Instruct --max-num-batched-tokens 8192
+```
+
+`--max-num-batched-tokens` works for any of CLM, MLM, SeqCls, TokCls, Encoders, or Sentence Transformers. It can be combined along with `--batch-size`, which is interpreted as `max_num_seqs` to size the language model head spike.
+
+> [!WARNING]
+> This estimation just applies for Safetensors models and not GGUF.
+
+This estimation mimics PyTorch's caching-allocator behavior (persistent residual stream + largest transient), inferred from `config.json`. It excludes runtime-discovered components such as NCCL buffers or FlashAttention kernels, among others. Bear that in mind as the real-world peak may be ~10 to 30 percent higher.
+
 ## GGUF
 
 If the repository contains GGUF model weights, those will be listed by default (only if there are no Safetensors weights, otherwise the GGUFs will be ignored) and the memory will be estimated for each one of those; whereas if a specific file is provided, then the memory estimation will be targeted for that given file instead.
