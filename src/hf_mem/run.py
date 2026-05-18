@@ -5,6 +5,7 @@ import warnings
 from dataclasses import dataclass, field
 from functools import reduce
 from typing import Any, Dict, List, Tuple, Union
+from urllib.parse import quote
 from uuid import uuid4
 
 import httpx
@@ -218,6 +219,11 @@ async def arun(
     gguf_file: str | None = None,
     details: bool = False,
 ) -> Result:
+    # NOTE: Revisions like `refs/pr/4` contain slashes (and branches may contain `#`, spaces, etc.)
+    # that must be percent-encoded so the Hub API treats the revision as a single path segment.
+    # Keep the raw `revision` for display (User-Agent, error messages, `Result.revision`).
+    revision_encoded = quote(revision, safe="")
+
     headers: Dict[str, str] = {
         "User-Agent": f"hf-mem/{__version__}; id={uuid4()}; model_id={model_id}; revision={revision}"
     }
@@ -252,7 +258,7 @@ async def arun(
         http2=True,
         follow_redirects=True,
     )
-    url = f"https://huggingface.co/api/models/{model_id}/tree/{revision}?recursive=true"
+    url = f"https://huggingface.co/api/models/{model_id}/tree/{revision_encoded}?recursive=true"
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
@@ -310,7 +316,7 @@ async def arun(
                         semaphore=semaphore,
                         client=client,
                         model_id=model_id,
-                        revision=revision,
+                        revision_encoded=revision_encoded,
                         path=path,
                         parse_kv_cache=parse_kv_cache,
                         shard_pattern=shard_pattern,
@@ -365,7 +371,7 @@ async def arun(
             )
 
     if "model.safetensors" in file_paths:
-        url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors"
+        url = f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/model.safetensors"
         raw_metadata = await fetch_safetensors_metadata(client=client, url=url, headers=headers)
 
         if "config_sentence_transformers.json" in file_paths:
@@ -374,7 +380,7 @@ async def arun(
                 if "modules.json" not in file_paths
                 else await fetch_modules_and_dense_metadata(
                     client=client,
-                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                    url=f"https://huggingface.co/{model_id}/resolve/{revision_encoded}",
                     headers=headers,
                 )
             )
@@ -389,11 +395,11 @@ async def arun(
     elif "model.safetensors.index.json" in file_paths:
         # TODO: We could eventually skip this request in favour of a greedy approach on trying to pull all the
         # files following the formatting `model-00000-of-00000.safetensors`
-        url = f"https://huggingface.co/{model_id}/resolve/{revision}/model.safetensors.index.json"
+        url = f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/model.safetensors.index.json"
         files_index = await get_json_file(client=client, url=url, headers=headers)
 
         urls = {
-            f"https://huggingface.co/{model_id}/resolve/{revision}/{f}"
+            f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{f}"
             for f in set(files_index["weight_map"].values())
         }
 
@@ -414,7 +420,7 @@ async def arun(
                 if "modules.json" not in file_paths
                 else await fetch_modules_and_dense_metadata(
                     client=client,
-                    url=f"https://huggingface.co/{model_id}/resolve/{revision}",
+                    url=f"https://huggingface.co/{model_id}/resolve/{revision_encoded}",
                     headers=headers,
                 )
             )
@@ -425,7 +431,7 @@ async def arun(
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
 
     elif "model_index.json" in file_paths:
-        url = f"https://huggingface.co/{model_id}/resolve/{revision}/model_index.json"
+        url = f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/model_index.json"
         files_index = await get_json_file(client=client, url=url, headers=headers)
         paths = {k for k, _ in files_index.items() if not k.startswith("_")}
 
@@ -433,26 +439,24 @@ async def arun(
         for path in paths:
             if f"{path}/diffusion_pytorch_model.safetensors" in file_paths:
                 path_urls[path] = [
-                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors"
+                    f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}/diffusion_pytorch_model.safetensors"
                 ]
             elif f"{path}/model.safetensors" in file_paths:
                 path_urls[path] = [
-                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors"
+                    f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}/model.safetensors"
                 ]
             elif f"{path}/diffusion_pytorch_model.safetensors.index.json" in file_paths:
-                url = f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/diffusion_pytorch_model.safetensors.index.json"
+                url = f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}/diffusion_pytorch_model.safetensors.index.json"
                 files_index = await get_json_file(client=client, url=url, headers=headers)
                 path_urls[path] = [
-                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
+                    f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}/{f}"
                     for f in set(files_index["weight_map"].values())
                 ]
             elif f"{path}/model.safetensors.index.json" in file_paths:
-                url = (
-                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/model.safetensors.index.json"
-                )
+                url = f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}/model.safetensors.index.json"
                 files_index = await get_json_file(client=client, url=url, headers=headers)
                 path_urls[path] = [
-                    f"https://huggingface.co/{model_id}/resolve/{revision}/{path}/{f}"
+                    f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}/{f}"
                     for f in set(files_index["weight_map"].values())
                 ]
 
@@ -486,7 +490,7 @@ async def arun(
     kv_cache_cls: KvCache | None = None
     moe_metadata: MoEMetadata | None = None
     if experimental and "config.json" in file_paths:
-        url = f"https://huggingface.co/{model_id}/resolve/{revision}/config.json"
+        url = f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/config.json"
         config: Dict[str, Any] = await get_json_file(client, url, headers)
 
         if not any(
@@ -507,7 +511,9 @@ async def arun(
                 text_config = config["text_config"]
 
                 if referenced_model := text_config.get("_name_or_path"):
-                    referenced_url = f"https://huggingface.co/{referenced_model}/resolve/{revision}/config.json"
+                    referenced_url = (
+                        f"https://huggingface.co/{referenced_model}/resolve/{revision_encoded}/config.json"
+                    )
                     warnings.warn(
                         f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
                     )

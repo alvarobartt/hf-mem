@@ -55,7 +55,7 @@ async def fetch_gguf_with_semaphore(
     semaphore: asyncio.Semaphore,
     client: httpx.AsyncClient,
     model_id: str,
-    revision: str,
+    revision_encoded: str,
     path: str,
     parse_kv_cache: bool,
     shard_pattern: re.Match | None,
@@ -67,7 +67,7 @@ async def fetch_gguf_with_semaphore(
     async with semaphore:
         metadata = await fetch_gguf_metadata(
             client=client,
-            url=f"https://huggingface.co/{model_id}/resolve/{revision}/{path}",
+            url=f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}",
             experimental=parse_kv_cache,
             max_model_len=max_model_len,
             kv_cache_dtype=kv_cache_dtype,
