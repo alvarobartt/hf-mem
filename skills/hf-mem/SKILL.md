@@ -1,49 +1,51 @@
 ---
 name: hf-mem
-description: CLI to estimate the required memory to load either Safetensors or GGUF model weights for inference from the Hugging Face Hub
+description: Hugging Face CLI to estimate the required memory to load Safetensors or GGUF model weights for inference from the Hugging Face Hub
 license: mit
 ---
 
-# hf-mem
+`hf_mem` estimates the required memory for inference, including model weights and an optional KV cache, for Safetensors and GGUF for models on the Hugging Face Hub using HTTP Range requests i.e., without downloading or loading any weights locally.
 
-Estimates inference memory (model weights + optional KV cache) for models on the Hugging Face Hub using HTTP Range requests; no weights are downloaded.
-
-## When to use
+## When to use?
 
 - User asks how much VRAM or memory a model needs to run
 - User wants to know if a model fits on their GPU or a given instance
 - User references a Hugging Face model ID or URL and asks about inference requirements
 - User asks about activation memory or warmup memory for a model
 
-## Requirements
+## What are the requirements?
 
 - `uv` installed (for `uvx`)
-- `HF_TOKEN` env var or `--hf-token` flag (gated/private models only)
+- `HF_TOKEN` env var or `--hf-token` flag (for gated or private models only)
 
-## Safetensors models
+## How to run?
 
-Auto-detected when the repo contains `model.safetensors`, `model.safetensors.index.json`, or `model_index.json`. Covers Transformers, Diffusers, and Sentence Transformers; no extra flags needed.
+Run with `--model-id` pointing to the Hugging Face Hub repository which will check that it either contains Safetensors (via `model.safetensors`, `model.safetensors.index.json` if sharded, or `model_index.json` for Diffusers) or GGUF model weights within.
 
 ```bash
-uvx hf-mem --model-id <org/model>
+uvx hf-mem --model-id <model-id> --json-output
 ```
 
-## GGUF models
-
-Auto-detected when the repo contains only `.gguf` files. When both Safetensors and GGUF files coexist, pass `--gguf-file` to target a specific file. Any shard path works for sharded models.
+If the repository contains GGUF model weights in multiple precisions / quantizations, the estimations will be on a per-file basis, whereas for inference you won't load all of those but rather only a single precision. This being said, for GGUF you might as well need to provide `--gguf-file` to target the specific file (or path if sharded) you want to run.
 
 ```bash
-uvx hf-mem --model-id <org/model> --gguf-file <path-in-repo>
+uvx hf-mem --model-id <model-id> --gguf-file <file-or-path> --json-output
 ```
 
-## KV cache estimation (`--experimental`)
+Additionally, `hf-mem` comes with an `--experimental` flag that will also calculate the KV cache memory requirements too, useful for large-language models, meaning it applies to LLMs (`...ForCausalLM`), VLMs (`...ForConditionalGeneration`), and GGUF models.
 
-Adds KV cache memory on top of weights. Applies to LLMs (`...ForCausalLM`), VLMs (`...ForConditionalGeneration`), and GGUF models. Reads `max_model_len` from `config.json` by default; override with `--max-model-len`. KV cache dtype defaults to `auto` (reads `torch_dtype`/`dtype` from `config.json`, or the FP8 quantization format if applicable; for GGUF `auto` = `F16`).
+As per the context window, it will be read from the default or overridden with `--max-model-len` a la vLLM. And, same goes for the KV cache precision, which will default to the model precision unless manually set via `--kv-cache-dtype` a la vLLM too.
+
+For Safetensors use as:
 
 ```bash
-uvx hf-mem --model-id <org/model> [--gguf-file <path>] \
-  --experimental [--max-model-len N] [--batch-size N] \
-  [--kv-cache-dtype auto|bfloat16|fp8|fp8_e4m3|fp8_e5m2]
+uvx hf-mem --model-id <model-id> --experimental [--max-model-len N] [--batch-size N] [--kv-cache-dtype auto|bfloat16|fp8|fp8_ds_mla|fp8_e4m3|fp8_e5m2|fp8_inc] --json-output
+```
+
+And, for GGUF use as:
+
+```bash
+uvx hf-mem --model-id <model-id> --gguf-file <file-or-path> --experimental [--max-model-len N] [--batch-size N] [--kv-cache-dtype auto|F32|F16|Q4_0|Q4_1|Q5_0|Q5_1|Q8_0|Q8_1|Q2_K|Q3_K|Q4_K|Q5_K|Q6_K|Q8_K|IQ2_XXS|IQ2_XS|IQ3_XXS|IQ1_S|IQ4_NL|IQ3_S|IQ2_S|IQ4_XS|I8|I16|I32|I64|F64|IQ1_M|BF16|TQ1_0|TQ2_0|MXFP4] --json-output
 ```
 
 ## Warmup peak memory (`--max-num-batched-tokens`)
@@ -56,27 +58,32 @@ uvx hf-mem --model-id <org/model> --max-num-batched-tokens 8192 [--batch-size N]
 
 ## Examples
 
+For Transformers with Safetensors weights:
+
 ```bash
-# Transformers
-uvx hf-mem --model-id MiniMaxAI/MiniMax-M2
-
-# Diffusers
-uvx hf-mem --model-id Qwen/Qwen-Image
-
-# Sentence Transformers
-uvx hf-mem --model-id google/embeddinggemma-300m
-
-# LLM with KV cache
-uvx hf-mem --model-id mistralai/Mistral-7B-v0.1 --experimental
-
-# GGUF with KV cache (sharded)
-uvx hf-mem --model-id unsloth/Qwen3.5-397B-A17B-GGUF \
-  --gguf-file Q4_K_M/Qwen3.5-397B-A17B-Q4_K_M-00001-of-00006.gguf \
-  --experimental
+uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --json-output
 ```
 
-## Errors
+For Diffusers with Safetensors weights:
 
-- **HTTP 401**: the model is gated or private; provide `HF_TOKEN` or `--hf-token`.
-- **HTTP 404**: the model ID not found on the Hub.
-- **RuntimeError**: no supported weight format found, or `--gguf-file` path doesn't match any file in the repository.
+```bash
+uvx hf-mem --model-id Qwen/Qwen-Image --json-output
+```
+
+For Sentence Transformers with Safetensors weights:
+
+```bash
+uvx hf-mem --model-id google/embeddinggemma-300m --json-output
+```
+
+With `--experimental` to include the KV cache estimation for LLMs and VLMs:
+
+```bash
+uvx hf-mem --model-id mistralai/Mistral-7B-v0.1 --experimental --json-output
+```
+
+And, for LLMs or VLMs with GGUF weights:
+
+```bash
+uvx hf-mem --model-id unsloth/Qwen3.5-397B-A17B-GGUF --gguf-file Q4_K_M --experimental --json-output
+```
