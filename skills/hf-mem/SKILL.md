@@ -11,6 +11,7 @@ license: mit
 - User asks how much VRAM or memory a model needs to run
 - User wants to know if a model fits on their GPU or a given instance
 - User references a Hugging Face model ID or URL and asks about inference requirements
+- User asks about activation memory or warmup memory for a model
 
 ## What are the requirements?
 
@@ -45,6 +46,14 @@ And, for GGUF use as:
 
 ```bash
 uvx hf-mem --model-id <model-id> --gguf-file <file-or-path> --experimental [--max-model-len N] [--batch-size N] [--kv-cache-dtype auto|F32|F16|Q4_0|Q4_1|Q5_0|Q5_1|Q8_0|Q8_1|Q2_K|Q3_K|Q4_K|Q5_K|Q6_K|Q8_K|IQ2_XXS|IQ2_XS|IQ3_XXS|IQ1_S|IQ4_NL|IQ3_S|IQ2_S|IQ4_XS|I8|I16|I32|I64|F64|IQ1_M|BF16|TQ1_0|TQ2_0|MXFP4] --json-output
+```
+
+## Warmup peak memory (`--max-num-batched-tokens`)
+
+Estimates peak activation memory during a single warmup forward pass (vLLM `profile_run` / TEI warmup analog). Works for causal LMs, VLMs, masked LMs, sequence/token classifiers, base encoders, and Sentence Transformers. Independent of `--experimental`. Reuses `--batch-size` as `max_num_seqs`. Not supported for GGUF.
+
+```bash
+uvx hf-mem --model-id <org/model> --max-num-batched-tokens 8192 [--batch-size N]
 ```
 
 ## Examples
