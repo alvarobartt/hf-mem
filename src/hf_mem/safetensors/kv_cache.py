@@ -157,13 +157,17 @@ def compute_safetensors_kv_cache_size(
     # making the fallback `hidden_size // num_attention_heads` incorrect for those models
     head_dim: int = config.get("head_dim", hidden_size // num_attention_heads)
 
-    # NOTE: For hybrid attention models full-attention layers grow with `max_model_len` while
-    # sliding-window layers reuse a fixed-size buffer capped at `sliding_window`; so we sum the
-    # per-layer token counts (`max_model_len` for full-attention, `min(sliding_window, max_model_len)`
-    # for sliding-window) instead of multiplying a single layer count by `max_model_len`.
+    # NOTE: Full-attention layers always grow with `max_model_len`. Sliding-window layers depend
+    # on the regime: in a *hybrid* model (mix of full + sliding layers) inference engines commonly
+    # unify KV page sizes across layer groups, so sliding layers reserve full-size pages and
+    # effectively cost `max_model_len` tokens too; in a *pure* sliding-window model they stay capped
+    # at `min(sliding_window, max_model_len)`. We report the reserved (upper-bound) footprint so the
+    # estimate does not under-count what actually gets allocated for long contexts.
     num_full_layers, num_sliding_layers = _resolve_attention_layer_counts(config)
     sliding_window = config.get("sliding_window") or max_model_len
-    total_kv_tokens = num_full_layers * max_model_len + num_sliding_layers * min(sliding_window, max_model_len)
+    is_hybrid = num_full_layers > 0 and num_sliding_layers > 0
+    sliding_tokens = max_model_len if is_hybrid else min(sliding_window, max_model_len)
+    total_kv_tokens = num_full_layers * max_model_len + num_sliding_layers * sliding_tokens
 
     return (
         # NOTE: 2 because it applies to both key and value projections
