@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Tuple, Union
 from urllib.parse import quote
 from uuid import uuid4
 
-import httpx
+import httpx2
 
 from hf_mem._fetch import get_json_file
 from hf_mem._types import KvCache
@@ -248,12 +248,12 @@ async def arun(
             with open(filename, "r", encoding="utf-8") as f:
                 headers["Authorization"] = f"Bearer {f.read().strip()}"
 
-    client = httpx.AsyncClient(
-        limits=httpx.Limits(
+    client = httpx2.AsyncClient(
+        limits=httpx2.Limits(
             max_keepalive_connections=MAX_CONCURRENCY,
             max_connections=MAX_CONCURRENCY,
         ),
-        timeout=httpx.Timeout(30.0),
+        timeout=httpx2.Timeout(30.0),
         # NOTE: HTTP/2 for header-compression and connection multiplexing
         http2=True,
         follow_redirects=True,
