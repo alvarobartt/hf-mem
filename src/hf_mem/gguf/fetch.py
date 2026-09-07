@@ -3,7 +3,7 @@ import re
 import struct
 from typing import Dict, Tuple
 
-import httpx
+import httpx2
 
 from hf_mem._fetch import REQUEST_TIMEOUT
 from hf_mem.gguf.metadata import GGUFMetadata, parse_gguf_metadata
@@ -15,7 +15,7 @@ _MAX_FETCH_SIZE = 100_000_000  # 100 MB
 
 
 async def fetch_gguf_metadata(
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     url: str,
     experimental: bool = False,
     max_model_len: int | None = None,
@@ -53,7 +53,7 @@ async def fetch_gguf_metadata(
 
 async def fetch_gguf_with_semaphore(
     semaphore: asyncio.Semaphore,
-    client: httpx.AsyncClient,
+    client: httpx2.AsyncClient,
     model_id: str,
     revision_encoded: str,
     path: str,

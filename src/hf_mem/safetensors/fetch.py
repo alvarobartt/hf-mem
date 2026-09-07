@@ -2,7 +2,7 @@ import json
 import struct
 from typing import Any, Dict
 
-import httpx
+import httpx2
 
 from hf_mem._fetch import REQUEST_TIMEOUT, get_json_file  # noqa: F401
 
@@ -12,7 +12,7 @@ MAX_METADATA_SIZE = 100_000
 
 
 async def fetch_safetensors_metadata(
-    client: httpx.AsyncClient, url: str, headers: Dict[str, str] | None = None
+    client: httpx2.AsyncClient, url: str, headers: Dict[str, str] | None = None
 ) -> Dict[str, Any]:
     headers = {"Range": f"bytes=0-{MAX_METADATA_SIZE}", **(headers or {})}
     response = await client.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
@@ -39,7 +39,7 @@ async def fetch_safetensors_metadata(
 
 
 async def fetch_modules_and_dense_metadata(
-    client: httpx.AsyncClient, url: str, headers: Dict[str, str] | None
+    client: httpx2.AsyncClient, url: str, headers: Dict[str, str] | None
 ) -> Dict[str, Any]:
     dense_metadata = {}
 
