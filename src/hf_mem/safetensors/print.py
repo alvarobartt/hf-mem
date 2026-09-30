@@ -12,7 +12,7 @@ from hf_mem._print import (
     _print_header,
     _print_row,
 )
-from hf_mem._types import KvCache
+from hf_mem._types import KvCache, WarmupPeak
 from hf_mem._version import __version__
 from hf_mem.safetensors.metadata import MoEMetadata, SafetensorsMetadata
 
@@ -31,8 +31,13 @@ def print_safetensors_report(
     metadata: SafetensorsMetadata,
     kv_cache: KvCache | None = None,
     moe: MoEMetadata | None = None,
+    warmup_peak: WarmupPeak | None = None,
 ) -> None:
-    combined_total = metadata.bytes_count + kv_cache.cache_size if kv_cache else metadata.bytes_count
+    combined_total = (
+        metadata.bytes_count
+        + (kv_cache.cache_size if kv_cache else 0)
+        + (warmup_peak.peak_bytes if warmup_peak else 0)
+    )
     model_total = metadata.bytes_count
 
     centered_rows = [
@@ -41,18 +46,26 @@ def print_safetensors_report(
     ]
     if kv_cache:
         centered_rows.append(f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}")
+    if warmup_peak:
+        centered_rows.append(
+            f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, max-num-seqs={warmup_peak.max_num_seqs}"
+        )
     for name, nested_metadata in metadata.components.items():
         if len(metadata.components) > 1:
             centered_rows.append(
                 f"{name.upper()} ({_format_short_number(nested_metadata.param_count)} PARAMS, {_bytes_to_gib(nested_metadata.bytes_count):.2f} GiB)"
             )
-        elif kv_cache:
+        elif kv_cache or warmup_peak:
             centered_rows.append(
                 f"MODEL ({_format_short_number(nested_metadata.param_count)} PARAMS, {_bytes_to_gib(nested_metadata.bytes_count):.2f} GiB)"
             )
     if kv_cache:
         centered_rows.append(
             f"KV CACHE ({kv_cache.max_model_len * kv_cache.batch_size} TOKENS, {_bytes_to_gib(kv_cache.cache_size):.2f} GiB)"
+        )
+    if warmup_peak:
+        centered_rows.append(
+            f"WARMUP PEAK ({warmup_peak.max_num_batched_tokens} TOKENS, {_bytes_to_gib(warmup_peak.peak_bytes):.2f} GiB)"
         )
     if moe:
         moe_rows = [
@@ -67,10 +80,16 @@ def print_safetensors_report(
         ]
         centered_rows.extend(moe_rows)
 
-    data_rows = []
+    extras = []
     if kv_cache:
+        extras.append("KV CACHE")
+    if warmup_peak:
+        extras.append("WARMUP PEAK")
+
+    data_rows = []
+    if extras:
         data_rows.append(
-            f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
+            f"{_bytes_to_gib(combined_total):.2f} GiB ({_format_short_number(metadata.param_count)} PARAMS + {' + '.join(extras)})"
         )
     else:
         data_rows.append(
@@ -99,6 +118,10 @@ def print_safetensors_report(
             )
     if kv_cache:
         data_rows.append(f"{_bytes_to_gib(kv_cache.cache_size):.2f} / {_bytes_to_gib(combined_total):.2f} GiB")
+    if warmup_peak:
+        data_rows.append(
+            f"{_bytes_to_gib(warmup_peak.peak_bytes):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+        )
 
     max_centered_len = max(len(r) for r in centered_rows)
     max_data_len = max(len(r) for r in data_rows)
@@ -122,12 +145,17 @@ def print_safetensors_report(
             f"w/ max-model-len={kv_cache.max_model_len}, batch-size={kv_cache.batch_size}",
             current_len,
         )
+    if warmup_peak:
+        _print_centered(
+            f"w/ max-num-batched-tokens={warmup_peak.max_num_batched_tokens}, max-num-seqs={warmup_peak.max_num_seqs}",
+            current_len,
+        )
     _print_divider(data_col_width + 1, "top")
 
-    if kv_cache:
+    if extras:
         total_text = (
             f"{_bytes_to_gib(combined_total):.2f} GiB "
-            f"({_format_short_number(metadata.param_count)} PARAMS + KV CACHE)"
+            f"({_format_short_number(metadata.param_count)} PARAMS + {' + '.join(extras)})"
         )
         total_bar = _make_bar(combined_total, combined_total, data_col_width)
         _print_row("TOTAL MEMORY", total_text, data_col_width)
@@ -213,7 +241,7 @@ def print_safetensors_report(
                 current_len,
             )
             _print_divider(data_col_width + 1, "top")
-        elif kv_cache:
+        elif kv_cache or warmup_peak:
             _print_divider(data_col_width + 1, "top-continue")
             _print_centered(
                 f"MODEL ({_format_short_number(value.param_count)} PARAMS, {_bytes_to_gib(value.bytes_count):.2f} GiB)",
@@ -271,6 +299,29 @@ def print_safetensors_report(
         _print_row(
             f"{kv_cache.max_model_len * kv_cache.batch_size} TOKENS",
             kv_bar,
+            data_col_width,
+        )
+
+    if warmup_peak:
+        _print_divider(data_col_width + 1, "top-continue")
+        _print_centered(
+            f"WARMUP PEAK ({warmup_peak.max_num_batched_tokens} TOKENS, {_bytes_to_gib(warmup_peak.peak_bytes):.2f} GiB)",
+            current_len,
+        )
+        _print_divider(data_col_width + 1, "top")
+
+        wp_dtype_label = (warmup_peak.activation_dtype or "?").upper()
+        wp_text = f"{_bytes_to_gib(warmup_peak.peak_bytes):.2f} / {_bytes_to_gib(combined_total):.2f} GiB"
+        _print_row(
+            wp_dtype_label + " " * max(0, max_length - len(wp_dtype_label)),
+            wp_text,
+            data_col_width,
+        )
+
+        wp_bar = _make_bar(warmup_peak.peak_bytes, combined_total, data_col_width)
+        _print_row(
+            f"{warmup_peak.max_num_batched_tokens} TOKENS",
+            wp_bar,
             data_col_width,
         )
 

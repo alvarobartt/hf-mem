@@ -20,6 +20,7 @@ def _print_result(result: Result) -> None:
             metadata=result.safetensors,
             kv_cache=result.kv_cache_metadata,
             moe=result.moe_metadata,
+            warmup_peak=result.warmup_peak_metadata,
         )
         return
 
@@ -80,7 +81,24 @@ def main() -> None:
         "--batch-size",
         type=int,
         default=1,
-        help="Batch size to help estimate the required RAM for caching when running the inference. Defaults to 1.",
+        help=(
+            "Concurrent sequence count. Used for both KV cache sizing "
+            "(under --experimental) and as the `max_num_seqs` cap for the warmup peak "
+            "LM head spike (when --max-num-batched-tokens is set). Defaults to 1."
+        ),
+    )
+    parser.add_argument(
+        "--max-num-batched-tokens",
+        type=int,
+        default=None,
+        # NOTE: https://docs.vllm.ai/en/stable/configuration/engine_args/#-max-num-batched-tokens
+        help=(
+            "Total tokens in a batched warmup forward pass. When set, hf-mem computes "
+            "an activation-peak memory estimate analogous to vLLM's profile_run / TEI's "
+            "warmup. For LM head sizing, --batch-size is reused as max_num_seqs. Has no "
+            "effect for GGUF files. Suggested values: 8192 (vLLM online default), "
+            "16384 (TEI default). Defaults to None (skip the estimate)."
+        ),
     )
     parser.add_argument(
         "--kv-cache-dtype",
@@ -115,7 +133,13 @@ def main() -> None:
 
     if args.experimental:
         warnings.warn(
-            "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
+            "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind. Warmup peak activation memory is controlled separately via `--max-num-batched-tokens`."
+        )
+
+    if args.max_num_batched_tokens is not None and args.gguf_file is not None:
+        warnings.warn(
+            "`--max-num-batched-tokens` has no effect when combined with `--gguf-file`; "
+            "warmup peak is not computed for GGUF files."
         )
 
     if args.ignore_table_width:
@@ -139,8 +163,15 @@ def main() -> None:
             kv_cache_dtype=args.kv_cache_dtype,
             gguf_file=args.gguf_file,
             details=args.details,
+            max_num_batched_tokens=args.max_num_batched_tokens,
         )
     )
+
+    if result.gguf_files is not None and args.max_num_batched_tokens is not None and args.gguf_file is None:
+        warnings.warn(
+            "`--max-num-batched-tokens` has no effect for GGUF-only repos; "
+            "warmup peak is not computed for GGUF files."
+        )
 
     if args.json_output:
         print(json.dumps(result.to_json()))
