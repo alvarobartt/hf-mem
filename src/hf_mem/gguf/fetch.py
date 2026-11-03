@@ -6,7 +6,7 @@ from typing import Dict, Tuple
 
 import httpx2
 
-from hf_mem._fetch import REQUEST_TIMEOUT
+from hf_mem._fetch import REQUEST_TIMEOUT, raise_for_status
 from hf_mem.gguf.metadata import GGUFMetadata, parse_gguf_metadata
 
 # NOTE: Start with 1 MB; this is sufficient for the metadata of most GGUF models.
@@ -33,7 +33,7 @@ async def fetch_gguf_metadata(
         try:
             request_headers = {"Range": f"bytes=0-{size}", **(headers or {})}
             response = await client.get(url, headers=request_headers, timeout=REQUEST_TIMEOUT)
-            response.raise_for_status()
+            raise_for_status(response)
             raw_metadata = response.read()
             content_range = response.headers.get("content-range", "")
             file_size = int(content_range.rsplit("/", 1)[-1]) if "/" in content_range else len(raw_metadata)

@@ -3,6 +3,8 @@ import asyncio
 import json
 import warnings
 
+import httpx2
+
 from hf_mem.gguf.print import print_gguf_files_report, print_gguf_report
 from hf_mem.gguf.types import GGUFDtype
 from hf_mem.run import Result, arun
@@ -124,23 +126,26 @@ def main() -> None:
         )
 
     if args.kv_cache_dtype not in VALID_KV_CACHE_DTYPES:
-        raise RuntimeError(
+        parser.error(
             f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {VALID_KV_CACHE_DTYPES}."
         )
 
-    result = asyncio.run(
-        arun(
-            model_id=args.model_id,
-            revision=args.revision,
-            hf_token=args.hf_token,
-            experimental=args.experimental,
-            max_model_len=args.max_model_len,
-            batch_size=args.batch_size,
-            kv_cache_dtype=args.kv_cache_dtype,
-            gguf_file=args.gguf_file,
-            details=args.details,
+    try:
+        result = asyncio.run(
+            arun(
+                model_id=args.model_id,
+                revision=args.revision,
+                hf_token=args.hf_token,
+                experimental=args.experimental,
+                max_model_len=args.max_model_len,
+                batch_size=args.batch_size,
+                kv_cache_dtype=args.kv_cache_dtype,
+                gguf_file=args.gguf_file,
+                details=args.details,
+            )
         )
-    )
+    except (RuntimeError, httpx2.HTTPError) as e:
+        parser.exit(1, f"hf-mem: error: {e}\n")
 
     if args.json_output:
         print(json.dumps(result.to_json()))

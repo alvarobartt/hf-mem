@@ -169,8 +169,7 @@ def compute_safetensors_kv_cache_size(
     sliding_tokens = max_model_len if is_hybrid else min(sliding_window, max_model_len)
     total_kv_tokens = num_full_layers * max_model_len + num_sliding_layers * sliding_tokens
 
-    return (
-        # NOTE: 2 because it applies to both key and value projections
+    return int(
         2
         * total_kv_tokens
         * num_key_value_heads

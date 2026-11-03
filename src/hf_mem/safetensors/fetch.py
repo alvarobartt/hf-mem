@@ -4,7 +4,7 @@ from typing import Any, Dict
 
 import httpx2
 
-from hf_mem._fetch import REQUEST_TIMEOUT, get_json_file  # noqa: F401
+from hf_mem._fetch import REQUEST_TIMEOUT, get_json_file, raise_for_status  # noqa: F401
 
 # NOTE: Defines the bytes that will be fetched per safetensors file; the metadata can exceed this
 # limit, in which case a second ranged request fetches the remainder
@@ -16,7 +16,7 @@ async def fetch_safetensors_metadata(
 ) -> Dict[str, Any]:
     headers = {"Range": f"bytes=0-{MAX_METADATA_SIZE}", **(headers or {})}
     response = await client.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
+    raise_for_status(response)
 
     metadata = response.read()
     # NOTE: Parse the first 8 bytes as a little-endian uint64 (size of the metadata)
@@ -32,7 +32,7 @@ async def fetch_safetensors_metadata(
     headers["Range"] = f"bytes={MAX_METADATA_SIZE + 1}-{metadata_size + 7}"
 
     response = await client.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-    response.raise_for_status()
+    raise_for_status(response)
 
     metadata += response.read()
     return json.loads(metadata)
