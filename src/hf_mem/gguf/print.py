@@ -1,4 +1,3 @@
-import warnings
 from typing import Dict
 
 from hf_mem._print import (
@@ -71,11 +70,6 @@ def print_gguf_report(
 
     min_width_for_data = MAX_NAME_LEN + max_data_len + 5
     max_len = max(max_centered_len, min_width_for_data)
-
-    if max_len > MAX_DATA_LEN:
-        warnings.warn(
-            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views."
-        )
 
     current_len = max_len
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - MAX_NAME_LEN - 5
@@ -216,11 +210,6 @@ def print_gguf_files_report(
     min_width_for_data = max_name_length + max_data_text_len + 5
     max_centered_len = max(max(len(r) for r in centered_rows), len("FILES"))
     max_len = max(max_centered_len, min_width_for_data)
-
-    if max_len > MAX_DATA_LEN:
-        warnings.warn(
-            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views."
-        )
 
     current_len = max_len
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - max_name_length - 5
