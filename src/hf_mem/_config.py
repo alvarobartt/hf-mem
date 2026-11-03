@@ -210,7 +210,11 @@ def kv_heads(config: dict[str, Any]) -> int:
     config = normalize(config)
     if config.get("kv_lora_rank"):
         return 1
-    return config["num_key_value_heads"] or config["num_attention_heads"]
+    return (
+        config.get("num_global_key_value_heads")
+        or config["num_key_value_heads"]
+        or config["num_attention_heads"]
+    )
 
 
 def kv_cache(
