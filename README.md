@@ -101,7 +101,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 --json
 
 - `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
 - `components` (per Diffusers component or file), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are added when they apply.
-- `format` is `safetensors`, `gguf`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt` or `.nemo` weights.
+- `format` is `safetensors`, `gguf`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt`, `.nemo` or `.onnx` weights.
 - GGUF listings return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
 
 ### Python
@@ -139,7 +139,7 @@ hf extensions add alvarobartt/hf-mem
   - `cuda_graphs`: the CUDA graphs captured for decoding, as estimated by vLLM before sizing the KV cache.
   - `non_torch` and `cuda_context`: attention, cuBLAS and NCCL workspaces, and the CUDA context, which vLLM keeps outside `--gpu-memory-utilization`.
 
-  vLLM sizes these for two profiles: 8192 batched tokens and 1024 sequences on GPUs with 70 GiB or more, or 2048 tokens and 256 sequences on smaller GPUs and A100s. hf-mem follows `--gpu-memory`, or `--max-num-batched-tokens` (e.g. 2048 on A100).
+  vLLM picks its batching by GPU memory, not architecture: 16384 batched tokens on GPUs with 160 GiB or more (e.g. B200), 8192 tokens on GPUs with 70 GiB or more (e.g. H100, H200), and 2048 tokens with 256 sequences on smaller GPUs and on A100s, which are excluded by name. hf-mem follows `--gpu-memory`, or `--max-num-batched-tokens` (e.g. 2048 on A100). With the same batching, only the CUDA graphs differ between architectures (up to 0.5 GiB more on Hopper than on Ampere).
 
 The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4, A10G, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs), with llama.cpp, and with Diffusers and Sentence Transformers, on 40+ LLMs, MoEs, hybrid, vision, audio and omni models.
 
@@ -154,7 +154,7 @@ The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4
 
 ```bash
 uv run --group test pytest
-uv run --group lint pre-commit run --all-files
+uv run --group lint pre-commit run --all-files  # ruff and mypy
 ```
 
 ## References
