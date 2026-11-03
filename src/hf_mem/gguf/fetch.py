@@ -1,6 +1,7 @@
 import asyncio
 import re
 import struct
+import warnings
 from typing import Dict, Tuple
 
 import httpx2
@@ -33,13 +34,17 @@ async def fetch_gguf_metadata(
             request_headers = {"Range": f"bytes=0-{size}", **(headers or {})}
             response = await client.get(url, headers=request_headers, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
+            raw_metadata = response.read()
+            content_range = response.headers.get("content-range", "")
+            file_size = int(content_range.rsplit("/", 1)[-1]) if "/" in content_range else len(raw_metadata)
 
             return parse_gguf_metadata(
-                raw_metadata=response.read(),
+                raw_metadata=raw_metadata,
                 experimental=experimental,
                 max_model_len=max_model_len,
                 kv_cache_dtype=kv_cache_dtype,
                 batch_size=batch_size,
+                file_size=file_size,
             )
 
         except (struct.error, UnicodeDecodeError):
@@ -63,15 +68,22 @@ async def fetch_gguf_with_semaphore(
     kv_cache_dtype: str = "F16",
     batch_size: int = 1,
     headers: Dict[str, str] | None = None,
-) -> Tuple[str, GGUFMetadata, re.Match | None]:
+    skip_invalid: bool = False,
+) -> Tuple[str, GGUFMetadata | None, re.Match | None]:
     async with semaphore:
-        metadata = await fetch_gguf_metadata(
-            client=client,
-            url=f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}",
-            experimental=parse_kv_cache,
-            max_model_len=max_model_len,
-            kv_cache_dtype=kv_cache_dtype,
-            batch_size=batch_size,
-            headers=headers,
-        )
+        try:
+            metadata = await fetch_gguf_metadata(
+                client=client,
+                url=f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}",
+                experimental=parse_kv_cache,
+                max_model_len=max_model_len,
+                kv_cache_dtype=kv_cache_dtype,
+                batch_size=batch_size,
+                headers=headers,
+            )
+        except RuntimeError as e:
+            if not skip_invalid:
+                raise
+            warnings.warn(f"Skipping `{path}`: {e}")
+            metadata = None
         return (str(path), metadata, shard_pattern)
