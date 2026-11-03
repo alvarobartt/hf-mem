@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from hf_mem._types import KvCache
 from hf_mem._version import __version__
-from hf_mem.gguf.kv_cache import KV_CACHE_FIELD_ENDINGS, compute_gguf_kv_cache_size
+from hf_mem.gguf.kv_cache import compute_gguf_kv_cache_size
 from hf_mem.gguf.types import (
     _PARSERS,
     GGUFDtype,
@@ -106,8 +106,8 @@ def parse_gguf_metadata(
     max_model_len: int | None = None,
     kv_cache_dtype: str = "F16",
     batch_size: int = 1,
+    file_size: int | None = None,
 ) -> "GGUFMetadata":
-    # NOTE: Validate the GGUF magic number to fail fast on invalid or truncated files
     if raw_metadata[:4] != b"GGUF":
         raise RuntimeError("Not a valid GGUF file: magic number mismatch.")
 
@@ -125,35 +125,27 @@ def parse_gguf_metadata(
 
     kv_cache = None
     if experimental:
-        # NOTE: Extract only the fields needed for KV cache estimation, matched by suffix to be
-        # model-agnostic (e.g. "llama.block_count" -> "block_count")
-        kv_cache_dict = {
-            ending: kv_metadata[key]
-            for ending in KV_CACHE_FIELD_ENDINGS
-            for key in kv_metadata
-            if key.endswith(ending)
-        }
-        if max_model_len is not None:
-            kv_cache_dict["context_length"] = max_model_len
-
-        missing_fields = set(KV_CACHE_FIELD_ENDINGS) - set(kv_cache_dict.keys())
-        if missing_fields:
-            raise RuntimeError(
-                f"Incomplete KV cache metadata for size estimation. Missing fields: {missing_fields}"
-            )
-
-        kv_cache = KvCache(
-            max_model_len=kv_cache_dict["context_length"],
-            cache_size=compute_gguf_kv_cache_size(
-                kv_metadata=kv_cache_dict,
+        arch = kv_metadata.get("general.architecture")
+        context_length = max_model_len or kv_metadata.get(f"{arch}.context_length")
+        cache_size = (
+            compute_gguf_kv_cache_size(
+                kv_metadata=kv_metadata,
+                max_model_len=context_length,
                 kv_cache_dtype=kv_cache_dtype,
                 batch_size=batch_size,
-            ),
-            batch_size=batch_size,
-            cache_dtype=kv_cache_dtype,
+            )
+            if isinstance(context_length, int)
+            else None
         )
+        if cache_size is not None:
+            kv_cache = KvCache(
+                max_model_len=context_length,  # type: ignore[arg-type]
+                cache_size=cache_size,
+                batch_size=batch_size,
+                cache_dtype=kv_cache_dtype,
+            )
 
-    component = GGUFComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
+    tensors = []
     for _ in range(tensor_count):
         _, offset = _read_string(raw_metadata, offset)
         n_dimensions, offset = _read_uint32(raw_metadata, offset)
@@ -162,20 +154,26 @@ def parse_gguf_metadata(
             dim, offset = _read_uint64(raw_metadata, offset)
             dimensions.append(dim)
         tensor_type, offset = _read_uint32(raw_metadata, offset)
-        _, offset = _read_uint64(raw_metadata, offset)
+        data_offset, offset = _read_uint64(raw_metadata, offset)
+        tensors.append((data_offset, GGUFDtype(tensor_type), math.prod(dimensions)))
 
-        param_count = math.prod(dimensions)
-        bytes_count = int(GGUFDtypeBitsPerWeight[GGUFDtype(tensor_type)] / 8.0 * param_count)
+    alignment = kv_metadata.get("general.alignment", 32)
+    data_size = file_size - math.ceil(offset / alignment) * alignment if file_size else None
+    tensors.sort(key=lambda t: t[0])
+    ends = [t[0] for t in tensors[1:]] + [data_size]
 
-        if GGUFDtype(tensor_type) in component.dtypes:
-            dtype_meta = component.dtypes[GGUFDtype(tensor_type)]
-            dtype_meta.param_count += param_count
-            dtype_meta.bytes_count += bytes_count
+    component = GGUFComponentMetadata(dtypes={}, param_count=0, bytes_count=0)
+    for (data_offset, dtype, param_count), end in zip(tensors, ends):
+        if dtype in GGUFDtypeBitsPerWeight:
+            bytes_count = int(GGUFDtypeBitsPerWeight[dtype] / 8.0 * param_count)
+        elif end is not None:
+            bytes_count = end - data_offset
         else:
-            component.dtypes[GGUFDtype(tensor_type)] = DtypeMetadata(
-                param_count=param_count,
-                bytes_count=bytes_count,
-            )
+            raise RuntimeError(f"GGUF tensor type {dtype.name} is not supported.")
+
+        dtype_meta = component.dtypes.setdefault(dtype, DtypeMetadata(param_count=0, bytes_count=0))
+        dtype_meta.param_count += param_count
+        dtype_meta.bytes_count += bytes_count
         component.param_count += param_count
         component.bytes_count += bytes_count
 

@@ -46,6 +46,13 @@ class GGUFDtype(IntEnum):
     # IQ4_NL_8_8 = 38
     MXFP4 = 39
 
+    @classmethod
+    def _missing_(cls, value: object) -> "GGUFDtype":
+        member = int.__new__(cls, value)  # type: ignore[call-overload]
+        member._name_ = f"UNKNOWN_{value}"
+        member._value_ = value
+        return member
+
 
 # NOTE: Bits-per-weight for each GGUF dtype, used to compute byte sizes without storing all tensor data
 GGUFDtypeBitsPerWeight: Dict[GGUFDtype, float] = {

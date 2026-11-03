@@ -198,10 +198,12 @@ def _merge(dicts: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def _collect_gguf_results(
-    results: List[Tuple[str, GGUFMetadata, re.Match | None]],
+    results: List[Tuple[str, GGUFMetadata | None, re.Match | None]],
 ) -> Dict[str, GGUFMetadata]:
     gguf_files: Dict[str, GGUFMetadata] = {}
     for path, metadata, shard_pattern in results:
+        if metadata is None:
+            continue
         if shard_pattern:
             # NOTE: e.g., `base_name` is `Kimi-K2.5-BF16.gguf`
             base_name = shard_pattern.group(1) + ".gguf"
@@ -268,10 +270,11 @@ async def arun(
     files = await get_json_file(client=client, url=url, headers=headers)
     file_paths = [f["path"] for f in files if f.get("path") and f.get("type") == "file"]
 
-    # NOTE: Exclude the `mmproj-*` files as those are the multimodal projection and not the language model
-    # weights per se, so excluding those from the estimation (especifically when `--experimental`)
-    # See https://github.com/alvarobartt/hf-mem/issues/47
-    gguf_paths = [f for f in file_paths if str(f).endswith(".gguf") and not f.__contains__("mmproj-")]
+    gguf_paths = [
+        f
+        for f in file_paths
+        if f.endswith(".gguf") and not any(t in f.rsplit("/", 1)[-1].lower() for t in ("mmproj", "imatrix"))
+    ]
     has_safetensors = any(
         f in ["model.safetensors", "model.safetensors.index.json", "model_index.json"] for f in file_paths
     )
@@ -301,7 +304,9 @@ async def arun(
                     if re.match(rf"{re.escape(prefix)}-\d+-of-\d+\.gguf$", str(path))
                 ]
             else:
-                gguf_paths = [path for path in gguf_paths if str(path).endswith(gguf_file)]
+                gguf_paths = [
+                    path for path in gguf_paths if path == gguf_file or path.endswith(f"/{gguf_file}")
+                ]
                 if len(gguf_paths) > 1:
                     raise RuntimeError(
                         f"Multiple GGUF files named `{gguf_file}` found for {model_id} @ {revision}."
@@ -330,12 +335,15 @@ async def arun(
                         kv_cache_dtype=kv_cache_dtype or "auto",
                         batch_size=batch_size,
                         headers=headers,
+                        skip_invalid=gguf_file is None,
                     )
                 )
             )
 
         gguf_files_dict = _collect_gguf_results(await asyncio.gather(*tasks))
         await client.aclose()
+        if not gguf_files_dict:
+            raise RuntimeError(f"No valid GGUF files found for {model_id} @ {revision}.")
 
         if gguf_file is not None:
             single_filename = next(iter(gguf_files_dict))
