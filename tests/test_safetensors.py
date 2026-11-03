@@ -194,3 +194,13 @@ def test_local_file_reads_the_sibling_config(tmp_path):
 
     assert result.file == "model.safetensors"
     assert result.kv_cache is not None
+
+
+def test_mistral_params_json_warns(tmp_path):
+    write_safetensors(str(tmp_path / "consolidated.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "params.json"), {"dim": 64, "n_layers": 4})
+
+    result = run(str(tmp_path))
+
+    assert result.kv_cache is None
+    assert any("params.json" in w for w in result.warnings)
