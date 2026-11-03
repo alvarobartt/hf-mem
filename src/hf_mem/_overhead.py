@@ -78,7 +78,7 @@ def _tower_bytes(tower: dict[str, Any], positions: int) -> int:
 
 def _image_patches(config: dict[str, Any], vision: dict[str, Any], processor: dict[str, Any]) -> int:
     patch = vision.get("patch_size") or processor.get("patch_size") or 14
-    size = processor.get("size") if isinstance(processor.get("size"), dict) else {}
+    size: dict[str, Any] = processor["size"] if isinstance(processor.get("size"), dict) else {}
     pixels = processor.get("max_pixels") or (
         size.get("longest_edge") if (size.get("longest_edge") or 0) > 65536 else None
     )
@@ -99,8 +99,13 @@ def _image_patches(config: dict[str, Any], vision: dict[str, Any], processor: di
     return tiles * (side // patch) ** 2
 
 
+def _root(config: dict[str, Any]) -> dict[str, Any]:
+    thinker = config.get("thinker_config")
+    return thinker if isinstance(thinker, dict) else config
+
+
 def encoder(config: dict[str, Any], processor: dict[str, Any]) -> int:
-    root = config.get("thinker_config") if isinstance(config.get("thinker_config"), dict) else config
+    root = _root(config)
     vision, audio = root.get("vision_config"), root.get("audio_config")
     largest = 0
     if isinstance(vision, dict):
@@ -111,8 +116,8 @@ def encoder(config: dict[str, Any], processor: dict[str, Any]) -> int:
 
 
 def supports_video(config: dict[str, Any], files: Any) -> bool:
-    root = config.get("thinker_config") if isinstance(config.get("thinker_config"), dict) else config
-    vision = root.get("vision_config") if isinstance(root.get("vision_config"), dict) else {}
+    vision = _root(config).get("vision_config")
+    vision = vision if isinstance(vision, dict) else {}
     return bool(vision) and (
         "video_preprocessor_config.json" in files or bool(vision.get("temporal_patch_size"))
     )

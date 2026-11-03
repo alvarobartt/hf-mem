@@ -81,8 +81,8 @@ def _select(groups: dict[str, list[str]], file: str) -> dict[str, list[str]]:
 
 
 def _complete(paths: list[str]) -> bool:
-    totals = {m.group(1) if (m := _MODEL_SHARD.fullmatch(p)) else None for p in paths}
-    return len(totals) == 1 and None not in totals and int(totals.pop()) == len(paths)
+    totals = {m.group(1) if (m := _MODEL_SHARD.fullmatch(p)) else "" for p in paths}
+    return len(totals) == 1 and "" not in totals and int(next(iter(totals))) == len(paths)
 
 
 async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[str, list[str]]:
@@ -162,7 +162,7 @@ async def read_components(
     weights: dict[str, Weights] = {}
     experts: dict[str, dict[int, Weights]] = {}
     for name, component_paths in components.items():
-        component, merged = Weights(), {}
+        component, merged = Weights(), dict[int, Weights]()
         for path in component_paths:
             dtypes, by_expert = summaries[path]
             for dtype, (params, nbytes) in dtypes.items():

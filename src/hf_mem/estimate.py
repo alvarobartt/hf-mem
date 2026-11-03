@@ -127,7 +127,7 @@ def _fit(
     kv = estimate.kv_cache
     estimate.fit = _overhead.fit(
         weights=estimate.weights.bytes,
-        kv_fixed=(kv.bytes - slope * kv.max_model_len) if kv else 0,
+        kv_fixed=int(kv.bytes - slope * kv.max_model_len) if kv else 0,
         kv_per_token=slope,
         max_model_len=kv.max_model_len if kv else 0,
         context_length=context_length,
