@@ -2,7 +2,7 @@
 
 ---
 
-`hf-mem` estimates the memory required to run any model from the Hugging Face Hub, or from a local path, without downloading the weights. It reads the [Safetensors](https://github.com/huggingface/safetensors) and [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests), and only depends on [`httpx2`](https://github.com/pydantic/httpx2).
+`hf-mem` estimates the memory required to run any model from the Hugging Face Hub, or from a local path, without downloading the weights. It reads the [Safetensors](https://github.com/huggingface/safetensors) and [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests), and only depends on [`httpx2`](https://github.com/pydantic/httpx2) and [`orjson`](https://github.com/ijl/orjson).
 
 The estimate covers the model weights, the KV cache for generative models, and the runtime overhead of the inference engine (activations, CUDA graphs and the CUDA context), for [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers), [Sentence Transformers](https://github.com/huggingface/sentence-transformers) and GGUF models.
 
@@ -60,7 +60,7 @@ uvx hf-mem unsloth/Qwen3.8-27B-GGUF --file Qwen3.8-27B-UD-Q4_K_M.gguf
 
 ### Does it fit?
 
-`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and reports whether the model fits, how many GPUs it needs, and the longest context that fits, using 90% of the memory as vLLM does by default (`--gpu-memory-utilization`).
+`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and reports whether the model fits, how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account.
 
 ```bash
 uvx hf-mem meta-llama/Llama-3.1-8B-Instruct --max-model-len 32768 --gpu-memory 24
@@ -91,10 +91,10 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 --json
   "model": "Qwen/Qwen3-8B",
   "revision": "main",
   "format": "safetensors",
-  "total": 23934363648,
+  "total": 24337016832,
   "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 2721054720, "activations": 1647312896, "cuda_graphs": 268435456, "runtime": 805306368},
+  "overhead": {"bytes": 3123707904, "activations": 2049966080, "cuda_graphs": 268435456, "runtime": 805306368},
   "warnings": []
 }
 ```
@@ -111,7 +111,7 @@ from hf_mem import run
 
 result = run("Qwen/Qwen3-8B", max_model_len=32768)
 print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead.bytes)
-# 23934363648 16381470720 4831838208 2721054720
+# 24337016832 16381470720 4831838208 3123707904
 print(result.to_dict())
 ```
 
@@ -132,10 +132,14 @@ hf extensions add alvarobartt/hf-mem
 ## How it works
 
 - **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory.
-- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window + 4096` tokens, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
-- **Overhead** follows vLLM's memory profiling for Safetensors models (activations for the sampler logits and 4096 tokens, CUDA graphs, CUDA context and non-torch memory) and llama.cpp's compute buffer and CUDA context for GGUF models.
+- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus the batched tokens, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
+- **Overhead** follows vLLM's memory profiling for Safetensors models (activations for the sampler logits and the batched tokens, CUDA graphs, CUDA context and non-torch memory) and llama.cpp's compute buffer and CUDA context for GGUF models. As in vLLM, 8192 tokens are batched, or 2048 when `--gpu-memory` is under 70 GiB.
 
-The estimates have been validated on NVIDIA A100 GPUs against vLLM, SGLang, llama.cpp, Diffusers and Sentence Transformers, e.g. the KV cache per 32K-token request matches vLLM exactly for Llama 3.1, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 (sliding window), Qwen3.5 (linear attention) and Nemotron-H (Mamba), and the total is within 2% of the measured footprint for 7 of the 9 models tested. The vision encoder of VLMs and the linear attention kernels are not profiled, which added up to 3 GiB more on Qwen2.5-VL and Qwen3.5.
+The estimates have been validated on NVIDIA T4, L4, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs) against vLLM, SGLang, llama.cpp, Diffusers and Sentence Transformers. The KV cache per request matches vLLM exactly for Llama 3.1, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 (sliding window), Qwen3.5 (linear attention) and Nemotron-H (Mamba), the KV cache per token matches SGLang for Llama 3, Qwen3, DeepSeek-V2, Qwen3.6 and gpt-oss. On a single GPU, the total is within -3% and +9% of the memory used by vLLM for most models, erring high on GPUs where vLLM batches fewer tokens (e.g. A100), with these known gaps:
+
+- Vision and audio encoders are counted in the weights, but their profiling activations are not, which adds up to 3 GiB in vLLM for VLMs (-9% on Qwen2.5-VL), and the non-torch memory of the Qwen3.5 linear attention kernels is not either (-9%).
+- On large GPUs, MoE and hybrid models can use 2 to 5 GiB more for activations and CUDA graphs than estimated.
+- Inference engines can repack or offload weights, e.g. vLLM pads the gpt-oss MXFP4 experts (-11% in total) and keeps the per-layer embeddings of Qwen3.8-Flash-Next on the CPU, and SGLang loads the gpt-oss experts in BF16 on Hopper GPUs.
 
 ## Contributing
 
