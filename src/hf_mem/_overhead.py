@@ -5,6 +5,7 @@ from typing import Any
 GIB = 1 << 30
 MIB = 1 << 20
 LARGE_GPU = 70 * GIB
+LARGEST_GPU = 160 * GIB
 
 # Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
 _PROFILES = {
@@ -66,7 +67,8 @@ class Overhead:
 def batched_tokens(gpu_memory: str | None, override: int | None = None) -> int:
     if override is not None:
         return override
-    return 2048 if gpu_memory is not None and parse_gpu_memory(gpu_memory)[1] < LARGE_GPU else 8192
+    size = parse_gpu_memory(gpu_memory)[1] if gpu_memory is not None else LARGE_GPU
+    return 16384 if size >= LARGEST_GPU else 8192 if size >= LARGE_GPU else 2048
 
 
 def _tower_bytes(tower: dict[str, Any], positions: int) -> int:

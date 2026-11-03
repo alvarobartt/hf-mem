@@ -72,7 +72,7 @@ def main() -> None:
     parser.add_argument(
         "--max-num-batched-tokens",
         type=int,
-        help="Tokens per batch as in vLLM, defaults to 8192 (2048 with `--gpu-memory` under 70 GiB), use 2048 for A100.",
+        help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--json", "--json-output", dest="json", action="store_true", help="Print JSON.")

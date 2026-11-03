@@ -59,6 +59,7 @@ def test_encoder_patches() -> None:
 def test_batched_tokens_follow_the_gpu_size() -> None:
     assert _overhead.batched_tokens(None) == _overhead.batched_tokens("8x80") == 8192
     assert _overhead.batched_tokens("24") == 2048
+    assert _overhead.batched_tokens("180") == 16384
 
 
 @pytest.mark.parametrize(
