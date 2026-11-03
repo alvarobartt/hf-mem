@@ -64,12 +64,7 @@ def main() -> None:
     parser.add_argument(
         "--experimental",
         action="store_true",
-        help=(
-            "Whether to enable the experimental KV Cache estimation or not. For Safetensors "
-            "MoE Transformers models it also includes a base-model-vs-experts weights "
-            "breakdown. Only applies to `...ForCausalLM` and `...ForConditionalGeneration` "
-            "models from Transformers."
-        ),
+        help="Also estimate the KV cache for generative models (and the experts breakdown for MoEs).",
     )
     parser.add_argument(
         "--max-model-len",
@@ -114,11 +109,7 @@ def main() -> None:
         help="Include per-component dtype and parameter breakdowns in JSON output (`--json-output` only).",
     )
     args = parser.parse_args()
-
-    if args.experimental:
-        warnings.warn(
-            "`--experimental` is set, which means that models with an architecture as `...ForCausalLM` and `...ForConditionalGeneration` will include estimations for the KV Cache as well. You can also provide the args `--max-model-len` and `--batch-size` as part of the estimation. Note that enabling `--experimental` means that the output will be different both when displayed and when dumped as JSON with `--json-output`, so bear that in mind."
-        )
+    warnings.formatwarning = lambda message, *_, **__: f"hf-mem: warning: {message}\n"
 
     if args.ignore_table_width:
         warnings.warn(

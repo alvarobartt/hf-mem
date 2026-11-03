@@ -300,21 +300,22 @@ async def arun(
             raise RuntimeError(f"No GGUF files found for {model_id} @ {revision}.")
 
         if gguf_file:
-            # NOTE: Check if it's a sharded file (e.g. model-00001-of-00046.gguf)
-            if prefix_match := re.match(r"(.+)-\d+-of-\d+\.gguf$", gguf_file):
-                prefix = prefix_match.group(1)
+            target = gguf_file.strip("/")
+            if prefix_match := _SHARD_PATTERN.match(target):
                 gguf_paths = [
-                    path
-                    for path in gguf_paths
-                    if re.match(rf"{re.escape(prefix)}-\d+-of-\d+\.gguf$", str(path))
+                    p
+                    for p in gguf_paths
+                    if (m := _SHARD_PATTERN.match(p)) and m.group(1) == prefix_match.group(1)
                 ]
             else:
                 gguf_paths = [
-                    path for path in gguf_paths if path == gguf_file or path.endswith(f"/{gguf_file}")
+                    p
+                    for p in gguf_paths
+                    if p == target or p.endswith(f"/{target}") or p.startswith(f"{target}/")
                 ]
-                if len(gguf_paths) > 1:
+                if len({(m.group(1) if (m := _SHARD_PATTERN.match(p)) else p) for p in gguf_paths}) > 1:
                     raise RuntimeError(
-                        f"Multiple GGUF files named `{gguf_file}` found for {model_id} @ {revision}."
+                        f"Multiple GGUF files match `{gguf_file}` for {model_id} @ {revision}: {gguf_paths}."
                     )
 
             if not gguf_paths:

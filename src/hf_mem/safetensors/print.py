@@ -1,8 +1,5 @@
-import warnings
-
 from hf_mem._print import (
     BORDERS_AND_PADDING,
-    MAX_DATA_LEN,
     MAX_NAME_LEN,
     _bytes_to_gib,
     _format_short_number,
@@ -105,11 +102,6 @@ def print_safetensors_report(
 
     min_width_for_data = MAX_NAME_LEN + max_data_len + 5
     max_len = max(max_centered_len, min_width_for_data)
-
-    if max_len > MAX_DATA_LEN:
-        warnings.warn(
-            f"Given that the provided `--model-id {model_id}` (with `--revision {revision}`) is longer than {MAX_DATA_LEN} characters, the table width will be expanded to fit the provided values within their row, but it might lead to unexpected table views."
-        )
 
     current_len = max_len
     data_col_width = current_len + 2 * BORDERS_AND_PADDING - MAX_NAME_LEN - 5
