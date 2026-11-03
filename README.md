@@ -7,7 +7,7 @@
 
 `hf-mem` is a CLI to estimate inference memory requirements for Hugging Face models, written in Python. `hf-mem` is lightweight, only depends on [`httpx2`](https://github.com/pydantic/httpx2), as it pulls the [Safetensors](https://github.com/huggingface/safetensors) and / or [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests). It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
 
-`hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers) and [Sentence Transformers](https://github.com/huggingface/sentence-transformers) models, or really any model as long as it contains any of [Safetensors](https://github.com/huggingface/safetensors) or [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) weights.
+`hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers) and [Sentence Transformers](https://github.com/huggingface/sentence-transformers) models, or really any model as long as it contains any of [Safetensors](https://github.com/huggingface/safetensors) or [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) weights. Repositories without a standard layout (e.g. `consolidated-*.safetensors` or ComfyUI single-file checkpoints) are estimated per `*.safetensors` file.
 
 Read more information about `hf-mem` in [this short-form post](https://alvarobartt.com/hf-mem), but note it's not up-to-date as it was written in January 2026.
 
@@ -63,7 +63,9 @@ print(result)
 
 ## Experimental
 
-By enabling the `--experimental` flag, you can enable the KV Cache memory estimation for LLMs (`...ForCausalLM`) and VLMs (`...ForConditionalGeneration`), even including a custom `--max-model-len` (defaults to the `config.json` default), `--batch-size` (defaults to 1), and the `--kv-cache-dtype` (defaults to `auto` which means it uses the default data type set in `config.json` under `torch_dtype` or `dtype`, or rather from `quantization_config` when applicable).
+By enabling the `--experimental` flag, you can enable the KV Cache memory estimation for generative models (LLMs, VLMs, omni and speech models), even including a custom `--max-model-len` (defaults to the `config.json` default), `--batch-size` (defaults to 1), and the `--kv-cache-dtype` (defaults to `auto` which, same as vLLM, uses the model data type set in `config.json` under `torch_dtype` or `dtype`, unless the `quantization_config` declares a quantized KV cache).
+
+The KV cache estimation accounts for the attention layout of the model: Multi-head Latent Attention (MLA) caches the compressed latent, hybrid models only cache the full and sliding attention layers (linear attention, convolution or Mamba layers don't grow with the context length), and the text decoder is resolved from nested configurations such as `text_config` or `llm_config`.
 
 Additionally, for Mixture of Experts (MoEs), the `--experimental` flag also adds a weights-only breakdown of the base model and all the experts combined.
 
@@ -75,7 +77,7 @@ uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --experimental
 
 ## GGUF
 
-If the repository contains GGUF model weights, those will be listed by default (only if there are no Safetensors weights, otherwise the GGUFs will be ignored) and the memory will be estimated for each one of those; whereas if a specific file is provided, then the memory estimation will be targeted for that given file instead.
+If the repository contains GGUF model weights, those will be listed by default (only if there are no Safetensors weights, otherwise the GGUFs will be ignored) and the memory will be estimated for each one of those, skipping `mmproj` and `imatrix` files; whereas if a specific file (or a directory containing a sharded file) is provided via `--gguf-file`, then the memory estimation will be targeted for that given file instead.
 
 ```bash
 uvx hf-mem --model-id TheBloke/deepseek-llm-7B-chat-GGUF --experimental

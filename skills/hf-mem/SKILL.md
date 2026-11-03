@@ -19,7 +19,7 @@ license: mit
 
 ## How to run?
 
-Run with `--model-id` pointing to the Hugging Face Hub repository which will check that it either contains Safetensors (via `model.safetensors`, `model.safetensors.index.json` if sharded, or `model_index.json` for Diffusers) or GGUF model weights within.
+Run with `--model-id` pointing to the Hugging Face Hub repository which will check that it either contains Safetensors (via `model.safetensors`, `model.safetensors.index.json` if sharded, `model_index.json` for Diffusers, or any other `*.safetensors` files) or GGUF model weights within.
 
 ```bash
 uvx hf-mem --model-id <model-id> --json-output
@@ -31,7 +31,7 @@ If the repository contains GGUF model weights in multiple precisions / quantizat
 uvx hf-mem --model-id <model-id> --gguf-file <file-or-path> --json-output
 ```
 
-Additionally, `hf-mem` comes with an `--experimental` flag that will also calculate the KV cache memory requirements too, useful for large-language models, meaning it applies to LLMs (`...ForCausalLM`), VLMs (`...ForConditionalGeneration`), and GGUF models.
+Additionally, `hf-mem` comes with an `--experimental` flag that will also calculate the KV cache memory requirements too, useful for generative models i.e., LLMs, VLMs, omni or speech models, for both Safetensors and GGUF weights.
 
 As per the context window, it will be read from the default or overridden with `--max-model-len` a la vLLM. And, same goes for the KV cache precision, which will default to the model precision unless manually set via `--kv-cache-dtype` a la vLLM too.
 
