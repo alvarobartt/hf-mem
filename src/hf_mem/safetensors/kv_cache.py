@@ -3,7 +3,7 @@ from collections import Counter
 from typing import Any, Dict, List
 
 from hf_mem.safetensors.metadata import SafetensorsMetadata
-from hf_mem.safetensors.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
+from hf_mem.safetensors.types import get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
 
@@ -138,16 +138,6 @@ def resolve_kv_cache_dtype(
     kv_cache_scheme = quantization_config.get("kv_cache_scheme") or {}
     if kv_cache_scheme.get("num_bits") == 8 or quantization_config.get("kv_cache_quant_algo") == "FP8":
         return "F8_E4M3"
-
-    if quantization_config.get("quant_method") in {"fp8", "modelopt"}:
-        fmt = quantization_config.get("fmt", quantization_config.get("format"))
-        if fmt:
-            fmt = fmt if fmt.startswith("float8_") else f"float8_{fmt}"
-            if fmt in TorchDtypes.__args__:
-                return torch_dtype_to_safetensors_dtype(fmt)
-        f8 = [d for c in metadata.components.values() for d in c.dtypes if d in {"F8_E5M2", "F8_E4M3"}]
-        if f8:
-            return max(f8, key=f8.count)
 
     if dtype := config.get("torch_dtype") or config.get("dtype"):
         if isinstance(dtype, str):
