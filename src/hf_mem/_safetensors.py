@@ -1,5 +1,4 @@
 import asyncio
-import json
 import math
 import os
 import re
@@ -7,12 +6,16 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
+import orjson
+
 from hf_mem._weights import Weights
 
 PROBE_SIZE = 100_000
 SHARD = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
+_MODEL_SHARD = re.compile(r"model-\d+-of-(\d+)\.safetensors")
 WEIGHT_EXTENSIONS = (".bin", ".pt", ".pth", ".ckpt", ".nemo")
-_EXPERT_TOKENS = {"expert", "experts", "local_expert", "local_experts", "routed_expert", "routed_experts"}
+_EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
+POOL_MIN_FILES = 32
 
 
 @dataclass
@@ -33,19 +36,32 @@ class MoE:
         }
 
 
-async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> dict[str, Any]:
+async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
     head = await source.read(path, 0, probe)
     if len(head) < 8:
         raise RuntimeError(f"`{path}` is not a valid Safetensors file.")
     size = struct.unpack("<Q", head[:8])[0]
     if size + 8 > len(head):
         head += await source.read(path, len(head), size + 8)
-    try:
-        header = json.loads(head[8 : size + 8])
-        header["__size__"] = size + 8
-        return header
-    except ValueError as e:
-        raise RuntimeError(f"`{path}` is not a valid Safetensors file.") from e
+    return head[8 : size + 8]
+
+
+def summarize(raw: bytes) -> tuple[dict[str, list[int]], dict[tuple[int, str], list[int]]]:
+    dtypes: dict[str, list[int]] = {}
+    experts: dict[tuple[int, str], list[int]] = {}
+    for tensor, info in orjson.loads(raw).items():
+        if tensor == "__metadata__":
+            continue
+        start, end = info["data_offsets"]
+        params, dtype = math.prod(info["shape"]), info["dtype"]
+        entry = dtypes.setdefault(dtype, [0, 0])
+        entry[0] += params
+        entry[1] += end - start
+        if "expert" in tensor and (match := _EXPERT.search(tensor)):
+            entry = experts.setdefault((int(match.group(1)), dtype), [0, 0])
+            entry[0] += params
+            entry[1] += end - start
+    return dtypes, experts
 
 
 def _groups(paths: list[str]) -> dict[str, list[str]]:
@@ -63,6 +79,11 @@ def _select(groups: dict[str, list[str]], file: str) -> dict[str, list[str]]:
         for name, paths in groups.items()
         if name == target or name.startswith(target + "/") or os.path.basename(name) == target
     }
+
+
+def _complete(paths: list[str]) -> bool:
+    totals = {m.group(1) if (m := _MODEL_SHARD.fullmatch(p)) else None for p in paths}
+    return len(totals) == 1 and None not in totals and int(totals.pop()) == len(paths)
 
 
 async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[str, list[str]]:
@@ -91,11 +112,10 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
             return components
 
     if "model" in groups or "model.safetensors.index.json" in files:
-        if "model.safetensors.index.json" in files:
+        paths = groups.get("model", [])
+        if "model.safetensors.index.json" in files and not _complete(paths):
             index = await source.json("model.safetensors.index.json")
             paths = sorted(set(index["weight_map"].values()))
-        else:
-            paths = groups["model"]
         if "config_sentence_transformers.json" not in files:
             return {"Transformer": paths}
         components = {"0_Transformer": paths}
@@ -122,35 +142,45 @@ async def read_components(
 ) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]]]:
     paths = sorted({p for ps in components.values() for p in ps})
     semaphore, probe = asyncio.Semaphore(32), [PROBE_SIZE]
+    summaries: dict[str, tuple[dict[str, list[int]], dict[tuple[int, str], list[int]]]] = {}
+    pool = _pool() if len(paths) >= POOL_MIN_FILES else None
+    loop = asyncio.get_running_loop()
 
-    async def read(path: str) -> dict[str, Any]:
+    async def read(path: str) -> None:
         async with semaphore:
-            header = await read_header(source, path, probe[0])
-            probe[0] = max(probe[0], header.pop("__size__"))
-            return header
+            raw = await read_header(source, path, probe[0])
+        probe[0] = max(probe[0], len(raw) + 8)
+        try:
+            summaries[path] = await loop.run_in_executor(pool, summarize, raw) if pool else summarize(raw)
+        except orjson.JSONDecodeError as e:
+            raise RuntimeError(f"`{path}` is not a valid Safetensors file.") from e
 
-    headers = dict(zip(paths, await asyncio.gather(*(read(p) for p in paths))))
+    try:
+        await asyncio.gather(*(read(p) for p in paths))
+    finally:
+        if pool:
+            pool.shutdown(cancel_futures=True)
     weights: dict[str, Weights] = {}
     experts: dict[str, dict[int, Weights]] = {}
     for name, component_paths in components.items():
-        totals: dict[str, list[int]] = {}
-        by_expert: dict[int, Weights] = {}
+        component, merged = Weights(), {}
         for path in component_paths:
-            for tensor, info in headers[path].items():
-                if tensor == "__metadata__":
-                    continue
-                start, end = info["data_offsets"]
-                params, dtype = math.prod(info["shape"]), info["dtype"]
-                entry = totals.setdefault(dtype, [0, 0])
-                entry[0] += params
-                entry[1] += end - start
-                if "expert" in tensor and (expert := _expert_id(tensor)) is not None:
-                    by_expert.setdefault(expert, Weights()).add(dtype, params, end - start)
-        component = Weights()
-        for dtype, (params, nbytes) in totals.items():
-            component.add(dtype, params, nbytes)
-        weights[name], experts[name] = component, by_expert
+            dtypes, by_expert = summaries[path]
+            for dtype, (params, nbytes) in dtypes.items():
+                component.add(dtype, params, nbytes)
+            for (expert, dtype), (params, nbytes) in by_expert.items():
+                merged.setdefault(expert, Weights()).add(dtype, params, nbytes)
+        weights[name], experts[name] = component, merged
     return weights, experts
+
+
+def _pool() -> Any:
+    try:
+        from concurrent.futures import ProcessPoolExecutor
+
+        return ProcessPoolExecutor(min(os.cpu_count() or 1, 8))
+    except (ImportError, NotImplementedError, OSError):
+        return None
 
 
 def from_file_sizes(files: dict[str, int], file: str | None) -> dict[str, Weights]:
@@ -168,14 +198,6 @@ def from_file_sizes(files: dict[str, int], file: str | None) -> dict[str, Weight
 
 def _int(config: dict[str, Any], *keys: str) -> int | None:
     return next((v for k in keys if isinstance(v := config.get(k), int) and v > 1), None)
-
-
-def _expert_id(tensor: str) -> int | None:
-    parts = tensor.split(".")
-    for i, part in enumerate(parts[:-1]):
-        if part in _EXPERT_TOKENS and parts[i + 1].isdigit():
-            return int(parts[i + 1])
-    return None
 
 
 def moe_breakdown(

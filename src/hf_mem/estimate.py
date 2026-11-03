@@ -247,6 +247,8 @@ async def _estimate_safetensors(
         warnings=warnings,
     )
 
+    if not config and "params.json" in files:
+        warnings.append("KV cache estimation skipped, as Mistral `params.json` configs are not supported.")
     if not config or "config_sentence_transformers.json" in files or not _config.is_generative(config, files):
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
