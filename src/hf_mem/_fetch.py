@@ -6,10 +6,14 @@ import httpx2
 REQUEST_TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
 
 
+class HubError(RuntimeError):
+    pass
+
+
 def raise_for_status(response: httpx2.Response) -> None:
     if response.is_error:
         message = response.headers.get("x-error-message") or f"HTTP {response.status_code} for {response.url}"
-        raise RuntimeError(message)
+        raise HubError(message)
 
 
 async def get_json_file(client: httpx2.AsyncClient, url: str, headers: Dict[str, str] | None = None) -> Any:

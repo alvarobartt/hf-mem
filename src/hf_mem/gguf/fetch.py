@@ -6,13 +6,11 @@ from typing import Dict, Tuple
 
 import httpx2
 
-from hf_mem._fetch import REQUEST_TIMEOUT, raise_for_status
+from hf_mem._fetch import REQUEST_TIMEOUT, HubError, raise_for_status
 from hf_mem.gguf.metadata import GGUFMetadata, parse_gguf_metadata
 
-# NOTE: Start with 1 MB; this is sufficient for the metadata of most GGUF models.
-# If the metadata section is larger, the fetch size doubles on each retry up to the cap.
-_INITIAL_FETCH_SIZE = 1_000_000  # 1 MB
-_MAX_FETCH_SIZE = 100_000_000  # 100 MB
+_INITIAL_FETCH_SIZE = 1_000_000
+_MAX_FETCH_SIZE = 100_000_000
 
 
 async def fetch_gguf_metadata(
@@ -24,20 +22,19 @@ async def fetch_gguf_metadata(
     batch_size: int = 1,
     headers: Dict[str, str] | None = None,
 ) -> GGUFMetadata:
-    # NOTE: `auto` falls back to F16 for GGUF files as there's no `config.json` to infer dtype from
     if kv_cache_dtype == "auto":
         kv_cache_dtype = "F16"
 
-    size = _INITIAL_FETCH_SIZE
+    raw_metadata, file_size, size = b"", None, _INITIAL_FETCH_SIZE
     while True:
-        try:
-            request_headers = {"Range": f"bytes=0-{size}", **(headers or {})}
-            response = await client.get(url, headers=request_headers, timeout=REQUEST_TIMEOUT)
-            raise_for_status(response)
-            raw_metadata = response.read()
-            content_range = response.headers.get("content-range", "")
-            file_size = int(content_range.rsplit("/", 1)[-1]) if "/" in content_range else len(raw_metadata)
+        request_headers = {"Range": f"bytes={len(raw_metadata)}-{size - 1}", **(headers or {})}
+        response = await client.get(url, headers=request_headers, timeout=REQUEST_TIMEOUT)
+        raise_for_status(response)
+        raw_metadata += response.read()
+        content_range = response.headers.get("content-range", "")
+        file_size = int(content_range.rsplit("/", 1)[-1]) if "/" in content_range else len(raw_metadata)
 
+        try:
             return parse_gguf_metadata(
                 raw_metadata=raw_metadata,
                 experimental=experimental,
@@ -46,13 +43,11 @@ async def fetch_gguf_metadata(
                 batch_size=batch_size,
                 file_size=file_size,
             )
-
         except (struct.error, UnicodeDecodeError):
-            if size >= _MAX_FETCH_SIZE:
+            if size >= _MAX_FETCH_SIZE or len(raw_metadata) >= file_size:
                 raise RuntimeError(
                     f"Failed to parse GGUF metadata from {url}, the metadata section exceeds {_MAX_FETCH_SIZE // 1_000_000} MB."
                 )
-            # NOTE: Double on each retry until the full metadata section fits within the fetched range
             size = min(size * 2, _MAX_FETCH_SIZE)
 
 
@@ -82,7 +77,7 @@ async def fetch_gguf_with_semaphore(
                 headers=headers,
             )
         except RuntimeError as e:
-            if not skip_invalid:
+            if not skip_invalid or isinstance(e, HubError):
                 raise
             warnings.warn(f"Skipping `{path}`: {e}")
             metadata = None
