@@ -11,6 +11,7 @@ from hf_mem._weights import Weights
 FIRST_READ = 1 << 20
 PREFIX_READ = 1 << 17
 MAX_READ = 256 << 20
+LISTING_READ = 16 << 20
 SHARD = re.compile(r"-(\d+)-of-(\d+)\.gguf$")
 _SKIP = ("mmproj", "imatrix")
 
@@ -113,18 +114,24 @@ class Header:
     data_start: int
 
 
-def _metadata(buf: bytes, prefix: bool = False) -> tuple[dict[str, Any], int, int, bool]:
+def _metadata(buf: bytes, prefix: bool = False, partial: bool = False) -> tuple[dict[str, Any], int, int, bool]:
     if buf[:4] != b"GGUF":
         raise RuntimeError("not a valid GGUF file (magic number mismatch)")
     _, tensor_count, kv_count = _unpack("<IQQ", buf, 4)
     offset, metadata = 24, {}
-    for _ in range(kv_count):
-        key, offset = _value(buf, offset, 8, True)
-        if prefix and key.startswith("tokenizer."):
-            return metadata, offset, tensor_count, True
-        (kind,) = _unpack("<I", buf, offset)
-        value, offset = _value(buf, offset + 4, kind, not key.startswith("tokenizer."))
-        metadata[key] = value
+    try:
+        for _ in range(kv_count):
+            start = offset
+            key, offset = _value(buf, offset, 8, True)
+            if prefix and key.startswith("tokenizer."):
+                return metadata, offset, tensor_count, True
+            (kind,) = _unpack("<I", buf, offset)
+            value, offset = _value(buf, offset + 4, kind, not key.startswith("tokenizer."))
+            metadata[key] = value
+    except _Truncated:
+        if not partial:
+            raise
+        return metadata, start, tensor_count, False
     return metadata, offset, tensor_count, False
 
 
@@ -170,17 +177,29 @@ async def read_header(source: Any, path: str) -> Header:
 
 
 async def read_metadata(source: Any, path: str) -> tuple[dict[str, Any], bool]:
-    try:
-        metadata, _, _, tokenizer = _metadata(
-            await source.read(path, 0, min(PREFIX_READ, source.files[path])), True
-        )
-        if not tokenizer or f"{metadata.get('general.architecture')}.block_count" in metadata:
-            return metadata, tokenizer
-    except _Truncated:
-        pass
-    except (struct.error, UnicodeDecodeError, KeyError) as e:
-        raise RuntimeError(f"`{path}` is not a valid GGUF file ({e}).") from e
-    return (await read_header(source, path)).metadata, True
+    size, buf = source.files[path], b""
+    end, prefix = min(PREFIX_READ, size), True
+    while True:
+        if len(buf) < end:
+            buf += await source.read(path, len(buf), end)
+        try:
+            metadata, _, _, tokenizer = _metadata(buf, prefix)
+            if not prefix or not tokenizer or f"{metadata.get('general.architecture')}.block_count" in metadata:
+                return metadata, tokenizer or not prefix
+            prefix = False
+            continue
+        except _Truncated:
+            metadata, offset, _, _ = _metadata(buf, prefix, partial=True)
+            try:
+                key = _value(buf, offset, 8, True)[0]
+            except _Truncated:
+                key = "tokenizer."
+            tokenizer = key.startswith("tokenizer.")
+            if end >= min(LISTING_READ, size) or (not tokenizer and len(buf) - offset > PREFIX_READ):
+                return metadata, tokenizer
+        except (struct.error, UnicodeDecodeError, KeyError) as e:
+            raise RuntimeError(f"`{path}` is not a valid GGUF file ({e}).") from e
+        end = min(max(end * 2, FIRST_READ), LISTING_READ, size)
 
 
 def gguf_paths(files: dict[str, int]) -> list[str]:
