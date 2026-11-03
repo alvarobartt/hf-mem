@@ -115,7 +115,12 @@ def _gguf_kv(
 
 
 def _fit(
-    estimate: Estimate, context_length: int, slope: float, gpu_memory: str | None, utilization: float
+    estimate: Estimate,
+    context_length: int,
+    slope: float,
+    gpu_memory: str | None,
+    utilization: float,
+    kv_heads: int | None = None,
 ) -> None:
     if gpu_memory is None:
         return
@@ -129,6 +134,7 @@ def _fit(
         overhead=estimate.overhead.bytes if estimate.overhead else 0,
         gpu_memory=gpu_memory,
         utilization=utilization,
+        kv_heads=kv_heads,
     )
 
 
@@ -247,6 +253,8 @@ async def _estimate_safetensors(
         warnings=warnings,
     )
 
+    if not config and "params.json" in files:
+        warnings.append("KV cache estimation skipped, as Mistral `params.json` configs are not supported.")
     if not config or "config_sentence_transformers.json" in files or not _config.is_generative(config, files):
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
@@ -277,12 +285,20 @@ async def _estimate_safetensors(
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
     dtype = _config.kv_dtype(text, kv_dtype, weights, warnings)
-    size, layers = _config.kv_cache(text, dtype, length, batch_size)
-    half = _config.kv_cache(text, dtype, max(1, length // 2), batch_size)[0]
+    tokens = _overhead.batched_tokens(gpu_memory)
+    size, layers = _config.kv_cache(text, dtype, length, batch_size, tokens)
+    half = _config.kv_cache(text, dtype, max(1, length // 2), batch_size, tokens)[0]
     slope = (size - half) / (length - max(1, length // 2)) if length > 1 else 0.0
     estimate.kv_cache = KVCache(size, dtype, length, batch_size, layers)
-    estimate.overhead = _overhead.vllm(text, moe=estimate.moe is not None)
-    _fit(estimate, text.get("max_position_embeddings") or length, slope, gpu_memory, utilization)
+    estimate.overhead = _overhead.vllm(text, moe=estimate.moe is not None, tokens=tokens)
+    _fit(
+        estimate,
+        text.get("max_position_embeddings") or length,
+        slope,
+        gpu_memory,
+        utilization,
+        _config.kv_heads(text),
+    )
     return estimate
 
 
@@ -295,7 +311,7 @@ async def arun(
     kv_cache_dtype: str = "auto",
     hf_token: str | None = None,
     gpu_memory: str | None = None,
-    gpu_memory_utilization: float = 0.9,
+    gpu_memory_utilization: float = 0.92,
     progress: Progress | None = None,
 ) -> Estimate | Listing:
     source, url_file = await open_source(model_id, revision, hf_token, progress)
@@ -352,7 +368,7 @@ def run(
     kv_cache_dtype: str = "auto",
     hf_token: str | None = None,
     gpu_memory: str | None = None,
-    gpu_memory_utilization: float = 0.9,
+    gpu_memory_utilization: float = 0.92,
 ) -> Estimate | Listing:
     try:
         asyncio.get_running_loop()

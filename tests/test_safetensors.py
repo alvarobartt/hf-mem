@@ -3,7 +3,7 @@ import os
 import pytest
 from helpers import llama_config, llama_tensors, write_json, write_safetensors
 
-from hf_mem import Estimate, run
+from hf_mem import Estimate, _safetensors, run
 
 
 def test_dense_model_with_kv_cache(tmp_path):
@@ -47,6 +47,41 @@ def test_sharded_model_uses_the_index(tmp_path):
 
     assert result.weights.bytes == first + second
     assert list(result.components) == ["Transformer"]
+
+
+def test_complete_shard_listing_skips_the_index(tmp_path):
+    tensors = list(llama_tensors().items())
+    first = write_safetensors(str(tmp_path / "model-00001-of-00002.safetensors"), dict(tensors[:5]))
+    second = write_safetensors(str(tmp_path / "model-00002-of-00002.safetensors"), dict(tensors[5:]))
+    (tmp_path / "model.safetensors.index.json").write_text("not json")
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    assert run(str(tmp_path)).weights.bytes == first + second
+
+    write_safetensors(str(tmp_path / "model-00001-of-00003.safetensors"), dict(tensors))
+    write_json(
+        str(tmp_path / "model.safetensors.index.json"),
+        {"weight_map": {"a": "model-00001-of-00002.safetensors", "b": "model-00002-of-00002.safetensors"}},
+    )
+    assert run(str(tmp_path)).weights.bytes == first + second
+
+
+def test_many_shards_are_parsed_in_a_process_pool(tmp_path, monkeypatch):
+    for i in range(4):
+        write_safetensors(
+            str(tmp_path / f"model-0000{i + 1}-of-00004.safetensors"),
+            {f"model.layers.{i}.mlp.experts.{e}.down_proj.weight": ("BF16", [64, 32]) for e in range(4)}
+            | {f"model.layers.{i}.self_attn.q_proj.weight": ("BF16", [64, 64])},
+        )
+    write_json(str(tmp_path / "config.json"), llama_config(num_local_experts=4, num_experts_per_tok=2))
+
+    inline = run(str(tmp_path))
+    monkeypatch.setattr(_safetensors, "POOL_MIN_FILES", 1)
+    pooled = run(str(tmp_path))
+
+    assert pooled.to_dict() == inline.to_dict()
+    assert pooled.moe is not None and pooled.moe.experts == 4
+    assert pooled.moe.expert.bytes == 4 * 64 * 32 * 2
 
 
 def test_diffusers_pipeline_prefers_the_default_variant(tmp_path):
@@ -159,3 +194,13 @@ def test_local_file_reads_the_sibling_config(tmp_path):
 
     assert result.file == "model.safetensors"
     assert result.kv_cache is not None
+
+
+def test_mistral_params_json_warns(tmp_path):
+    write_safetensors(str(tmp_path / "consolidated.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "params.json"), {"dim": 64, "n_layers": 4})
+
+    result = run(str(tmp_path))
+
+    assert result.kv_cache is None
+    assert any("params.json" in w for w in result.warnings)

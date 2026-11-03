@@ -4,7 +4,7 @@ from typing import Any
 
 GIB = 1 << 30
 SAMPLER_ROWS = 1024
-PROFILE_TOKENS = 4096
+LARGE_GPU = 70 * GIB
 
 
 @dataclass
@@ -26,13 +26,17 @@ class Overhead:
         }
 
 
-def vllm(config: dict[str, Any], moe: bool) -> Overhead:
+def batched_tokens(gpu_memory: str | None) -> int:
+    return 2048 if gpu_memory is not None and parse_gpu_memory(gpu_memory)[1] < LARGE_GPU else 8192
+
+
+def vllm(config: dict[str, Any], moe: bool, tokens: int) -> Overhead:
     hidden = config.get("hidden_size") or 0
     vocab = config.get("vocab_size") or 32000
     intermediate = config.get("intermediate_size") or config.get("ffn_hidden_size") or 4 * hidden
     if moe and not config.get("intermediate_size"):
         intermediate = (config.get("moe_intermediate_size") or 0) * (config.get("num_experts_per_tok") or 1)
-    activations = SAMPLER_ROWS * vocab * 8 + PROFILE_TOKENS * intermediate * 8
+    activations = SAMPLER_ROWS * vocab * 8 + tokens * intermediate * 8
     return Overhead(activations, int((0.36 if moe else 0.25) * GIB), int(0.75 * GIB))
 
 
@@ -81,11 +85,23 @@ def fit(
     overhead: int,
     gpu_memory: str,
     utilization: float,
+    kv_heads: int | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
     usable = size * utilization - overhead
-    kv_cache = kv_fixed + kv_per_token * max_model_len
-    needed = next((n for n in (1, 2, 4, 8, 16, 32, 64) if weights + kv_cache <= n * usable), None)
-    budget = (gpus or needed or 1) * usable - weights - kv_fixed
-    longest = math.floor(budget / kv_per_token) if kv_per_token > 0 and budget > 0 else 0
+
+    def per_token(n: int) -> float:
+        return kv_per_token * (max(1.0, n / kv_heads) if kv_heads else 1.0)
+
+    needed = next(
+        (
+            n
+            for n in (1, 2, 4, 8, 16, 32, 64)
+            if weights + kv_fixed + per_token(n) * max_model_len <= n * usable
+        ),
+        None,
+    )
+    n = gpus or 1
+    budget = n * usable - weights - kv_fixed
+    longest = math.floor(budget / per_token(n)) if kv_per_token > 0 and budget > 0 else 0
     return Fit(size, gpus, needed, min(longest, context_length))

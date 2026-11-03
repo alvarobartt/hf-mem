@@ -2,6 +2,7 @@ import pytest
 from helpers import write_gguf
 
 from hf_mem import Estimate, Listing, _gguf, run
+from hf_mem._source import LocalSource
 
 ARCH = {
     "general.architecture": "llama",
@@ -123,3 +124,23 @@ def test_invalid_files(tmp_path):
         run(str(tmp_path), file="Q8_0")
     with pytest.raises(RuntimeError, match="not valid for GGUF"):
         run(str(tmp_path), file="ok-Q4_0.gguf", kv_cache_dtype="bfloat16")
+
+
+def test_listing_stops_at_large_embedded_metadata(tmp_path, monkeypatch):
+    embedded = {"general.architecture": "audio", "audio.embedded_files.data": list(range(1 << 20)), **ARCH}
+    for quant in ("F16", "Q8_0"):
+        write_gguf(str(tmp_path / f"audio-{quant}.gguf"), embedded, TENSORS)
+    reads = []
+    read = LocalSource.read
+
+    async def counting(self, path, start, end):
+        reads.append(end - start)
+        return await read(self, path, start, end)
+
+    monkeypatch.setattr(LocalSource, "read", counting)
+    result = run(str(tmp_path))
+
+    assert isinstance(result, Listing)
+    assert len(result.files) == 2
+    assert all(f.kv_cache is None for f in result.files)
+    assert sum(reads) < 8 << 20

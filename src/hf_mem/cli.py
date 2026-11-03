@@ -66,8 +66,8 @@ def main() -> None:
     parser.add_argument(
         "--gpu-memory-utilization",
         type=float,
-        default=0.9,
-        help="Fraction of the GPU memory that can be used, defaults to 0.9 (as vLLM).",
+        default=0.92,
+        help="Fraction of the GPU memory that can be used, defaults to 0.92 (as vLLM).",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--json", "--json-output", dest="json", action="store_true", help="Print JSON.")
