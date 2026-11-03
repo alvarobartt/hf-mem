@@ -210,7 +210,11 @@ def kv_heads(config: dict[str, Any]) -> int:
     config = normalize(config)
     if config.get("kv_lora_rank"):
         return 1
-    return config["num_key_value_heads"] or config["num_attention_heads"]
+    return (
+        config.get("num_global_key_value_heads")
+        or config["num_key_value_heads"]
+        or config["num_attention_heads"]
+    )
 
 
 def kv_cache(
@@ -225,30 +229,33 @@ def kv_cache(
     kv_heads: int = config["num_key_value_heads"] or heads
     head_dim: int = config.get("head_dim") or (config["hidden_size"] or 0) // heads
     if rank := config.get("kv_lora_rank"):
-        width = rank + (config.get("qk_rope_head_dim") or 0) + (config.get("index_head_dim") or 0)
+        width = full_width = rank + (config.get("qk_rope_head_dim") or 0) + (config.get("index_head_dim") or 0)
     else:
         width = 2 * kv_heads * head_dim
+        full_width = (
+            2
+            * (config.get("num_global_key_value_heads") or kv_heads)
+            * (config.get("global_head_dim") or head_dim)
+        )
 
     kinds = layer_kinds(config)
     full, sliding, state = kinds.count("full"), kinds.count("sliding"), kinds.count("state")
     layers = {"full": full, "sliding": sliding, "state": state, "none": len(kinds) - full - sliding - state}
     window = config.get("sliding_window") or config.get("attention_chunk_size") or max_model_len
     sliding_tokens = min(window - 1 + batched_tokens, max_model_len)
+    sliding_pages = _cdiv(sliding_tokens, BLOCK_SIZE) + (sliding_tokens < max_model_len)
     dtype_bytes = _BYTES.get(dtype, 2)
-    token = int(width * dtype_bytes)
+    token, full_token = int(width * dtype_bytes), int(full_width * dtype_bytes)
     if not state:
-        block = BLOCK_SIZE
-        pages = full * _cdiv(max_model_len, block) + sliding * (
-            _cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len)
-        )
-        return pages * block * token * batch_size, layers
+        size = full * _cdiv(max_model_len, BLOCK_SIZE) * full_token + sliding * sliding_pages * token
+        return size * BLOCK_SIZE * batch_size, layers
 
     state_bytes, state_pages = _state(config, dtype_bytes)
     if not full + sliding:
         return state * state_pages * state_bytes * batch_size, layers
     block = max(BLOCK_SIZE, _cdiv(_cdiv(state_bytes, token), BLOCK_SIZE) * BLOCK_SIZE)
     group = min(n for n in (full, sliding, state) if n)
-    pages = _cdiv(full, group) * _cdiv(max_model_len, block)
-    pages += _cdiv(sliding, group) * (_cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len))
-    pages += _cdiv(state, group) * state_pages
-    return group * pages * block * token * batch_size, layers
+    size = _cdiv(full, group) * _cdiv(max_model_len, block) * full_token
+    size += _cdiv(sliding, group) * (_cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len)) * token
+    size += _cdiv(state, group) * state_pages * token
+    return group * size * block * batch_size, layers
