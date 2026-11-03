@@ -36,7 +36,7 @@ def vllm(config: dict[str, Any], moe: bool, tokens: int) -> Overhead:
     intermediate = config.get("intermediate_size") or config.get("ffn_hidden_size") or 4 * hidden
     if moe and not config.get("intermediate_size"):
         intermediate = (config.get("moe_intermediate_size") or 0) * (config.get("num_experts_per_tok") or 1)
-    activations = SAMPLER_ROWS * vocab * 8 + tokens * intermediate * 8
+    activations = SAMPLER_ROWS * vocab * 8 + tokens * intermediate * 16
     return Overhead(activations, int((0.36 if moe else 0.25) * GIB), int(0.75 * GIB))
 
 

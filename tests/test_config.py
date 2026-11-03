@@ -21,7 +21,7 @@ def test_mla_caches_the_latent():
 
 
 def sliding_tokens(window, length=100_000):
-    tokens = min(window - 1 + _config.MAX_NUM_BATCHED_TOKENS, length)
+    tokens = min(window - 1 + 2 * _config.MAX_NUM_BATCHED_TOKENS, length)
     return (-(-tokens // 16) + (tokens < length)) * 16
 
 
