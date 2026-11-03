@@ -227,7 +227,7 @@ async def _estimate_safetensors(
     try:
         selected = await _safetensors.discover(source, file, warnings)
         if selected:
-            components, experts = await _safetensors.read_components(source, selected)
+            components, experts = await _safetensors.read_components(source, selected, warnings)
             fmt = "safetensors"
         elif components := _safetensors.from_file_sizes(files, file):
             experts = {}
@@ -235,6 +235,11 @@ async def _estimate_safetensors(
             warnings.append(
                 "No Safetensors or GGUF weights found, so the estimate is based on the weight file sizes."
             )
+            if len(components) > 1:
+                warnings.append(
+                    f"{len(components)} weight files were found and are counted as separate components, assuming "
+                    "all of them are loaded; use `--file` to pick one."
+                )
         else:
             return None
         try:

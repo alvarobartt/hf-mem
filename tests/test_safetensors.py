@@ -245,3 +245,37 @@ def test_video_models_warn_about_the_vllm_video_profile(tmp_path: Path) -> None:
     write_json(str(tmp_path / "config.json"), config)
 
     assert any("largest video" in w for w in estimate(str(tmp_path)).warnings)
+
+
+def test_index_with_missing_files_uses_the_uploaded_ones(tmp_path: Path) -> None:
+    tensors = list(llama_tensors().items())
+    first = write_safetensors(str(tmp_path / "model-00001-of-00003.safetensors"), dict(tensors[:5]))
+    weight_map = {f"t{i}": f"model-0000{i}-of-00003.safetensors" for i in (1, 2, 3)}
+    write_json(str(tmp_path / "model.safetensors.index.json"), {"weight_map": weight_map})
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == first
+    assert any("2 files that are not in the repository" in w for w in result.warnings)
+
+
+def test_onnx_weights_from_file_sizes(tmp_path: Path) -> None:
+    (tmp_path / "model.onnx").write_bytes(b"\0" * 100)
+    (tmp_path / "model.onnx_data").write_bytes(b"\0" * 1000)
+
+    result = estimate(str(tmp_path))
+
+    assert (result.format, result.weights.bytes) == ("file-sizes", 1100)
+
+
+def test_invalid_files_are_skipped_in_multi_file_repositories(tmp_path: Path) -> None:
+    good = write_safetensors(str(tmp_path / "lora-a.safetensors"), {"w": ("BF16", [64, 64])})
+    (tmp_path / "lora-b.safetensors").write_bytes(b"\x10\0\0\0\0\0\0\0not json")
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == good
+    assert any("Skipping 1 invalid" in w for w in result.warnings)
+    with pytest.raises(RuntimeError, match="not a valid Safetensors"):
+        estimate(str(tmp_path), file="lora-b.safetensors")
