@@ -1,12 +1,11 @@
 import asyncio
+import json
 import math
 import os
 import re
 import struct
 from dataclasses import dataclass
 from typing import Any
-
-import orjson
 
 from hf_mem._weights import Weights
 
@@ -49,7 +48,7 @@ async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
 def summarize(raw: bytes) -> tuple[dict[str, list[int]], dict[tuple[int, str], list[int]]]:
     dtypes: dict[str, list[int]] = {}
     experts: dict[tuple[int, str], list[int]] = {}
-    for tensor, info in orjson.loads(raw).items():
+    for tensor, info in json.loads(raw).items():
         if tensor == "__metadata__":
             continue
         start, end = info["data_offsets"]
@@ -152,7 +151,7 @@ async def read_components(
         probe[0] = max(probe[0], len(raw) + 8)
         try:
             summaries[path] = await loop.run_in_executor(pool, summarize, raw) if pool else summarize(raw)
-        except orjson.JSONDecodeError as e:
+        except ValueError as e:
             raise RuntimeError(f"`{path}` is not a valid Safetensors file.") from e
 
     try:
