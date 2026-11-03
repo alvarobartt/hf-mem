@@ -37,8 +37,17 @@ _DEFAULTS = {
         "sliding_window": 4096,
         "sliding_window_pattern": 6,
         "max_position_embeddings": 131072,
+        "num_attention_heads": 8,
         "num_key_value_heads": 4,
         "vocab_size": 262208,
+    },
+    "qwen2": {
+        "hidden_size": 4096,
+        "num_hidden_layers": 32,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 32,
+        "max_position_embeddings": 32768,
+        "vocab_size": 151936,
     },
 }
 _TEXT_KEYS = ("text_config", "language_config", "llm_config", "lfm", "thinker_config", "talker_config")

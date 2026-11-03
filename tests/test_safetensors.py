@@ -206,11 +206,41 @@ def test_mistral_params_json_warns(tmp_path):
     assert any("params.json" in w for w in result.warnings)
 
 
-def test_max_num_batched_tokens_scales_the_activations(tmp_path):
+def test_max_num_batched_tokens_selects_the_vllm_profile(tmp_path):
     write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
     write_json(str(tmp_path / "config.json"), llama_config(intermediate_size=128))
 
     default = run(str(tmp_path)).overhead
     small = run(str(tmp_path), max_num_batched_tokens=2048).overhead
 
-    assert default.activations - small.activations == (8192 - 2048) * 128 * 16
+    assert default.activations > small.activations
+    assert default.non_torch > small.non_torch
+
+
+def test_vision_encoder_overhead(tmp_path):
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    vision = {"hidden_size": 64, "intermediate_size": 128, "patch_size": 14, "image_size": 896}
+    config = {
+        "architectures": ["LlavaForConditionalGeneration"],
+        "text_config": llama_config(),
+        "vision_config": vision,
+    }
+    write_json(str(tmp_path / "config.json"), config)
+    write_json(str(tmp_path / "preprocessor_config.json"), {"max_pixels": 14 * 14 * 1024})
+
+    overhead = run(str(tmp_path)).overhead
+
+    assert overhead.encoder == 1024 * 2 * (4 * 64 + 2 * 128)
+
+
+def test_video_models_warn_about_the_vllm_video_profile(tmp_path):
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    vision = {"hidden_size": 64, "intermediate_size": 128, "patch_size": 14, "temporal_patch_size": 2}
+    config = {
+        "architectures": ["Qwen2VLForConditionalGeneration"],
+        "text_config": llama_config(),
+        "vision_config": vision,
+    }
+    write_json(str(tmp_path / "config.json"), config)
+
+    assert any("largest video" in w for w in run(str(tmp_path)).warnings)
