@@ -2,117 +2,154 @@
 
 ---
 
-> [!WARNING]
-> `hf-mem` is still experimental and therefore subject to major changes across releases, so please keep in mind that breaking changes may occur until v1.0.0.
+`hf-mem` estimates the memory required to run any model from the Hugging Face Hub, or from a local path, without downloading the weights. It reads the [Safetensors](https://github.com/huggingface/safetensors) and [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests), and only depends on [`httpx2`](https://github.com/pydantic/httpx2).
 
-`hf-mem` is a CLI to estimate inference memory requirements for Hugging Face models, written in Python. `hf-mem` is lightweight, only depends on [`httpx2`](https://github.com/pydantic/httpx2), as it pulls the [Safetensors](https://github.com/huggingface/safetensors) and / or [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests). It's recommended to run with [`uv`](https://github.com/astral-sh/uv) for a better experience.
-
-`hf-mem` lets you estimate the inference requirements to run any model from the Hugging Face Hub, including [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers) and [Sentence Transformers](https://github.com/huggingface/sentence-transformers) models, or really any model as long as it contains any of [Safetensors](https://github.com/huggingface/safetensors) or [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) weights. Repositories without a standard layout (e.g. `consolidated-*.safetensors` or ComfyUI single-file checkpoints) are estimated per `*.safetensors` file.
-
-Read more information about `hf-mem` in [this short-form post](https://alvarobartt.com/hf-mem), but note it's not up-to-date as it was written in January 2026.
+The estimate covers the model weights, the KV cache for generative models, and the runtime overhead of the inference engine (activations, CUDA graphs and the CUDA context), for [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers), [Sentence Transformers](https://github.com/huggingface/sentence-transformers) and GGUF models.
 
 ## Usage
 
-### CLI (Recommended)
+Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, where `<model>` is a Hub model ID (optionally with `@revision`), a Hub URL, or a local path.
 
-#### Transformers
+### Transformers
 
 ```bash
-uvx hf-mem --model-id zai-org/GLM-5.3-Flash
+uvx hf-mem zai-org/GLM-5.3-Flash
 ```
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/transformers.png" />
 
-#### Diffusers
+For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, which as in vLLM is the model dtype unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
 
 ```bash
-uvx hf-mem --model-id Qwen/Qwen-Image-2.1
+uvx hf-mem Qwen/Qwen3.8-27B --max-model-len 32768 --batch-size 4
+```
+
+### Diffusers
+
+```bash
+uvx hf-mem Qwen/Qwen-Image-2.1
 ```
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/diffusers.png" />
 
-#### Sentence Transformers
+### Sentence Transformers
 
 ```bash
-uvx hf-mem --model-id google/embeddinggemma-2
+uvx hf-mem google/embeddinggemma-2
 ```
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/sentence-transformers.png" />
 
-### Python
+### GGUF
 
-You can also run it programmatically with Python as:
-
-```python
-from hf_mem import run
-
-result = run(model_id="zai-org/GLM-5.3-Flash", experimental=True)
-print(result)
-# Result(model_id='zai-org/GLM-5.3-Flash', revision='main', filename=None, memory=328326771576, kv_cache=14763950080, total_memory=343090721656, details=False)
-```
-
-If you're already inside an async application, use `arun(...)` instead:
-
-```python
-from hf_mem import arun
-
-result = await arun(model_id="zai-org/GLM-5.3-Flash", experimental=True)
-print(result)
-# Result(model_id='zai-org/GLM-5.3-Flash', revision='main', filename=None, memory=328326771576, kv_cache=14763950080, total_memory=343090721656, details=False)
-```
-
-## Experimental
-
-By enabling the `--experimental` flag, you can enable the KV Cache memory estimation for generative models (LLMs, VLMs, omni and speech models), even including a custom `--max-model-len` (defaults to the `config.json` default), `--batch-size` (defaults to 1), and the `--kv-cache-dtype` (defaults to `auto` which, same as vLLM, uses the model data type set in `config.json` under `torch_dtype` or `dtype`, unless the `quantization_config` declares a quantized KV cache).
-
-The KV cache estimation accounts for the attention layout of the model: Multi-head Latent Attention (MLA) caches the compressed latent, hybrid models only cache the full and sliding attention layers (linear attention, convolution or Mamba layers don't grow with the context length), and the text decoder is resolved from nested configurations such as `text_config` or `llm_config`.
-
-Additionally, for Mixture of Experts (MoEs), the `--experimental` flag also adds a weights-only breakdown of the base model and all the experts combined.
+GGUF repositories list every file (skipping `mmproj` and `imatrix` files), and `--file` estimates a single file, which can also be a directory or any shard of a sharded file.
 
 ```bash
-uvx hf-mem --model-id zai-org/GLM-5.3-Flash --experimental
-```
-
-<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/experimental.png" />
-
-## GGUF
-
-If the repository contains GGUF model weights, those will be listed by default (only if there are no Safetensors weights, otherwise the GGUFs will be ignored) and the memory will be estimated for each one of those, skipping `mmproj` and `imatrix` files; whereas if a specific file (or a directory containing a sharded file) is provided via `--gguf-file`, then the memory estimation will be targeted for that given file instead.
-
-```bash
-uvx hf-mem --model-id LiquidAI/LFM3-1.7B-GGUF --experimental
+uvx hf-mem LiquidAI/LFM3-1.7B-GGUF
 ```
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/gguf.png" />
 
-Or if you want to only get the estimation on a given file:
-
 ```bash
-uvx hf-mem --model-id unsloth/Qwen3.8-27B-GGUF --gguf-file Qwen3.8-27B-UD-Q4_K_M.gguf --experimental
+uvx hf-mem unsloth/Qwen3.8-27B-GGUF --file Qwen3.8-27B-UD-Q4_K_M.gguf
 ```
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/gguf-file.png" />
 
-## Skills
+`--file` also selects a single `*.safetensors` file or shard set, e.g. on ComfyUI repositories that ship multiple checkpoints.
 
-Optionally, you can add `hf-mem` as an agent skill, which allows the underlying coding agent to discover and use it when provided as a [`SKILL.md`](skills/hf-mem/SKILL.md), e.g., `.claude/skills/hf-mem/SKILL.md`.
+### Does it fit?
 
-More information can be found at [Anthropic Agent Skills and how to use them](https://github.com/anthropics/skills).
+`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and reports whether the model fits, how many GPUs it needs, and the longest context that fits, using 90% of the memory as vLLM does by default (`--gpu-memory-utilization`).
 
-## Extensions
+```bash
+uvx hf-mem meta-llama/Llama-3.1-8B-Instruct --max-model-len 32768 --gpu-memory 24
+```
 
-Optionally, you can also add `hf-mem` as an extension to the Hugging Face Hub CLI under `hf` as `hf mem ...`. First you need to install `hf` as explained in [Hugging Face CLI - "Getting started"](https://huggingface.co/docs/huggingface_hub/en/guides/cli). To add `hf-mem` as an extension, all you need to do is run:
+### Local models and the cache
+
+Local directories and files work the same way, and models already downloaded to the Hugging Face cache are read from disk when unchanged on the Hub, or only from the cache with `HF_HUB_OFFLINE=1`.
+
+```bash
+uvx hf-mem ./path/to/model
+HF_HUB_OFFLINE=1 uvx hf-mem Qwen/Qwen3-8B
+```
+
+Gated and private models need a token, read from `--hf-token`, `HF_TOKEN`, or the token saved by `hf auth login`.
+
+### JSON and Markdown
+
+`--json` prints the estimate in bytes, and `--markdown` prints a table to share in model cards, issues or pull requests.
+
+```bash
+uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 --json
+```
+
+```json
+{
+  "hf_mem": "1.0.0",
+  "model": "Qwen/Qwen3-8B",
+  "revision": "main",
+  "format": "safetensors",
+  "total": 23934363648,
+  "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
+  "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
+  "overhead": {"bytes": 2721054720, "activations": 1647312896, "cuda_graphs": 268435456, "runtime": 805306368},
+  "warnings": []
+}
+```
+
+- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes; `kv_cache` and `overhead` are `null` for non-generative models.
+- `components` (per Diffusers component or file), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are added when they apply.
+- `format` is `safetensors`, `gguf`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt` or `.nemo` weights.
+- GGUF listings return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
+
+### Python
+
+```python
+from hf_mem import run
+
+result = run("Qwen/Qwen3-8B", max_model_len=32768)
+print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead.bytes)
+# 23934363648 16381470720 4831838208 2721054720
+print(result.to_dict())
+```
+
+`run` takes the same options as the CLI (`revision`, `file`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory` and `gpu_memory_utilization`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF repositories.
+
+### Agents
+
+Coding agents can use `uvx hf-mem <model> --json` to answer questions such as how much memory a model needs or whether it fits on a given GPU (adding `--gpu-memory`), choosing a single `--file` for GGUF repositories since only one file is loaded for inference.
+
+### Extensions
+
+`hf-mem` can also be added as an extension to the [Hugging Face CLI](https://huggingface.co/docs/huggingface_hub/en/guides/cli) as `hf mem ...`:
 
 ```bash
 hf extensions add alvarobartt/hf-mem
 ```
-More information can be found at [Hugging Face Hub CLI - "How Python extensions are installed"](https://huggingface.co/docs/huggingface_hub/en/guides/cli-extensions#how-python-extensions-are-installed).
 
-Once installed, you can use `hf-mem` via `hf` as `hf mem ...` along with the rest of Hugging Face extensions you have installed (which you can list via `hf extensions list`).
+## How it works
+
+- **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory.
+- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window + 4096` tokens, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
+- **Overhead** follows vLLM's memory profiling for Safetensors models (activations for the sampler logits and 4096 tokens, CUDA graphs, CUDA context and non-torch memory) and llama.cpp's compute buffer and CUDA context for GGUF models.
+
+The estimates have been validated on NVIDIA A100 GPUs against vLLM, SGLang, llama.cpp, Diffusers and Sentence Transformers, e.g. the KV cache per 32K-token request matches vLLM exactly for Llama 3.1, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 (sliding window), Qwen3.5 (linear attention) and Nemotron-H (Mamba), and the total is within 2% of the measured footprint for 7 of the 9 models tested. The vision encoder of VLMs and the linear attention kernels are not profiled, which added up to 3 GiB more on Qwen2.5-VL and Qwen3.5.
+
+## Contributing
+
+`hf-mem` is intentionally lightweight, simple and opinionated, so fixes and small improvements are welcome, but please open an issue before any non-trivial change, avoid new dependencies or abstractions, and keep the changes minimal and focused. `hf-mem` is maintained by humans, so please use AI assistance thoughtfully, similarly to the [Ghostty AI Policy](https://github.com/ghostty-org/ghostty/blob/main/AI_POLICY.md).
+
+```bash
+uv run --group test pytest
+uv run --group lint pre-commit run --all-files
+```
 
 ## References
 
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
 - [GGUF File format](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)
 - [GGUF on the Hugging Face Hub](https://huggingface.co/docs/hub/en/gguf)
+- [vLLM - Memory profiling](https://docs.vllm.ai/en/latest/configuration/conserving_memory/)
 - [usgraphics - TR-100 Machine Report](https://github.com/usgraphics/usgc-machine-report)
