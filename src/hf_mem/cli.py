@@ -60,6 +60,15 @@ def main() -> None:
         help="KV cache dtype, `auto` uses the model dtype (Safetensors) or F16 (GGUF). "
         f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(KV_DTYPES)}.",
     )
+    parser.add_argument(
+        "--gpu-memory", help="GPU memory in GiB, e.g. `80` or `8x80`, to check whether it fits."
+    )
+    parser.add_argument(
+        "--gpu-memory-utilization",
+        type=float,
+        default=0.9,
+        help="Fraction of the GPU memory that can be used, defaults to 0.9 (as vLLM).",
+    )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--json", "--json-output", dest="json", action="store_true", help="Print JSON.")
     parser.add_argument("--markdown", action="store_true", help="Print a Markdown table.")
@@ -73,6 +82,8 @@ def main() -> None:
         parser.error("the model ID or local path is required, e.g. `hf-mem Qwen/Qwen3-8B`")
     if args.batch_size < 1 or (args.max_model_len is not None and args.max_model_len < 1):
         parser.error("`--batch-size` and `--max-model-len` must be positive")
+    if not 0 < args.gpu_memory_utilization <= 1:
+        parser.error("`--gpu-memory-utilization` must be in (0, 1]")
     if args.experimental:
         print(
             "hf-mem: warning: `--experimental` is no longer needed, the KV cache is always estimated.",
@@ -90,6 +101,8 @@ def main() -> None:
                 batch_size=args.batch_size,
                 kv_cache_dtype=args.kv_cache_dtype,
                 hf_token=args.hf_token,
+                gpu_memory=args.gpu_memory,
+                gpu_memory_utilization=args.gpu_memory_utilization,
                 progress=Progress(status),
             )
         )

@@ -30,6 +30,7 @@ _DEFAULTS = {
         "sliding_window": 4096,
         "sliding_window_pattern": 2,
         "max_position_embeddings": 8192,
+        "vocab_size": 256000,
     },
     "gemma3_text": {
         "head_dim": 256,
@@ -37,6 +38,7 @@ _DEFAULTS = {
         "sliding_window_pattern": 6,
         "max_position_embeddings": 131072,
         "num_key_value_heads": 4,
+        "vocab_size": 262208,
     },
 }
 _TEXT_KEYS = ("text_config", "language_config", "llm_config", "lfm", "thinker_config", "talker_config")

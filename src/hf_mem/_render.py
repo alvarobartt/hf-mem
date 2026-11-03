@@ -93,7 +93,8 @@ def table(estimate: Estimate | Listing) -> str:
         return _listing(estimate)
     total, kv, weights = estimate.total or 1, estimate.kv_cache, estimate.weights
     params = f"{short(weights.params)} PARAMS" if weights.params else "FROM FILE SIZES"
-    summary = f"{gib(estimate.total)} GiB ({params}{' + KV CACHE' if kv else ''})"
+    parts = [params] + (["KV CACHE"] if kv else []) + (["OVERHEAD"] if estimate.overhead else [])
+    summary = f"{gib(estimate.total)} GiB ({' + '.join(parts)})"
     sections: list[Section] = [(None, [("TOTAL MEMORY", summary, "REQUIREMENTS", 1.0)])]
 
     def heading(name: str, w) -> str:
@@ -134,6 +135,30 @@ def table(estimate: Estimate | Listing) -> str:
         sections.append(
             (title, [(kv.dtype, f"{gib(kv.bytes)} / {gib(total)} GiB", f"{tokens} TOKENS", kv.bytes / total)])
         )
+    if overhead := estimate.overhead:
+        items = [
+            (name, f"{gib(value)} / {gib(total)} GiB", "", value / total)
+            for name, value in (
+                ("ACTIVATIONS", overhead.activations),
+                ("CUDA GRAPHS", overhead.cuda_graphs),
+                ("RUNTIME", overhead.runtime),
+            )
+            if value
+        ]
+        sections.append((f"OVERHEAD ({gib(overhead.bytes)} GiB)", items))
+    if fit := estimate.fit:
+        gpus = fit.gpus or fit.needed or 1
+        capacity = gpus * fit.gpu_memory
+        if fit.fits:
+            text = f"FITS ON {fit.needed} x {gib(fit.gpu_memory)} GiB"
+        elif fit.needed:
+            text = f"NEEDS {fit.needed} x {gib(fit.gpu_memory)} GiB"
+        else:
+            text = f"DOES NOT FIT ON 64 x {gib(fit.gpu_memory)} GiB"
+        if kv:
+            text += f", UP TO {fit.max_model_len} TOKENS"
+        used = f"{estimate.total / capacity:.0%} OF {gpus} GPU{'S' if gpus > 1 else ''}"
+        sections.append((None, [("GPU FIT", text, used, estimate.total / capacity)]))
     return _color(_draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH))
 
 

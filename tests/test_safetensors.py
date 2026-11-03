@@ -17,7 +17,7 @@ def test_dense_model_with_kv_cache(tmp_path):
     assert set(result.weights.dtypes) == {"BF16", "F32"}
     assert result.kv_cache is not None
     assert result.kv_cache.bytes == 2 * 4 * 2 * 32 * 1024 * 2
-    assert result.total == nbytes + result.kv_cache.bytes
+    assert result.total == nbytes + result.kv_cache.bytes + result.overhead.bytes
 
 
 def test_kv_cache_options(tmp_path):
@@ -72,7 +72,7 @@ def test_diffusers_pipeline_prefers_the_default_variant(tmp_path):
     result = run(str(tmp_path))
 
     assert {n: c.bytes for n, c in result.components.items()} == {"transformer": transformer, "vae": vae}
-    assert result.kv_cache is None
+    assert result.kv_cache is None and result.overhead is None
 
 
 def test_sentence_transformers_adds_dense_modules(tmp_path):

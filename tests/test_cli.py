@@ -40,9 +40,21 @@ def test_json(monkeypatch, capsys, model):
     code, out, _ = cli(monkeypatch, capsys, model, "--json", "--max-model-len", "10", "--batch-size", "2")
     data = json.loads(out)
     assert code == 0
-    assert list(data) == ["hf_mem", "model", "revision", "format", "total", "weights", "kv_cache", "warnings"]
+    keys = ["hf_mem", "model", "revision", "format", "total", "weights", "kv_cache", "overhead", "warnings"]
+    assert list(data) == keys
     assert data["kv_cache"]["max_model_len"] == 10 and data["kv_cache"]["batch_size"] == 2
-    assert data["total"] == data["weights"]["bytes"] + data["kv_cache"]["bytes"]
+    assert data["total"] == data["weights"]["bytes"] + data["kv_cache"]["bytes"] + data["overhead"]["bytes"]
+
+
+def test_gpu_fit(monkeypatch, capsys, model):
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "--json")
+    fit = json.loads(out)["fit"]
+    assert code == 0 and fit["gpus"] == 2 and fit["needed"] == 1 and fit["fits"]
+    assert fit["max_model_len"] == 1024
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "4")
+    assert code == 0 and "FITS ON 1 x 4.00 GiB" in out
+    code, _, err = cli(monkeypatch, capsys, model, "--gpu-memory", "lots")
+    assert code == 1 and "--gpu-memory" in err
 
 
 def test_markdown(monkeypatch, capsys, model):
