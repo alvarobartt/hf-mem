@@ -62,3 +62,7 @@ def test_fit_replicates_kv_heads_across_gpus():
     assert _overhead.fit(
         weights=0, gpu_memory="8x10", utilization=1.0, kv_heads=None, **args
     ).max_model_len == (split.max_model_len)
+
+
+def test_batched_tokens_override():
+    assert _overhead.batched_tokens("8x80", 2048) == 2048
