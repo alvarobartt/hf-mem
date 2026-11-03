@@ -1,32 +1,120 @@
 import warnings
-from typing import Any, Dict
+from collections import Counter
+from typing import Any, Dict, List
 
 from hf_mem.safetensors.metadata import SafetensorsMetadata
 from hf_mem.safetensors.types import TorchDtypes, get_safetensors_dtype_bytes, torch_dtype_to_safetensors_dtype
 
 KV_CACHE_DTYPE_CHOICES = ["auto", "bfloat16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
 
+_ALIASES = {
+    "num_hidden_layers": ("num_hidden_layers", "n_layers", "num_layers", "n_layer"),
+    "num_attention_heads": ("num_attention_heads", "n_heads", "n_head", "num_heads"),
+    "num_key_value_heads": ("num_key_value_heads", "n_kv_heads", "num_kv_heads", "multi_query_group_num"),
+    "hidden_size": ("hidden_size", "d_model", "n_embd", "dim"),
+    "max_position_embeddings": ("max_position_embeddings", "n_positions", "max_seq_len", "seq_length"),
+}
+_TEXT_CONFIG_KEYS = ("text_config", "language_config", "llm_config", "lfm", "thinker_config", "talker_config")
+_NON_TEXT_HINTS = ("vision", "audio", "encoder", "codec", "depth", "speech", "image", "video", "visual", "detr")
+_ENCODER_ARCH_HINTS = (
+    "ForMaskedLM",
+    "ForSequenceClassification",
+    "ForTokenClassification",
+    "ForQuestionAnswering",
+    "ForImageClassification",
+    "ForMaskGeneration",
+    "ForTextEncoding",
+    "Embedding",
+)
+_STATEFUL_LAYER_HINTS = (
+    "linear",
+    "conv",
+    "mamba",
+    "ssm",
+    "recurrent",
+    "delta",
+    "rwkv",
+    "lightning",
+    "mlp",
+    "moe",
+)
+_SLIDING_LAYER_HINTS = ("sliding", "local", "chunked", "swa")
 
-def _resolve_attention_layer_counts(config: Dict[str, Any]) -> tuple[int, int]:
-    num_hidden_layers: int = config["num_hidden_layers"]
 
-    # NOTE: Gemma3-style hybrid attention: every N-th layer (0-indexed where `i % N == N-1`)
-    # is a global attention layer; the rest are sliding window attention layers.
-    # For N=6 and 46 total layers: 46 // 6 = 7 global attention layers.
-    # For N=4 and 60 total layers: 60 // 4 = 15 global attention layers (e.g. Qwen3.5-397B-A17B).
-    if "sliding_window_pattern" in config:
-        num_full = num_hidden_layers // config["sliding_window_pattern"]
-        return num_full, num_hidden_layers - num_full
-
-    # NOTE: Some models provide an explicit list of layer types, so we need to count the non-sliding-window ones.
-    if "layer_types" in config:
-        num_full = sum(
-            1 for t in config["layer_types"] if t in {"attention", "full_attention", "global_attention"}
+def _normalize(config: Dict[str, Any]) -> Dict[str, Any]:
+    config = dict(config)
+    for key, aliases in _ALIASES.items():
+        if config.get(key) is None:
+            config[key] = next((config[a] for a in aliases if isinstance(config.get(a), int)), None)
+    if config["num_hidden_layers"] is None:
+        layers = (
+            config.get("layer_types")
+            or config.get("layers_block_type")
+            or config.get("hybrid_override_pattern")
         )
-        return num_full, num_hidden_layers - num_full
+        config["num_hidden_layers"] = len(layers) if layers else None
+    return config
 
-    # NOTE: By default assume all layers use full attention (standard MHA / GQA without SWA).
-    return num_hidden_layers, 0
+
+def _is_text_config(config: Any) -> bool:
+    return (
+        isinstance(config, dict)
+        and isinstance(_normalize(config)["num_hidden_layers"], int)
+        and isinstance(_normalize(config)["num_attention_heads"], int)
+    )
+
+
+def _nested_text_configs(config: Dict[str, Any], path: str = "") -> List[tuple[str, Dict[str, Any]]]:
+    found = []
+    for key, value in config.items():
+        if isinstance(value, dict):
+            child = f"{path}.{key}"
+            if _is_text_config(value):
+                found.append((child, value))
+            found.extend(_nested_text_configs(value, child))
+    return found
+
+
+def resolve_text_config(config: Dict[str, Any]) -> Dict[str, Any] | None:
+    if any(hint in arch for arch in config.get("architectures") or [] for hint in _ENCODER_ARCH_HINTS):
+        return None
+
+    text_config = None
+    for key in _TEXT_CONFIG_KEYS:
+        if isinstance(config.get(key), dict):
+            text_config = resolve_text_config(config[key]) or (
+                config[key] if _is_text_config(config[key]) else None
+            )
+            if text_config is not None:
+                break
+
+    if text_config is None and _is_text_config(config):
+        text_config = config
+
+    if text_config is None:
+        candidates = [
+            c for path, c in _nested_text_configs(config) if not any(h in path.lower() for h in _NON_TEXT_HINTS)
+        ]
+        if candidates:
+            text_config = max(candidates, key=lambda c: _normalize(c)["hidden_size"] or 0)
+
+    if text_config is None:
+        return None
+
+    text_config = _normalize(text_config)
+    for key in ("dtype", "torch_dtype", "quantization_config"):
+        if text_config.get(key) is None and config.get(key) is not None:
+            text_config[key] = config[key]
+    return text_config
+
+
+def _dominant_float_dtype(metadata: SafetensorsMetadata) -> str:
+    counts: Counter = Counter()
+    for component in metadata.components.values():
+        for dtype, dtype_metadata in component.dtypes.items():
+            if dtype in {"BF16", "F16", "F32"}:
+                counts[dtype] += dtype_metadata.param_count
+    return counts.most_common(1)[0][0] if counts else "BF16"
 
 
 def resolve_kv_cache_dtype(
@@ -37,106 +125,65 @@ def resolve_kv_cache_dtype(
 ) -> str:
     if kv_cache_dtype and kv_cache_dtype not in KV_CACHE_DTYPE_CHOICES:
         raise RuntimeError(
-            f"Provided `--kv_cache_dtype={kv_cache_dtype}` which is not valid for Safetensors models. "
-            f"Valid options for Safetensors models are: {KV_CACHE_DTYPE_CHOICES}. "
-            f"Note that GGUF-specific dtypes (e.g. F16, F32, Q4_K) are only valid when estimating GGUF files via `--gguf-file`. "
+            f"`--kv-cache-dtype={kv_cache_dtype}` is not valid for Safetensors models, valid options are: {KV_CACHE_DTYPE_CHOICES}."
         )
     if kv_cache_dtype in {"fp8_e5m2", "fp8_e4m3"}:
         return kv_cache_dtype.upper().replace("FP8", "F8")  # type: ignore[union-attr]
-
     if kv_cache_dtype in {"fp8", "fp8_ds_mla", "fp8_inc"}:
-        # NOTE: Default to `F8_E4M3` for the calculations, given that all those take 1 byte, but only F8_E5M2
-        # or `F8_E4M3` are supported in Safetensors, whilst `FP8_DS_MLA` (DeepSeek MLA) and `FP8_INC` (Intel HPUs)
-        # are not; and `F8_E4M3` is supported on both CUDA and AMD, hence seems a reasonable default
-        warnings.warn(
-            f"--kv-cache-dtype={kv_cache_dtype}` has been provided, but given that none of those matches an actual Safetensors dtype since it should be any of `F8_E5M2` or `F8_E4M3`, the `--kv-cache-dtype` will default to `F8_E4M3` instead, which implies that the calculations are the same given that both dtypes take 1 byte despite the quantization scheme of it, or the hardware compatibility; so the estimations should be accurate enough."
-        )
         return "F8_E4M3"
-
     if kv_cache_dtype == "bfloat16":
         return "BF16"
 
-    if "quantization_config" in config and "quant_method" in config["quantization_config"]:
-        _quantization_config = config["quantization_config"]
-        _quant_method = _quantization_config["quant_method"]
+    quantization_config = config.get("quantization_config") or {}
+    kv_cache_scheme = quantization_config.get("kv_cache_scheme") or {}
+    if kv_cache_scheme.get("num_bits") == 8 or quantization_config.get("kv_cache_quant_algo") == "FP8":
+        return "F8_E4M3"
 
-        if _quant_method in {"fp8", "modelopt"}:
-            _fmt = _quantization_config.get("fmt", _quantization_config.get("format", None))
-            if _fmt:
-                if not _fmt.startswith("float8_"):
-                    _fmt = f"float8_{_fmt}"
+    if quantization_config.get("quant_method") in {"fp8", "modelopt"}:
+        fmt = quantization_config.get("fmt", quantization_config.get("format"))
+        if fmt:
+            fmt = fmt if fmt.startswith("float8_") else f"float8_{fmt}"
+            if fmt in TorchDtypes.__args__:
+                return torch_dtype_to_safetensors_dtype(fmt)
+        f8 = [d for c in metadata.components.values() for d in c.dtypes if d in {"F8_E5M2", "F8_E4M3"}]
+        if f8:
+            return max(f8, key=f8.count)
 
-                if _fmt not in TorchDtypes.__args__:
-                    raise RuntimeError(
-                        f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `fmt` (or `format`) value of `{_fmt}` that's not supported (should be any of {TorchDtypes.__args__}), you might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
-                    )
+    if dtype := config.get("torch_dtype") or config.get("dtype"):
+        if isinstance(dtype, str):
+            return torch_dtype_to_safetensors_dtype(dtype)
 
-                return torch_dtype_to_safetensors_dtype(_fmt)
-
-            # NOTE: Some quantization methods (e.g. `modelopt` with NVFP4) include an explicit
-            # `kv_cache_scheme` in the `quantization_config`, which specifies the cache precision.
-            _kv_cache_scheme = _quantization_config.get("kv_cache_scheme", None)
-            if (
-                _kv_cache_scheme
-                and _kv_cache_scheme.get("num_bits") == 8
-                and _kv_cache_scheme.get("type") == "float"
-            ):
-                return "F8_E4M3"
-
-            # NOTE: If `quant_method` in `quantization_config` is set to `fp8` and `fmt` is not set, then
-            # we get the most used `F8_*` Safetensors dtype to map the `quant_method=fp8` to an actual Safetensors
-            # dtype, as `F8` is not a valid dtype neither on PyTorch nor on Safetensors, as we need to append
-            # the scheme / format.
-            # SAFETY: As per the snippets above, if `_fmt` is None we assume that `_quant_method=fp8`
-            cache_dtype = max(
-                (
-                    l := [
-                        d
-                        for c in metadata.components.values()
-                        for d in c.dtypes.keys()
-                        if d in {"F8_E5M2", "F8_E4M3"}
-                    ]
-                ),
-                key=l.count,
-                default=None,
-            )
-
-            # TODO: Not sure if we should default to `F8_E4M3` as a reasonable default as when `FP8`,
-            # `FP8_DS_MLA` or `FP8_INC` are provided... to prevent raising an exception
-            if not cache_dtype:
-                raise RuntimeError(
-                    f"The `config.json` file for `--model-id={model_id}` contains `quantization_config={_quantization_config}` with `quant_method={_quant_method}`, but none of the tensors in the model weights use `F8_E4M3` or `F8_E5M2`, so the `F8_` format for the Safetensors dtype cannot be inferred. You might need to set `--kv-cache-dtype=fp8` to enforce the dtype instead of pulling it from the `config.json`.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
-                )
-            return cache_dtype
-
-        # NOTE: For `compressed-tensors`, check if there's an explicit `kv_cache_scheme` in the config;
-        # if not, the KV cache is not quantized and we should fall through to the default dtype
-        # resolution below.
-        if _quant_method == "compressed-tensors":
-            _kv_cache_scheme = _quantization_config.get("kv_cache_scheme", None)
-            if _kv_cache_scheme is not None:
-                raise RuntimeError(
-                    f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `kv_cache_scheme` that is not supported; you should enforce the `--kv-cache-dtype` value to whatever quantization precision it's using, if applicable.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
-                )
-
-            warnings.warn(
-                f"The `config.json` for `--model-id={model_id}` contains `quantization_config` with `quant_method=compressed-tensors` but no `kv_cache_scheme`, so the KV cache dtype will be inferred from `torch_dtype` or `dtype` in the config instead."
-            )
-        else:
-            raise RuntimeError(
-                f"Provided `--kv-cache-dtype=auto` (or unset) and given that `config.json` contains the following `quantization_config={_quantization_config}` with a `quant_method` different than `fp8` i.e., `{_quant_method}`, which is not supported; you should enforce the `--kv-cache-dtype` value to whatever quantization precision it's using, if applicable.\nAs KV cache estimation is still experimental, as that might not be the case for your model, then feel free to open an issue at https://github.com/alvarobartt/hf-mem with a report and eventually what solution you would like to see implemented."
-            )
-
-    if _cache_dtype := config.get("torch_dtype", None):
-        return torch_dtype_to_safetensors_dtype(_cache_dtype)
-
-    if _cache_dtype := config.get("dtype", None):
-        return torch_dtype_to_safetensors_dtype(_cache_dtype)
-
-    raise RuntimeError(
-        f"Provided `--kv-cache-dtype={kv_cache_dtype}` but the KV cache dtype could not be resolved from `config.json`. "
-        f"The `config.json` should either contian the `torch_dtype` or `dtype` fields set; or if quantized, then the `quantization_config` needs to be set and contain the key `quant_method`."
+    dtype = _dominant_float_dtype(metadata)
+    warnings.warn(
+        f"The KV cache dtype for `{model_id}` could not be inferred from `config.json`, so it defaults to {dtype}, set `--kv-cache-dtype` to override it."
     )
+    return dtype
+
+
+def _layer_kinds(config: Dict[str, Any]) -> List[str]:
+    num_hidden_layers: int = config["num_hidden_layers"]
+
+    if isinstance(config.get("sliding_window_pattern"), int) and config["sliding_window_pattern"] > 0:
+        pattern = config["sliding_window_pattern"]
+        return ["full" if (i + 1) % pattern == 0 else "sliding" for i in range(num_hidden_layers)]
+
+    layer_types = config.get("layer_types") or config.get("layers_block_type")
+    if isinstance(layer_types, list) and layer_types:
+        kinds = []
+        for layer_type in layer_types:
+            layer_type = str(layer_type).lower()
+            if any(h in layer_type for h in _SLIDING_LAYER_HINTS):
+                kinds.append("sliding")
+            elif any(h in layer_type for h in _STATEFUL_LAYER_HINTS):
+                kinds.append("none")
+            else:
+                kinds.append("full")
+        return kinds
+
+    if isinstance(pattern := config.get("hybrid_override_pattern"), str):
+        return ["full" if c == "*" else "none" for c in pattern]
+
+    return ["full"] * num_hidden_layers
 
 
 def compute_safetensors_kv_cache_size(
@@ -145,35 +192,21 @@ def compute_safetensors_kv_cache_size(
     max_model_len: int,
     batch_size: int = 1,
 ) -> int:
-    hidden_size: int = config["hidden_size"]
+    config = _normalize(config)
+    hidden_size = config["hidden_size"] or 0
     num_attention_heads: int = config["num_attention_heads"]
+    num_key_value_heads: int = config["num_key_value_heads"] or num_attention_heads
+    head_dim: int = config.get("head_dim") or hidden_size // num_attention_heads
 
-    # NOTE: `num_key_value_heads` defaults to `num_attention_heads` in MHA, and is explicitly
-    # set to a smaller value in GQA / MQA
-    num_key_value_heads: int = config.get("num_key_value_heads", num_attention_heads)
+    if kv_lora_rank := config.get("kv_lora_rank"):
+        width = kv_lora_rank + (config.get("qk_rope_head_dim") or 0) + (config.get("index_head_dim") or 0)
+    else:
+        width = 2 * num_key_value_heads * head_dim
 
-    # NOTE: Use `head_dim` directly if specified in the config; some models (e.g. Qwen3) set
-    # hidden_size and num_attention_heads independently from the actual per-head size,
-    # making the fallback `hidden_size // num_attention_heads` incorrect for those models
-    head_dim: int = config.get("head_dim", hidden_size // num_attention_heads)
-
-    # NOTE: Full-attention layers always grow with `max_model_len`. Sliding-window layers depend
-    # on the regime: in a *hybrid* model (mix of full + sliding layers) inference engines commonly
-    # unify KV page sizes across layer groups, so sliding layers reserve full-size pages and
-    # effectively cost `max_model_len` tokens too; in a *pure* sliding-window model they stay capped
-    # at `min(sliding_window, max_model_len)`. We report the reserved (upper-bound) footprint so the
-    # estimate does not under-count what actually gets allocated for long contexts.
-    num_full_layers, num_sliding_layers = _resolve_attention_layer_counts(config)
+    kinds = _layer_kinds(config)
+    num_full, num_sliding = kinds.count("full"), kinds.count("sliding")
     sliding_window = config.get("sliding_window") or max_model_len
-    is_hybrid = num_full_layers > 0 and num_sliding_layers > 0
-    sliding_tokens = max_model_len if is_hybrid else min(sliding_window, max_model_len)
-    total_kv_tokens = num_full_layers * max_model_len + num_sliding_layers * sliding_tokens
+    sliding_tokens = max_model_len if num_full and num_sliding else min(sliding_window, max_model_len)
+    total_kv_tokens = num_full * max_model_len + num_sliding * sliding_tokens
 
-    return int(
-        2
-        * total_kv_tokens
-        * num_key_value_heads
-        * head_dim
-        * get_safetensors_dtype_bytes(cache_dtype)
-        * batch_size
-    )
+    return int(total_kv_tokens * width * get_safetensors_dtype_bytes(cache_dtype) * batch_size)

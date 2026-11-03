@@ -1,4 +1,5 @@
 import math
+import warnings
 from dataclasses import dataclass
 from typing import Any, Dict
 
@@ -139,12 +140,10 @@ def parse_moe_metadata(
     if configured_expert_count is not None:
         expected_ids = list(range(configured_expert_count))
         if observed_ids != expected_ids:
-            raise RuntimeError(
-                "MoE expert indices inferred from the Safetensors metadata do not match the "
-                f"`config.json` expert count. Expected IDs {expected_ids[:3]}...{expected_ids[-3:]} "
-                f"(count={configured_expert_count}), found IDs {observed_ids[:3]}...{observed_ids[-3:]} "
-                f"(count={observed_expert_count})."
+            warnings.warn(
+                f"MoE breakdown skipped, as the expert indices in the Safetensors metadata (count={observed_expert_count}) do not match the `config.json` expert count ({configured_expert_count})."
             )
+            return None
         expert_count = configured_expert_count
     else:
         expert_count = observed_expert_count
@@ -154,10 +153,8 @@ def parse_moe_metadata(
     expert_template = experts[observed_ids[0]]
     for expert_id in observed_ids[1:]:
         if not _components_match(expert_template, experts[expert_id]):
-            raise RuntimeError(
-                "MoE experts inferred from the Safetensors metadata are not uniform, so they "
-                "cannot be summarized as `N x EXPERTS` safely."
-            )
+            warnings.warn("MoE breakdown skipped, as the experts in the Safetensors metadata are not uniform.")
+            return None
     return MoEMetadata(
         base_model=base_model,
         experts=dict(sorted(experts.items())),

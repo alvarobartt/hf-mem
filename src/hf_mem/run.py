@@ -15,7 +15,11 @@ from hf_mem._version import __version__
 from hf_mem.gguf.fetch import fetch_gguf_with_semaphore
 from hf_mem.gguf.metadata import GGUFDtype, GGUFMetadata, merge_shards
 from hf_mem.safetensors.fetch import fetch_modules_and_dense_metadata, fetch_safetensors_metadata
-from hf_mem.safetensors.kv_cache import compute_safetensors_kv_cache_size, resolve_kv_cache_dtype
+from hf_mem.safetensors.kv_cache import (
+    compute_safetensors_kv_cache_size,
+    resolve_kv_cache_dtype,
+    resolve_text_config,
+)
 from hf_mem.safetensors.metadata import (
     MoEMetadata,
     SafetensorsMetadata,
@@ -529,63 +533,44 @@ async def arun(
 
     kv_cache_cls: KvCache | None = None
     moe_metadata: MoEMetadata | None = None
-    if experimental and "config.json" in file_paths:
+    if experimental and "config.json" in file_paths and "config_sentence_transformers.json" not in file_paths:
         url = f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/config.json"
         config: Dict[str, Any] = await get_json_file(client, url, headers)
+        architectures = config.get("architectures") or []
+        is_generative = "generation_config.json" in file_paths or any(
+            arch.endswith(("ForCausalLM", "ForConditionalGeneration", "LMHeadModel")) for arch in architectures
+        )
+        text_config = resolve_text_config(config) if is_generative else None
 
-        if not any(
-            arch.__contains__("ForCausalLM") or arch.__contains__("ForConditionalGeneration")
-            for arch in config.get("architectures", [])
+        stub = config.get("text_config") or {}
+        if (
+            is_generative
+            and text_config is None
+            and "/" in (referenced_model := stub.get("_name_or_path") or "")
         ):
-            warnings.warn(
-                "`experimental=True` was set, but either `config.json` doesn't have the `architectures` key meaning that the model architecture cannot be inferred, or rather that it's neither `...ForCausalLM` nor `...ForConditionalGeneration`, meaning that the KV Cache estimation might not apply. If that's the case, then set `experimental=False` to suppress this warning."
-            )
+            try:
+                referenced_config = await get_json_file(
+                    client, f"https://huggingface.co/{referenced_model}/resolve/main/config.json", headers
+                )
+                text_config = resolve_text_config({**referenced_config, **stub})
+            except (RuntimeError, httpx2.HTTPError):
+                pass
+
+        if text_config is None:
+            if is_generative:
+                warnings.warn(
+                    f"KV cache estimation skipped for `{model_id}`, as no text decoder config was found in `config.json`."
+                )
         else:
-            if (
-                any(arch.__contains__("ForConditionalGeneration") for arch in config["architectures"])
-                and "text_config" in config
-            ):
+            moe_metadata = parse_moe_metadata(raw_metadata=raw_metadata, config=text_config)
+            max_model_len = max_model_len or text_config.get("max_position_embeddings")
+            if not isinstance(max_model_len, int):
                 warnings.warn(
-                    f"Given that `model_id={model_id}` is a `...ForConditionalGeneration` model, then the configuration from `config.json` will be retrieved from the key `text_config` instead."
-                )
-                text_config = config["text_config"]
-
-                if referenced_model := text_config.get("_name_or_path"):
-                    referenced_url = (
-                        f"https://huggingface.co/{referenced_model}/resolve/{revision_encoded}/config.json"
-                    )
-                    warnings.warn(
-                        f"The `text_config` contains `_name_or_path={referenced_model}`, so fetching the config from `{referenced_model}` to retrieve the required fields for KV cache estimation."
-                    )
-                    referenced_config = await get_json_file(client, referenced_url, headers)
-                    referenced_config.update(text_config)
-                    text_config = referenced_config
-
-                for key in ("dtype", "torch_dtype", "quantization_config"):
-                    if key in config and key not in text_config:
-                        text_config[key] = config[key]
-
-                config = text_config
-
-            moe_metadata = parse_moe_metadata(raw_metadata=raw_metadata, config=config)
-
-            if max_model_len is None:
-                max_model_len = config.get(
-                    "max_position_embeddings",
-                    config.get("n_positions", config.get("max_seq_len", max_model_len)),
-                )
-
-            if max_model_len is None:
-                warnings.warn(
-                    "Either `max_model_len` was not set, is not available in `config.json` under any of `max_position_embeddings`, `n_positions`, or `max_seq_len` (in that order of priority), or both; so the memory required to fit the context length cannot be estimated."
-                )
-            elif not all(k in config for k in {"hidden_size", "num_hidden_layers", "num_attention_heads"}):
-                warnings.warn(
-                    f"`config.json` doesn't contain all the required keys `hidden_size`, `num_hidden_layers`, and `num_attention_heads`, but only {list(config.keys())}."
+                    f"KV cache estimation skipped for `{model_id}`, as the context length cannot be inferred from `config.json`, set `--max-model-len` to estimate it."
                 )
             else:
                 cache_dtype = resolve_kv_cache_dtype(
-                    config=config,
+                    config=text_config,
                     kv_cache_dtype=kv_cache_dtype,
                     metadata=metadata,
                     model_id=model_id,
@@ -593,7 +578,7 @@ async def arun(
                 kv_cache_cls = KvCache(
                     max_model_len=max_model_len,
                     cache_size=compute_safetensors_kv_cache_size(
-                        config=config,
+                        config=text_config,
                         cache_dtype=cache_dtype,
                         max_model_len=max_model_len,
                         batch_size=batch_size,
