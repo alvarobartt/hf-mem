@@ -91,10 +91,10 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 --json
   "model": "Qwen/Qwen3-8B",
   "revision": "main",
   "format": "safetensors",
-  "total": 24337016832,
+  "total": 25142323200,
   "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 3123707904, "activations": 2049966080, "cuda_graphs": 268435456, "runtime": 805306368},
+  "overhead": {"bytes": 3929014272, "activations": 2855272448, "cuda_graphs": 268435456, "runtime": 805306368},
   "warnings": []
 }
 ```
@@ -111,11 +111,11 @@ from hf_mem import run
 
 result = run("Qwen/Qwen3-8B", max_model_len=32768)
 print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead.bytes)
-# 24337016832 16381470720 4831838208 3123707904
+# 25142323200 16381470720 4831838208 3929014272
 print(result.to_dict())
 ```
 
-`run` takes the same options as the CLI (`revision`, `file`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory` and `gpu_memory_utilization`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF repositories.
+`run` takes the same options as the CLI (`revision`, `file`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization` and `max_num_batched_tokens`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF repositories.
 
 ### Agents
 
@@ -132,10 +132,10 @@ hf extensions add alvarobartt/hf-mem
 ## How it works
 
 - **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory.
-- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus the batched tokens, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
-- **Overhead** follows vLLM's memory profiling for Safetensors models (activations for the sampler logits and the batched tokens, CUDA graphs, CUDA context and non-torch memory) and llama.cpp's compute buffer and CUDA context for GGUF models. As in vLLM, 8192 tokens are batched, or 2048 when `--gpu-memory` is under 70 GiB.
+- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus two batches of tokens in flight, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
+- **Overhead** follows vLLM's memory profiling for Safetensors models (activations for the sampler logits and the batched tokens, CUDA graphs, CUDA context and non-torch memory) and llama.cpp's compute buffer and CUDA context for GGUF models. As in vLLM, 8192 tokens are batched, or 2048 when `--gpu-memory` is under 70 GiB, which can be set with `--max-num-batched-tokens` (e.g. 2048 on A100 GPUs, which vLLM treats as small GPUs).
 
-The estimates have been validated on NVIDIA T4, L4, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs) against vLLM, SGLang, llama.cpp, Diffusers and Sentence Transformers. The KV cache per request matches vLLM exactly for Llama 3.1, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 (sliding window), Qwen3.5 (linear attention) and Nemotron-H (Mamba), the KV cache per token matches SGLang for Llama 3, Qwen3, DeepSeek-V2, Qwen3.6 and gpt-oss. On a single GPU, the total is within -3% and +9% of the memory used by vLLM for most models, erring high on GPUs where vLLM batches fewer tokens (e.g. A100), with these known gaps:
+The estimates have been validated on NVIDIA T4, L4, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs) against vLLM, SGLang, llama.cpp, Diffusers and Sentence Transformers. The KV cache per request matches vLLM exactly for Llama 3.1, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 (sliding window), Qwen3.5 (linear attention) and Nemotron-H (Mamba), the KV cache per token matches SGLang for Llama 3, Qwen3, DeepSeek-V2, Qwen3.6 and gpt-oss. On a single GPU, the total is within -3% and +7% of the memory used by vLLM for most models, with these known gaps:
 
 - Vision and audio encoders are counted in the weights, but their profiling activations are not, which adds up to 3 GiB in vLLM for VLMs (-9% on Qwen2.5-VL), and the non-torch memory of the Qwen3.5 linear attention kernels is not either (-9%).
 - On large GPUs, MoE and hybrid models can use 2 to 5 GiB more for activations and CUDA graphs than estimated.
