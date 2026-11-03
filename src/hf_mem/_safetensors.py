@@ -7,12 +7,13 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
+from hf_mem._source import HubError
 from hf_mem._weights import Weights
 
 PROBE_SIZE = 100_000
 SHARD = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
 _MODEL_SHARD = re.compile(r"model-\d+-of-(\d+)\.safetensors")
-WEIGHT_EXTENSIONS = (".bin", ".pt", ".pth", ".ckpt", ".nemo")
+WEIGHT_EXTENSIONS = (".bin", ".pt", ".pth", ".ckpt", ".nemo", ".onnx", ".onnx_data")
 _EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
 POOL_MIN_FILES = 32
 
@@ -81,8 +82,8 @@ def _select(groups: dict[str, list[str]], file: str) -> dict[str, list[str]]:
 
 
 def _complete(paths: list[str]) -> bool:
-    totals = {m.group(1) if (m := _MODEL_SHARD.fullmatch(p)) else None for p in paths}
-    return len(totals) == 1 and None not in totals and int(totals.pop()) == len(paths)
+    totals = {m.group(1) if (m := _MODEL_SHARD.fullmatch(p)) else "" for p in paths}
+    return len(totals) == 1 and "" not in totals and int(next(iter(totals))) == len(paths)
 
 
 async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[str, list[str]]:
@@ -114,7 +115,14 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
         paths = groups.get("model", [])
         if "model.safetensors.index.json" in files and not _complete(paths):
             index = await source.json("model.safetensors.index.json")
-            paths = sorted(set(index["weight_map"].values()))
+            indexed = sorted(set(index["weight_map"].values()))
+            paths = [p for p in indexed if p in files]
+            if len(paths) < len(indexed):
+                warnings.append(
+                    f"`model.safetensors.index.json` references {len(indexed) - len(paths)} files that are not in "
+                    "the repository, so the estimate only covers the uploaded `*.safetensors` files."
+                )
+                paths = paths or sorted(p for ps in groups.values() for p in ps)
         if "config_sentence_transformers.json" not in files:
             return {"Transformer": paths}
         components = {"0_Transformer": paths}
@@ -137,7 +145,7 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
 
 
 async def read_components(
-    source: Any, components: dict[str, list[str]]
+    source: Any, components: dict[str, list[str]], warnings: list[str] | None = None
 ) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]]]:
     paths = sorted({p for ps in components.values() for p in ps})
     semaphore, probe = asyncio.Semaphore(32), [PROBE_SIZE]
@@ -155,14 +163,23 @@ async def read_components(
             raise RuntimeError(f"`{path}` is not a valid Safetensors file.") from e
 
     try:
-        await asyncio.gather(*(read(p) for p in paths))
+        results = await asyncio.gather(*(read(p) for p in paths), return_exceptions=True)
     finally:
         if pool:
             pool.shutdown(cancel_futures=True)
+    failed = {p: r for p, r in zip(paths, results) if isinstance(r, BaseException)}
+    if failed:
+        error = next(iter(failed.values()))
+        broken = [name for name, ps in components.items() if any(p in failed for p in ps)]
+        if not isinstance(error, RuntimeError) or isinstance(error, HubError) or len(broken) == len(components):
+            raise error
+        components = {name: ps for name, ps in components.items() if name not in broken}
+        if warnings is not None:
+            warnings.append(f"Skipping {len(broken)} invalid `*.safetensors` files, e.g. {error}")
     weights: dict[str, Weights] = {}
     experts: dict[str, dict[int, Weights]] = {}
     for name, component_paths in components.items():
-        component, merged = Weights(), {}
+        component, merged = Weights(), dict[int, Weights]()
         for path in component_paths:
             dtypes, by_expert = summaries[path]
             for dtype, (params, nbytes) in dtypes.items():

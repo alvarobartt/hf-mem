@@ -98,11 +98,11 @@ def _value(buf: bytes, offset: int, kind: int, keep: bool) -> tuple[Any, int]:
             return (list(values) if keep else None), offset + struct.calcsize(fmt)  # type: ignore[arg-type]
         if item == 8 and not keep:
             return None, _skip_strings(buf, offset, count)
-        values = []
+        items: list[Any] = []
         for _ in range(count):
             value, offset = _value(buf, offset, item, keep)
-            values.append(value)
-        return (values if keep else None), offset
+            items.append(value)
+        return (items if keep else None), offset
     fmt = "<" + _SCALAR[kind]
     return _unpack(fmt, buf, offset)[0], offset + struct.calcsize(fmt)
 
@@ -118,7 +118,7 @@ def _metadata(buf: bytes, prefix: bool = False, partial: bool = False) -> tuple[
     if buf[:4] != b"GGUF":
         raise RuntimeError("not a valid GGUF file (magic number mismatch)")
     _, tensor_count, kv_count = _unpack("<IQQ", buf, 4)
-    offset, metadata = 24, {}
+    offset, metadata = 24, dict[str, Any]()
     try:
         for _ in range(kv_count):
             start = offset
@@ -246,7 +246,7 @@ def _state_bytes(metadata: dict[str, Any], arch: str) -> int:
 def kv_cache(
     metadata: dict[str, Any], max_model_len: int, batch_size: int, dtype: str
 ) -> tuple[int, dict[str, int]] | None:
-    arch = metadata.get("general.architecture")
+    arch = str(metadata.get("general.architecture"))
     blocks = metadata.get(f"{arch}.block_count")
     heads = metadata.get(f"{arch}.attention.head_count")
     state = _state_bytes(metadata, arch)

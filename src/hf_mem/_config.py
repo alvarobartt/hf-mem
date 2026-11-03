@@ -70,7 +70,7 @@ _SLIDING = ("sliding", "local", "chunked", "swa")
 
 def normalize(config: dict[str, Any]) -> dict[str, Any]:
     config = {
-        **_DEFAULTS.get(config.get("model_type"), {}),
+        **_DEFAULTS.get(str(config.get("model_type")), {}),
         **{k: v for k, v in config.items() if v is not None},
     }
     for key, aliases in _ALIASES.items():

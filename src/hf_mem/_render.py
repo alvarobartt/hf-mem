@@ -2,6 +2,7 @@ import os
 import sys
 
 from hf_mem._version import __version__
+from hf_mem._weights import Weights
 from hf_mem.estimate import Estimate, Listing
 
 NAME_WIDTH = 14
@@ -75,7 +76,7 @@ def _titles(url: str, revision: str | None, file: str | None, kv: object) -> lis
     return titles
 
 
-def _dtype_items(weights, total: int) -> list[Item]:
+def _dtype_items(weights: Weights, total: int) -> list[Item]:
     width = max(len(f"{short(w.params)} PARAMS") for _, w in weights.sorted_dtypes())
     return [
         (
@@ -97,7 +98,7 @@ def table(estimate: Estimate | Listing) -> str:
     summary = f"{gib(estimate.total)} GiB ({' + '.join(parts)})"
     sections: list[Section] = [(None, [("TOTAL MEMORY", summary, "REQUIREMENTS", 1.0)])]
 
-    def heading(name: str, w) -> str:
+    def heading(name: str, w: Weights) -> str:
         return (
             f"{name.upper()} ({short(w.params)} PARAMS, {gib(w.bytes)} GiB)"
             if w.params
@@ -205,9 +206,9 @@ def markdown(estimate: Estimate | Listing) -> str:
         rows.append(
             f"| {label} | {gib(component.bytes)} GiB | {short(component.params) if component.params else '-'} |"
         )
-    if kv := estimate.kv_cache:
+    if cache := estimate.kv_cache:
         rows.append(
-            f"| KV cache ({kv.dtype}, {kv.max_model_len} tokens x {kv.batch_size}) | {gib(kv.bytes)} GiB | |"
+            f"| KV cache ({cache.dtype}, {cache.max_model_len} tokens x {cache.batch_size}) | {gib(cache.bytes)} GiB | |"
         )
     title = f"Memory estimate for {where}" + (f", file `{estimate.file}`" if estimate.file else "")
     return "\n".join([title, "", *rows])

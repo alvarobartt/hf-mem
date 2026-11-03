@@ -2,8 +2,9 @@ import json
 import math
 import os
 import struct
-from typing import Any
+from typing import Any, TypeVar
 
+from hf_mem import Estimate, Listing, run
 from hf_mem._gguf import TYPES
 
 _BITS = {"F64": 64, "F32": 32, "F16": 16, "BF16": 16, "I64": 64, "I32": 32, "F8_E4M3": 8, "U8": 8, "I8": 8}
@@ -93,3 +94,23 @@ def llama_tensors(layers: int = 4) -> dict[str, tuple[str, list[int]]]:
         tensors[f"model.layers.{i}.mlp.up_proj.weight"] = ("BF16", [512, 256])
         tensors[f"model.layers.{i}.input_layernorm.weight"] = ("F32", [256])
     return tensors
+
+
+T = TypeVar("T")
+
+
+def some(value: T | None) -> T:
+    assert value is not None
+    return value
+
+
+def estimate(*args: Any, **kwargs: Any) -> Estimate:
+    result = run(*args, **kwargs)
+    assert isinstance(result, Estimate)
+    return result
+
+
+def listing(*args: Any, **kwargs: Any) -> Listing:
+    result = run(*args, **kwargs)
+    assert isinstance(result, Listing)
+    return result

@@ -5,6 +5,7 @@ from typing import Any
 GIB = 1 << 30
 MIB = 1 << 20
 LARGE_GPU = 70 * GIB
+LARGEST_GPU = 160 * GIB
 
 # Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
 _PROFILES = {
@@ -66,7 +67,8 @@ class Overhead:
 def batched_tokens(gpu_memory: str | None, override: int | None = None) -> int:
     if override is not None:
         return override
-    return 2048 if gpu_memory is not None and parse_gpu_memory(gpu_memory)[1] < LARGE_GPU else 8192
+    size = parse_gpu_memory(gpu_memory)[1] if gpu_memory is not None else LARGE_GPU
+    return 16384 if size >= LARGEST_GPU else 8192 if size >= LARGE_GPU else 2048
 
 
 def _tower_bytes(tower: dict[str, Any], positions: int) -> int:
@@ -78,7 +80,7 @@ def _tower_bytes(tower: dict[str, Any], positions: int) -> int:
 
 def _image_patches(config: dict[str, Any], vision: dict[str, Any], processor: dict[str, Any]) -> int:
     patch = vision.get("patch_size") or processor.get("patch_size") or 14
-    size = processor.get("size") if isinstance(processor.get("size"), dict) else {}
+    size: dict[str, Any] = processor["size"] if isinstance(processor.get("size"), dict) else {}
     pixels = processor.get("max_pixels") or (
         size.get("longest_edge") if (size.get("longest_edge") or 0) > 65536 else None
     )
@@ -99,8 +101,13 @@ def _image_patches(config: dict[str, Any], vision: dict[str, Any], processor: di
     return tiles * (side // patch) ** 2
 
 
+def _root(config: dict[str, Any]) -> dict[str, Any]:
+    thinker = config.get("thinker_config")
+    return thinker if isinstance(thinker, dict) else config
+
+
 def encoder(config: dict[str, Any], processor: dict[str, Any]) -> int:
-    root = config.get("thinker_config") if isinstance(config.get("thinker_config"), dict) else config
+    root = _root(config)
     vision, audio = root.get("vision_config"), root.get("audio_config")
     largest = 0
     if isinstance(vision, dict):
@@ -111,8 +118,8 @@ def encoder(config: dict[str, Any], processor: dict[str, Any]) -> int:
 
 
 def supports_video(config: dict[str, Any], files: Any) -> bool:
-    root = config.get("thinker_config") if isinstance(config.get("thinker_config"), dict) else config
-    vision = root.get("vision_config") if isinstance(root.get("vision_config"), dict) else {}
+    vision = _root(config).get("vision_config")
+    vision = vision if isinstance(vision, dict) else {}
     return bool(vision) and (
         "video_preprocessor_config.json" in files or bool(vision.get("temporal_patch_size"))
     )

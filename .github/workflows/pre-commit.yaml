@@ -28,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: |
           source .venv/bin/activate
-          uv pip install --group lint
+          uv pip install -e . --group lint
 
       - name: Run pre-commit checks
         run: |

@@ -200,6 +200,9 @@ class HubSource:
         return json.loads((await self._get(f"{self._base}/{path}")).content)
 
     async def read(self, path: str, start: int, end: int) -> bytes:
+        end = min(end, self.files.get(path, end))
+        if start >= end:
+            return b""
         if cached := self._cached(path):
             with open(cached, "rb") as f:
                 f.seek(start)

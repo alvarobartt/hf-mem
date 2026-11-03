@@ -127,7 +127,7 @@ def _fit(
     kv = estimate.kv_cache
     estimate.fit = _overhead.fit(
         weights=estimate.weights.bytes,
-        kv_fixed=(kv.bytes - slope * kv.max_model_len) if kv else 0,
+        kv_fixed=int(kv.bytes - slope * kv.max_model_len) if kv else 0,
         kv_per_token=slope,
         max_model_len=kv.max_model_len if kv else 0,
         context_length=context_length,
@@ -227,7 +227,7 @@ async def _estimate_safetensors(
     try:
         selected = await _safetensors.discover(source, file, warnings)
         if selected:
-            components, experts = await _safetensors.read_components(source, selected)
+            components, experts = await _safetensors.read_components(source, selected, warnings)
             fmt = "safetensors"
         elif components := _safetensors.from_file_sizes(files, file):
             experts = {}
@@ -235,6 +235,11 @@ async def _estimate_safetensors(
             warnings.append(
                 "No Safetensors or GGUF weights found, so the estimate is based on the weight file sizes."
             )
+            if len(components) > 1:
+                warnings.append(
+                    f"{len(components)} weight files were found and are counted as separate components, assuming "
+                    "all of them are loaded; use `--file` to pick one."
+                )
         else:
             return None
         try:
@@ -298,6 +303,15 @@ async def _estimate_safetensors(
         return estimate
     dtype = _config.kv_dtype(text, kv_dtype, weights, warnings)
     tokens = _overhead.batched_tokens(gpu_memory, max_num_batched_tokens)
+    if (
+        max_num_batched_tokens is None
+        and gpu_memory
+        and 70 <= _overhead.parse_gpu_memory(gpu_memory)[1] / _overhead.GIB < 90
+    ):
+        warnings.append(
+            "vLLM batches 8192 tokens on GPUs with 70 GiB or more except on A100s, which use 2048, so set "
+            "`--max-num-batched-tokens 2048` for an A100."
+        )
     size, layers = _config.kv_cache(text, dtype, length, batch_size, tokens)
     half = _config.kv_cache(text, dtype, max(1, length // 2), batch_size, tokens)[0]
     slope = (size - half) / (length - max(1, length // 2)) if length > 1 else 0.0
