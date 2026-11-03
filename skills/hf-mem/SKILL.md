@@ -52,19 +52,19 @@ uvx hf-mem --model-id <model-id> --gguf-file <file-or-path> --experimental [--ma
 For Transformers with Safetensors weights:
 
 ```bash
-uvx hf-mem --model-id MiniMaxAI/MiniMax-M2 --json-output
+uvx hf-mem --model-id zai-org/GLM-5.3-Flash --json-output
 ```
 
 For Diffusers with Safetensors weights:
 
 ```bash
-uvx hf-mem --model-id Qwen/Qwen-Image --json-output
+uvx hf-mem --model-id Qwen/Qwen-Image-2.1 --json-output
 ```
 
 For Sentence Transformers with Safetensors weights:
 
 ```bash
-uvx hf-mem --model-id google/embeddinggemma-300m --json-output
+uvx hf-mem --model-id google/embeddinggemma-2 --json-output
 ```
 
 With `--experimental` to include the KV cache estimation for LLMs and VLMs:
