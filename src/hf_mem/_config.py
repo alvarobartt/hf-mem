@@ -3,7 +3,7 @@ from typing import Any
 from hf_mem._weights import Weights
 
 KV_CACHE_DTYPES = ["auto", "bfloat16", "float16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
-MAX_NUM_BATCHED_TOKENS = 4096
+MAX_NUM_BATCHED_TOKENS = 8192
 BLOCK_SIZE = 16
 
 _BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I8": 1}
@@ -206,8 +206,19 @@ def _state(config: dict[str, Any], dtype_bytes: float) -> tuple[int, int]:
     return 0, 2
 
 
+def kv_heads(config: dict[str, Any]) -> int:
+    config = normalize(config)
+    if config.get("kv_lora_rank"):
+        return 1
+    return config["num_key_value_heads"] or config["num_attention_heads"]
+
+
 def kv_cache(
-    config: dict[str, Any], dtype: str, max_model_len: int, batch_size: int
+    config: dict[str, Any],
+    dtype: str,
+    max_model_len: int,
+    batch_size: int,
+    batched_tokens: int = MAX_NUM_BATCHED_TOKENS,
 ) -> tuple[int, dict[str, int]]:
     config = normalize(config)
     heads: int = config["num_attention_heads"]
@@ -222,7 +233,7 @@ def kv_cache(
     full, sliding, state = kinds.count("full"), kinds.count("sliding"), kinds.count("state")
     layers = {"full": full, "sliding": sliding, "state": state, "none": len(kinds) - full - sliding - state}
     window = config.get("sliding_window") or config.get("attention_chunk_size") or max_model_len
-    sliding_tokens = min(window - 1 + MAX_NUM_BATCHED_TOKENS, max_model_len)
+    sliding_tokens = min(window - 1 + batched_tokens, max_model_len)
     dtype_bytes = _BYTES.get(dtype, 2)
     token = int(width * dtype_bytes)
     if not state:
