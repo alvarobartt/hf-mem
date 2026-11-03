@@ -3,26 +3,63 @@ from dataclasses import dataclass
 from typing import Any
 
 GIB = 1 << 30
-SAMPLER_ROWS = 1024
+MIB = 1 << 20
 LARGE_GPU = 70 * GIB
+
+# Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
+_PROFILES = {
+    "small": {
+        "vocab": 5004,
+        "inter": 6.6,
+        "hidden": 77.2,
+        "act": 0,
+        "graph": 0.16 * GIB,
+        "graph_layer": 5.4 * MIB,
+        "graph_moe": 5.6 * MIB,
+        "graph_hybrid": 0,
+        "graph_lh": 0,
+        "graph_width": 6174,
+        "non_torch": 0.27 * GIB,
+        "context": 0.83 * GIB,
+    },
+    "large": {
+        "vocab": 12702,
+        "inter": 0,
+        "hidden": 13.2,
+        "act": 0.93 * GIB,
+        "graph": 0.29 * GIB,
+        "graph_layer": 0,
+        "graph_moe": 12.9 * MIB,
+        "graph_hybrid": 7.6 * MIB,
+        "graph_lh": 248.8,
+        "graph_width": 23908,
+        "non_torch": 0.87 * GIB,
+        "context": 1.01 * GIB,
+    },
+}
+_GATED = ("silu", "swiglu", "swish")
 
 
 @dataclass
 class Overhead:
     activations: int
+    encoder: int
     cuda_graphs: int
-    runtime: int
+    non_torch: int
+    cuda_context: int
 
     @property
     def bytes(self) -> int:
-        return self.activations + self.cuda_graphs + self.runtime
+        return self.activations + self.encoder + self.cuda_graphs + self.non_torch + self.cuda_context
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "bytes": self.bytes,
             "activations": self.activations,
+            "encoder": self.encoder,
             "cuda_graphs": self.cuda_graphs,
-            "runtime": self.runtime,
+            "non_torch": self.non_torch,
+            "cuda_context": self.cuda_context,
         }
 
 
@@ -32,18 +69,75 @@ def batched_tokens(gpu_memory: str | None, override: int | None = None) -> int:
     return 2048 if gpu_memory is not None and parse_gpu_memory(gpu_memory)[1] < LARGE_GPU else 8192
 
 
-def vllm(config: dict[str, Any], moe: bool, tokens: int) -> Overhead:
+def _tower_bytes(tower: dict[str, Any], positions: int) -> int:
+    hidden = tower.get("hidden_size") or tower.get("d_model") or tower.get("embed_dim") or 0
+    inter = tower.get("intermediate_size") or tower.get("encoder_ffn_dim") or 4 * hidden
+    gated = any(a in str(tower.get("hidden_act") or tower.get("activation_function") or "") for a in _GATED)
+    return positions * 2 * (4 * hidden + (3 if gated else 2) * inter)
+
+
+def _image_patches(config: dict[str, Any], vision: dict[str, Any], processor: dict[str, Any]) -> int:
+    patch = vision.get("patch_size") or processor.get("patch_size") or 14
+    size = processor.get("size") if isinstance(processor.get("size"), dict) else {}
+    pixels = processor.get("max_pixels") or (
+        size.get("longest_edge") if (size.get("longest_edge") or 0) > 65536 else None
+    )
+    if pixels:
+        return pixels // patch**2
+    if soft := processor.get("max_soft_tokens") or config.get("vision_soft_tokens_per_image"):
+        return soft * (processor.get("pooling_kernel_size") or vision.get("pooling_kernel_size") or 1) ** 2
+    side = vision.get("image_size") or config.get("force_image_size") or size.get("height") or 224
+    tiles = 1
+    if dynamic := config.get("max_dynamic_patch"):
+        tiles = dynamic + bool(config.get("use_thumbnail"))
+    elif (ratio := str(config.get("vision_aspect_ratio") or "")).startswith("anyres_max_"):
+        tiles = int(ratio.rsplit("_", 1)[1]) + 1
+    elif (tile := (processor.get("max_image_size") or {}).get("longest_edge")) and size.get("longest_edge"):
+        tiles = (size["longest_edge"] // tile) ** 2 + 1
+    elif hd := processor.get("dynamic_hd"):
+        tiles = hd + 1
+    return tiles * (side // patch) ** 2
+
+
+def encoder(config: dict[str, Any], processor: dict[str, Any]) -> int:
+    root = config.get("thinker_config") if isinstance(config.get("thinker_config"), dict) else config
+    vision, audio = root.get("vision_config"), root.get("audio_config")
+    largest = 0
+    if isinstance(vision, dict):
+        largest = _tower_bytes(vision, _image_patches(root, vision, processor))
+    if isinstance(audio, dict):
+        largest = max(largest, _tower_bytes(audio, audio.get("max_source_positions") or 1500))
+    return largest
+
+
+def supports_video(config: dict[str, Any], files: Any) -> bool:
+    root = config.get("thinker_config") if isinstance(config.get("thinker_config"), dict) else config
+    vision = root.get("vision_config") if isinstance(root.get("vision_config"), dict) else {}
+    return bool(vision) and (
+        "video_preprocessor_config.json" in files or bool(vision.get("temporal_patch_size"))
+    )
+
+
+def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_bytes: int = 0) -> Overhead:
+    p = _PROFILES["large" if tokens >= 8192 else "small"]
+    layers = config.get("num_hidden_layers") or 0
     hidden = config.get("hidden_size") or 0
     vocab = config.get("vocab_size") or 32000
     intermediate = config.get("intermediate_size") or config.get("ffn_hidden_size") or 4 * hidden
-    if moe and not config.get("intermediate_size"):
-        intermediate = (config.get("moe_intermediate_size") or 0) * (config.get("num_experts_per_tok") or 1)
-    activations = SAMPLER_ROWS * vocab * 8 + tokens * intermediate * 16
-    return Overhead(activations, int((0.36 if moe else 0.25) * GIB), int(0.75 * GIB))
+    if moe and config.get("moe_intermediate_size"):
+        intermediate = config["moe_intermediate_size"] * (config.get("num_experts_per_tok") or 1)
+    activations = p["vocab"] * vocab + tokens * (p["inter"] * intermediate + p["hidden"] * hidden) + p["act"]
+    graphs = (
+        p["graph"]
+        + layers
+        * (p["graph_layer"] + moe * p["graph_moe"] + hybrid * p["graph_hybrid"] + p["graph_lh"] * hidden)
+        + p["graph_width"] * (hidden + intermediate)
+    )
+    return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]), int(p["context"]))
 
 
 def llama_cpp() -> Overhead:
-    return Overhead(int(0.15 * GIB), 0, int(0.47 * GIB))
+    return Overhead(int(0.15 * GIB), 0, 0, 0, int(0.47 * GIB))
 
 
 @dataclass
@@ -88,9 +182,10 @@ def fit(
     gpu_memory: str,
     utilization: float,
     kv_heads: int | None = None,
+    context: int = 0,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
-    usable = size * utilization - overhead
+    usable = min(size * utilization, size - context) - (overhead - context)
 
     def per_token(n: int) -> float:
         return kv_per_token * (max(1.0, n / kv_heads) if kv_heads else 1.0)

@@ -5,16 +5,53 @@ from hf_mem import _overhead
 GIB = _overhead.GIB
 
 
-def test_vllm_overhead():
-    config = {"vocab_size": 128256, "intermediate_size": 14336, "hidden_size": 4096}
-    dense = _overhead.vllm(config, moe=False, tokens=8192)
-    assert dense.activations == 1024 * 128256 * 8 + 8192 * 14336 * 16
-    assert (dense.cuda_graphs, dense.runtime) == (int(0.25 * GIB), int(0.75 * GIB))
+def test_vllm_overhead_follows_the_gpu_class():
+    config = {"vocab_size": 128256, "intermediate_size": 14336, "hidden_size": 4096, "num_hidden_layers": 32}
+    small = _overhead.vllm(config, moe=False, hybrid=False, tokens=2048)
+    large = _overhead.vllm(config, moe=False, hybrid=False, tokens=8192)
+    assert 1.2 * GIB < small.activations < 1.6 * GIB
+    assert 2.6 * GIB < large.activations < 3.0 * GIB
+    assert 0.35 * GIB < small.cuda_graphs < 0.5 * GIB
+    assert (small.non_torch, large.non_torch) == (int(0.27 * GIB), int(0.87 * GIB))
     moe = _overhead.vllm(
-        {"vocab_size": 1000, "moe_intermediate_size": 768, "num_experts_per_tok": 8}, moe=True, tokens=4096
+        {**config, "moe_intermediate_size": 768, "num_experts_per_tok": 8}, moe=True, hybrid=False, tokens=2048
     )
-    assert moe.activations == 1024 * 1000 * 8 + 4096 * 768 * 8 * 16
-    assert moe.cuda_graphs == int(0.36 * GIB)
+    assert moe.cuda_graphs > small.cuda_graphs
+    assert (
+        _overhead.vllm(config, moe=False, hybrid=False, tokens=2048, encoder_bytes=GIB).bytes
+        == small.bytes + GIB
+    )
+
+
+def test_encoder_patches():
+    qwen = {
+        "vision_config": {
+            "hidden_size": 1152,
+            "intermediate_size": 4304,
+            "patch_size": 16,
+            "hidden_act": "gelu",
+        }
+    }
+    assert _overhead.encoder(qwen, {"size": {"longest_edge": 16777216}}) == 65536 * 2 * (4 * 1152 + 2 * 4304)
+    gated = {"vision_config": {**qwen["vision_config"], "patch_size": 14, "hidden_act": "silu"}}
+    assert _overhead.encoder(gated, {"max_pixels": 12845056}) == 65536 * 2 * (4 * 1152 + 3 * 4304)
+    siglip = {"vision_config": {**qwen["vision_config"], "patch_size": 14, "image_size": 896}}
+    assert _overhead.encoder(siglip, {}) == 4096 * 2 * (4 * 1152 + 2 * 4304)
+    tiles = {
+        **siglip,
+        "max_dynamic_patch": 12,
+        "use_thumbnail": True,
+        "vision_config": {**siglip["vision_config"], "image_size": 448},
+    }
+    assert _overhead.encoder(tiles, {}) == 13 * 1024 * 2 * (4 * 1152 + 2 * 4304)
+    pooled = {
+        "vision_config": {**qwen["vision_config"], "pooling_kernel_size": 3},
+        "vision_soft_tokens_per_image": 280,
+    }
+    assert _overhead.encoder(pooled, {}) == 2520 * 2 * (4 * 1152 + 2 * 4304)
+    audio = {"audio_config": {"d_model": 1280, "encoder_ffn_dim": 5120, "max_source_positions": 1500}}
+    assert _overhead.encoder(audio, {}) == 1500 * 2 * (4 * 1280 + 2 * 5120)
+    assert _overhead.encoder({}, {}) == 0
 
 
 def test_batched_tokens_follow_the_gpu_size():
@@ -52,6 +89,18 @@ def test_fit():
         == 5
     )
     assert _overhead.fit(weights=10**15, gpu_memory="20", utilization=0.9, **args).needed is None
+
+
+def test_fit_keeps_the_cuda_context_outside_the_utilization():
+    args = dict(
+        weights=0, kv_fixed=0, kv_per_token=1024, max_model_len=1000, context_length=10**9, gpu_memory="20"
+    )
+    with_context = _overhead.fit(overhead=2 * GIB, utilization=0.9, context=GIB, **args)
+    without = _overhead.fit(overhead=GIB, utilization=0.9, **args)
+    assert with_context.max_model_len == without.max_model_len
+    assert _overhead.fit(overhead=2 * GIB, utilization=1.0, context=GIB, **args).max_model_len == int(
+        18 * GIB / 1024
+    )
 
 
 def test_fit_replicates_kv_heads_across_gpus():

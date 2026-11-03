@@ -140,8 +140,10 @@ def table(estimate: Estimate | Listing) -> str:
             (name, f"{gib(value)} / {gib(total)} GiB", "", value / total)
             for name, value in (
                 ("ACTIVATIONS", overhead.activations),
+                ("ENCODER", overhead.encoder),
                 ("CUDA GRAPHS", overhead.cuda_graphs),
-                ("RUNTIME", overhead.runtime),
+                ("NON-TORCH", overhead.non_torch),
+                ("CUDA CONTEXT", overhead.cuda_context),
             )
             if value
         ]

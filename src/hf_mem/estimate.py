@@ -135,6 +135,7 @@ def _fit(
         gpu_memory=gpu_memory,
         utilization=utilization,
         kv_heads=kv_heads,
+        context=estimate.overhead.cuda_context if estimate.overhead else 0,
     )
 
 
@@ -218,6 +219,11 @@ async def _estimate_safetensors(
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
+    processor_tasks = [
+        asyncio.ensure_future(source.json(name))
+        for name in ("preprocessor_config.json", "processor_config.json")
+        if name in files
+    ]
     try:
         selected = await _safetensors.discover(source, file, warnings)
         if selected:
@@ -236,9 +242,14 @@ async def _estimate_safetensors(
         except (RuntimeError, ValueError) as e:
             warnings.append(f"KV cache estimation skipped, as `config.json` could not be read ({e}).")
             config = {}
+        processor: dict[str, Any] = {}
+        for result in await asyncio.gather(*processor_tasks, return_exceptions=True):
+            if isinstance(result, dict):
+                processor.update(result, **(result.get("image_processor") or {}))
     finally:
-        if config_task and not config_task.done():
-            config_task.cancel()
+        for task in (config_task, *processor_tasks):
+            if task and not task.done():
+                task.cancel()
 
     weights = Weights()
     for component in components.values():
@@ -291,7 +302,19 @@ async def _estimate_safetensors(
     half = _config.kv_cache(text, dtype, max(1, length // 2), batch_size, tokens)[0]
     slope = (size - half) / (length - max(1, length // 2)) if length > 1 else 0.0
     estimate.kv_cache = KVCache(size, dtype, length, batch_size, layers)
-    estimate.overhead = _overhead.vllm(text, moe=estimate.moe is not None, tokens=tokens)
+    if _overhead.supports_video(config, files):
+        warnings.append(
+            "The encoder is estimated for the largest image, but vLLM profiles the largest video when it has more "
+            "tokens, which can reserve a few GiB more unless videos are disabled with "
+            "`--limit-mm-per-prompt '{\"video\": 0}'`."
+        )
+    estimate.overhead = _overhead.vllm(
+        text,
+        moe=estimate.moe is not None,
+        hybrid=layers["state"] > 0,
+        tokens=tokens,
+        encoder_bytes=_overhead.encoder(config, processor),
+    )
     _fit(
         estimate,
         text.get("max_position_embeddings") or length,
