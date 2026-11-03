@@ -1,12 +1,11 @@
 import asyncio
+import json
 import os
 import re
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote, urlparse
 from uuid import uuid4
-
-import orjson
 
 from hf_mem._version import __version__
 
@@ -106,7 +105,7 @@ class LocalSource:
         self.progress.start()
         try:
             with open(os.path.join(self.root, path), "rb") as f:
-                return orjson.loads(f.read())
+                return json.loads(f.read())
         finally:
             self.progress.finish()
 
@@ -178,7 +177,7 @@ class HubSource:
         while url:
             response = await self._get(url)
             commit = commit or response.headers.get("x-repo-commit")
-            for entry in orjson.loads(response.content):
+            for entry in json.loads(response.content):
                 if entry.get("type") == "file":
                     lfs = entry.get("lfs") or {}
                     self.files[entry["path"]] = lfs.get("size", entry.get("size", 0))
@@ -197,8 +196,8 @@ class HubSource:
     async def json(self, path: str) -> Any:
         if cached := self._cached(path):
             with open(cached, "rb") as f:
-                return orjson.loads(f.read())
-        return orjson.loads((await self._get(f"{self._base}/{path}")).content)
+                return json.loads(f.read())
+        return json.loads((await self._get(f"{self._base}/{path}")).content)
 
     async def read(self, path: str, start: int, end: int) -> bytes:
         if cached := self._cached(path):
