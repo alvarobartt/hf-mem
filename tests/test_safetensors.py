@@ -279,3 +279,11 @@ def test_invalid_files_are_skipped_in_multi_file_repositories(tmp_path: Path) ->
     assert any("Skipping 1 invalid" in w for w in result.warnings)
     with pytest.raises(RuntimeError, match="not a valid Safetensors"):
         estimate(str(tmp_path), file="lora-b.safetensors")
+
+
+def test_80_gib_gpus_warn_about_a100(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    assert any("A100" in w for w in estimate(str(tmp_path), gpu_memory="80").warnings)
+    assert not any("A100" in w for w in estimate(str(tmp_path), gpu_memory="141").warnings)
