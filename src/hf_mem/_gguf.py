@@ -55,6 +55,9 @@ _SCALAR = {0: "B", 1: "b", 2: "H", 3: "h", 4: "I", 5: "i", 6: "f", 7: "?", 10: "
 _SWA_PATTERN = {"gemma2": 2, "gemma3": 6, "gemma3n": 5, "cohere2": 4}
 
 
+_U64 = struct.Struct("<Q").unpack_from
+
+
 class _Truncated(Exception):
     pass
 
@@ -63,6 +66,17 @@ def _unpack(fmt: str, buf: bytes, offset: int) -> tuple[Any, ...]:
     if offset + struct.calcsize(fmt) > len(buf):
         raise _Truncated
     return struct.unpack_from(fmt, buf, offset)
+
+
+def _skip_strings(buf: bytes, offset: int, count: int) -> int:
+    try:
+        for _ in range(count):
+            offset += 8 + _U64(buf, offset)[0]
+    except struct.error:
+        raise _Truncated from None
+    if offset > len(buf):
+        raise _Truncated
+    return offset
 
 
 def _value(buf: bytes, offset: int, kind: int, keep: bool) -> tuple[Any, int]:
@@ -81,6 +95,8 @@ def _value(buf: bytes, offset: int, kind: int, keep: bool) -> tuple[Any, int]:
             if offset + struct.calcsize(fmt) > len(buf):
                 raise _Truncated
             return (list(values) if keep else None), offset + struct.calcsize(fmt)  # type: ignore[arg-type]
+        if item == 8 and not keep:
+            return None, _skip_strings(buf, offset, count)
         values = []
         for _ in range(count):
             value, offset = _value(buf, offset, item, keep)
