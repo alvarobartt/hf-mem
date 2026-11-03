@@ -3,8 +3,7 @@ import os
 import re
 import warnings
 from dataclasses import dataclass, field
-from functools import reduce
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, Iterable, List, Tuple, Union
 from urllib.parse import quote
 from uuid import uuid4
 
@@ -189,6 +188,13 @@ class Result:
 
         out["total_memory"] = self.total_memory
         return out
+
+
+def _merge(dicts: Iterable[Dict[str, Any]]) -> Dict[str, Any]:
+    merged: Dict[str, Any] = {}
+    for d in dicts:
+        merged.update(d)
+    return merged
 
 
 def _collect_gguf_results(
@@ -412,7 +418,7 @@ async def arun(
         metadata_list: List[Dict[str, Any]] = await asyncio.gather(
             *[asyncio.create_task(fetch_with_semaphore(url)) for url in urls]
         )
-        raw_metadata = reduce(lambda acc, m: acc | m, metadata_list, {})
+        raw_metadata = _merge(metadata_list)
 
         if "config_sentence_transformers.json" in file_paths:
             dense_metadata = (
@@ -475,10 +481,7 @@ async def arun(
         }
         await asyncio.gather(*[task for tasks in _tasks.values() for task in tasks])
 
-        raw_metadata = {
-            path: reduce(lambda acc, m: acc | m, [task.result() for task in tasks], {})
-            for path, tasks in _tasks.items()
-        }
+        raw_metadata = {path: _merge(task.result() for task in tasks) for path, tasks in _tasks.items()}
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
 
     else:
