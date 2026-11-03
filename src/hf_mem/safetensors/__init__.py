@@ -12,6 +12,7 @@ from hf_mem.safetensors.print import print_safetensors_report
 from hf_mem.safetensors.types import (
     SafetensorsDtypes,
     TorchDtypes,
+    get_safetensors_dtype_bits,
     get_safetensors_dtype_bytes,
     torch_dtype_to_safetensors_dtype,
 )
@@ -20,6 +21,7 @@ __all__ = [
     # types
     "SafetensorsDtypes",
     "TorchDtypes",
+    "get_safetensors_dtype_bits",
     "get_safetensors_dtype_bytes",
     "torch_dtype_to_safetensors_dtype",
     # metadata

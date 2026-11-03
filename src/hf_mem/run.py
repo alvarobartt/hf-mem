@@ -27,6 +27,7 @@ MAX_CONCURRENCY = int(os.getenv("MAX_WORKERS", min(32, (os.cpu_count() or 1) + 4
 
 # NOTE: Shard filename pattern, e.g. "Kimi-K2.5-BF16-00001-of-00046.gguf"
 _SHARD_PATTERN = re.compile(r"(.+)-(\d+)-of-(\d+)\.gguf$")
+_SAFETENSORS_SHARD_PATTERN = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
 
 
 @dataclass
@@ -492,11 +493,39 @@ async def arun(
         raw_metadata = {path: _merge(task.result() for task in tasks) for path, tasks in _tasks.items()}
         metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
 
+    elif safetensors_paths := [f for f in file_paths if f.endswith(".safetensors")]:
+        groups: Dict[str, List[str]] = {}
+        for path in safetensors_paths:
+            name = _SAFETENSORS_SHARD_PATTERN.sub("", path).removesuffix(".safetensors")
+            groups.setdefault(name, []).append(path)
+
+        if len(groups) > 1:
+            warnings.warn(
+                f"No `model.safetensors`, `model.safetensors.index.json` or `model_index.json` found for {model_id} @ {revision}, so each `*.safetensors` file is estimated as a separate component and the total assumes all of them are loaded."
+            )
+
+        semaphore = asyncio.Semaphore(MAX_CONCURRENCY)
+
+        async def fetch_with_semaphore(url: str) -> Dict[str, Any]:
+            async with semaphore:
+                return await fetch_safetensors_metadata(client=client, url=url, headers=headers)
+
+        _tasks = {
+            name: [
+                asyncio.create_task(
+                    fetch_with_semaphore(f"https://huggingface.co/{model_id}/resolve/{revision_encoded}/{path}")
+                )
+                for path in paths
+            ]
+            for name, paths in groups.items()
+        }
+        await asyncio.gather(*[task for tasks in _tasks.values() for task in tasks])
+        raw_metadata = {name: _merge(task.result() for task in tasks) for name, tasks in _tasks.items()}
+        metadata = parse_safetensors_metadata(raw_metadata=raw_metadata)
+
     else:
         await client.aclose()
-        raise RuntimeError(
-            "NONE OF `model.safetensors`, `model.safetensors.index.json`, `model_index.json` FILES HAVE BEEN FOUND"
-        )
+        raise RuntimeError(f"No Safetensors or GGUF weights found for {model_id} @ {revision}.")
 
     kv_cache_cls: KvCache | None = None
     moe_metadata: MoEMetadata | None = None

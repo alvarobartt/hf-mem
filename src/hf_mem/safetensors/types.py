@@ -1,6 +1,7 @@
 from typing import Literal
 
 SafetensorsDtypes = Literal[
+    "C64",
     "F64",
     "I64",
     "U64",
@@ -12,25 +13,37 @@ SafetensorsDtypes = Literal[
     "I16",
     "U16",
     "F8_E8M0",
-    "F8_E5M2",  # NOTE: Only CUDA +11.8
-    "F8_E4M3",  # NOTE: CUDA +11.8 and AMD ROCm
+    "F8_E5M2",
+    "F8_E4M3",
     "I8",
     "U8",
+    "BOOL",
+    "F6_E2M3",
+    "F6_E3M2",
+    "F4",
 ]
 
 
-def get_safetensors_dtype_bytes(dtype: SafetensorsDtypes | str) -> int:
+def get_safetensors_dtype_bits(dtype: SafetensorsDtypes | str) -> int:
     match dtype:
-        case "F64" | "I64" | "U64":
-            return 8
+        case "C64" | "F64" | "I64" | "U64":
+            return 64
         case "F32" | "I32" | "U32":
-            return 4
+            return 32
         case "F16" | "BF16" | "I16" | "U16":
-            return 2
-        case "F8_E5M2" | "F8_E4M3" | "F8_E8M0" | "I8" | "U8":
-            return 1
+            return 16
+        case "F8_E5M2" | "F8_E4M3" | "F8_E8M0" | "I8" | "U8" | "BOOL":
+            return 8
+        case "F6_E2M3" | "F6_E3M2":
+            return 6
+        case "F4":
+            return 4
         case _:
             raise RuntimeError(f"DTYPE={dtype} NOT HANDLED")
+
+
+def get_safetensors_dtype_bytes(dtype: SafetensorsDtypes | str) -> float:
+    return get_safetensors_dtype_bits(dtype) / 8
 
 
 TorchDtypes = Literal["float32", "float16", "bfloat16", "float8_e4m3", "float8_e4m3fn", "float8_e5m2", "int8"]

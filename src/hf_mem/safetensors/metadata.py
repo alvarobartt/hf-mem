@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from hf_mem.safetensors.types import SafetensorsDtypes, get_safetensors_dtype_bytes
+from hf_mem.safetensors.types import SafetensorsDtypes, get_safetensors_dtype_bits
 
 
 @dataclass
@@ -45,9 +45,8 @@ def _accumulate_tensor(
     if dtype not in component.dtypes:
         component.dtypes[dtype] = DtypeMetadata(param_count=0, bytes_count=0)
 
-    dtype_bytes = get_safetensors_dtype_bytes(dtype)
     current_shape = math.prod(shape)
-    current_shape_bytes = current_shape * dtype_bytes
+    current_shape_bytes = current_shape * get_safetensors_dtype_bits(dtype) // 8
 
     component.dtypes[dtype].param_count += current_shape
     component.dtypes[dtype].bytes_count += current_shape_bytes
