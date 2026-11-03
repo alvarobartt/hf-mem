@@ -27,9 +27,16 @@ lint = [
     "pre-commit>=4.5.1",
     "ruff>=0.14.10",
 ]
+test = [
+    "pytest>=8",
+]
 
 [tool.uv.dependency-groups]
 lint = { requires-python = ">=3.11" }
+
+[tool.pytest.ini_options]
+pythonpath = ["tests"]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 112

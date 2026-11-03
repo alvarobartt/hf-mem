@@ -1,144 +1,109 @@
 import argparse
 import asyncio
 import json
-import warnings
+import sys
+import time
 
-import httpx2
-
-from hf_mem.gguf.print import print_gguf_files_report, print_gguf_report
-from hf_mem.gguf.types import GGUFDtype
-from hf_mem.run import Result, arun
-from hf_mem.safetensors.kv_cache import KV_CACHE_DTYPE_CHOICES
-from hf_mem.safetensors.print import print_safetensors_report
-
-VALID_KV_CACHE_DTYPES = set(KV_CACHE_DTYPE_CHOICES) | set(GGUFDtype.__members__.keys())
+from hf_mem._config import KV_CACHE_DTYPES
+from hf_mem._gguf import KV_DTYPES
+from hf_mem._render import markdown, table
+from hf_mem._source import HubError, Progress
+from hf_mem._version import __version__
+from hf_mem.estimate import arun
 
 
-def _print_result(result: Result) -> None:
-    if result.safetensors is not None:
-        print_safetensors_report(
-            model_id=result.model_id,
-            revision=result.revision,
-            metadata=result.safetensors,
-            kv_cache=result.kv_cache_metadata,
-            moe=result.moe_metadata,
-        )
-        return
+class _Status:
+    FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
-    if result.gguf_files is not None:
-        if result.filename is not None:
-            print_gguf_report(
-                model_id=result.model_id,
-                filename=result.filename,
-                revision=result.revision,
-                metadata=result.gguf_files[result.filename],
-                kv_cache=result.gguf_files[result.filename].kv_cache,
-            )
-        else:
-            print_gguf_files_report(
-                model_id=result.model_id,
-                revision=result.revision,
-                gguf_files=result.gguf_files,
-                memory=result.memory,  # type: ignore[arg-type]
-                kv_cache=result.kv_cache,  # type: ignore[arg-type]
-            )
+    def __init__(self) -> None:
+        self.enabled = sys.stderr.isatty()
+        self.last, self.frame = 0.0, 0
+
+    def __call__(self, done: int, total: int) -> None:
+        now = time.monotonic()
+        if not self.enabled or (now - self.last < 0.08 and done < total):
+            return
+        self.last, self.frame = now, self.frame + 1
+        width = 24
+        filled = width * done // max(total, 1)
+        bar = "━" * filled + "╺" + "─" * (width - filled - 1) if filled < width else "━" * width
+        spinner = self.FRAMES[self.frame % len(self.FRAMES)]
+        sys.stderr.write(f"\r\x1b[2K{spinner} Reading metadata {bar} {done}/{total} requests")
+        sys.stderr.flush()
+
+    def clear(self) -> None:
+        if self.enabled:
+            sys.stderr.write("\r\x1b[2K")
+            sys.stderr.flush()
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("--model-id", required=True, help="Model ID on the Hugging Face Hub")
-    parser.add_argument(
-        "--revision",
-        default="main",
-        help="Model revision on the Hugging Face Hub",
+    parser = argparse.ArgumentParser(
+        prog="hf-mem",
+        description="Estimate the memory required to run a model from the Hugging Face Hub or a local path.",
     )
     parser.add_argument(
-        "--hf-token",
-        type=str,
-        default=None,
-        required=False,
-        help="The Hugging Face Hub token to use when sending requests to the Hub. If not provided it will be retrieved from either the `HF_TOKEN` environment variable or from the `.cache/huggingface/token` file if applicable.",
+        "model", nargs="?", help="Hub model ID (`org/name`, `org/name@revision`, or URL) or local path."
     )
-
+    parser.add_argument("--model-id", help=argparse.SUPPRESS)
+    parser.add_argument("--revision", help="Hub revision (branch, tag or commit), defaults to `main`.")
     parser.add_argument(
-        "--experimental",
-        action="store_true",
-        help="Also estimate the KV cache for generative models (and the experts breakdown for MoEs).",
+        "--file", "--gguf-file", dest="file", help="Single file, shard set or directory to estimate."
     )
+    parser.add_argument("--max-model-len", type=int, help="Context length, defaults to the model config.")
     parser.add_argument(
-        "--max-model-len",
-        type=int,
-        default=None,
-        # NOTE: https://docs.vllm.ai/en/stable/configuration/engine_args/#-max-model-len
-        help="Model context length (prompt and output). If unspecified, will be automatically derived from the model config.",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=1,
-        help="Batch size to help estimate the required RAM for caching when running the inference. Defaults to 1.",
+        "--batch-size", type=int, default=1, help="Concurrent sequences in the KV cache, defaults to 1."
     )
     parser.add_argument(
         "--kv-cache-dtype",
-        type=str,
         default="auto",
-        # NOTE: https://docs.vllm.ai/en/stable/cli/serve/#-kv-cache-dtype
-        help=f"Data type for the KV cache storage. If `auto` is specified, it will use the default model dtype specified in the `config.json` (if available) or F16 for GGUF files. Despite the FP8 data types having different formats, all those take 1 byte, meaning that the calculation would lead to the same results. Valid values are {KV_CACHE_DTYPE_CHOICES} for safetensors files and {['auto'] + list(GGUFDtype.__members__.keys())} for GGUF files. Defaults to `auto`.",
+        help="KV cache dtype, `auto` uses the model dtype (Safetensors) or F16 (GGUF). "
+        f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(KV_DTYPES)}.",
     )
-
-    parser.add_argument(
-        "--json-output",
-        action="store_true",
-        help="Whether to provide the output as a JSON instead of printed as table.",
-    )
-    parser.add_argument(
-        "--ignore-table-width",
-        action="store_true",
-        help="Deprecated: table width now auto-expands when needed, so this flag is ignored.",
-    )
-    parser.add_argument(
-        "--gguf-file",
-        type=str,
-        default=None,
-        help="Specific GGUF file to estimate. If not provided, all GGUF files found in the repo will be estimated. The path within the repo is required (e.g. Q4_K_M/model-Q4_K_M.gguf).",
-    )
-    parser.add_argument(
-        "--details",
-        action="store_true",
-        help="Include per-component dtype and parameter breakdowns in JSON output (`--json-output` only).",
-    )
+    parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
+    parser.add_argument("--json", "--json-output", dest="json", action="store_true", help="Print JSON.")
+    parser.add_argument("--markdown", action="store_true", help="Print a Markdown table.")
+    parser.add_argument("--version", action="version", version=f"hf-mem {__version__}")
+    for legacy in ("--experimental", "--details", "--ignore-table-width"):
+        parser.add_argument(legacy, action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    warnings.formatwarning = lambda message, *_, **__: f"hf-mem: warning: {message}\n"
 
-    if args.ignore_table_width:
-        warnings.warn(
-            "`--ignore-table-width` is deprecated and has no effect; table width auto-expands when needed by default."
+    model = args.model or args.model_id
+    if model is None:
+        parser.error("the model ID or local path is required, e.g. `hf-mem Qwen/Qwen3-8B`")
+    if args.batch_size < 1 or (args.max_model_len is not None and args.max_model_len < 1):
+        parser.error("`--batch-size` and `--max-model-len` must be positive")
+    if args.experimental:
+        print(
+            "hf-mem: warning: `--experimental` is no longer needed, the KV cache is always estimated.",
+            file=sys.stderr,
         )
 
-    if args.kv_cache_dtype not in VALID_KV_CACHE_DTYPES:
-        parser.error(
-            f"--kv-cache-dtype={args.kv_cache_dtype} not recognized. Valid options: {VALID_KV_CACHE_DTYPES}."
-        )
-
+    status = _Status()
     try:
         result = asyncio.run(
             arun(
-                model_id=args.model_id,
+                model,
                 revision=args.revision,
-                hf_token=args.hf_token,
-                experimental=args.experimental,
+                file=args.file,
                 max_model_len=args.max_model_len,
                 batch_size=args.batch_size,
                 kv_cache_dtype=args.kv_cache_dtype,
-                gguf_file=args.gguf_file,
-                details=args.details,
+                hf_token=args.hf_token,
+                progress=Progress(status),
             )
         )
-    except (RuntimeError, httpx2.HTTPError) as e:
+    except (RuntimeError, HubError) as e:
+        status.clear()
         parser.exit(1, f"hf-mem: error: {e}\n")
+    except KeyboardInterrupt:
+        status.clear()
+        parser.exit(130)
+    status.clear()
 
-    if args.json_output:
-        print(json.dumps(result.to_json()))
-    else:
-        _print_result(result)
+    if args.json:
+        print(json.dumps(result.to_dict()))
+        return
+    for warning in result.warnings:
+        print(f"hf-mem: warning: {warning}", file=sys.stderr)
+    print(markdown(result) if args.markdown else table(result))
