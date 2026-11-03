@@ -8,12 +8,12 @@ GIB = _overhead.GIB
 def test_vllm_overhead():
     config = {"vocab_size": 128256, "intermediate_size": 14336, "hidden_size": 4096}
     dense = _overhead.vllm(config, moe=False, tokens=8192)
-    assert dense.activations == 1024 * 128256 * 8 + 8192 * 14336 * 8
+    assert dense.activations == 1024 * 128256 * 8 + 8192 * 14336 * 16
     assert (dense.cuda_graphs, dense.runtime) == (int(0.25 * GIB), int(0.75 * GIB))
     moe = _overhead.vllm(
         {"vocab_size": 1000, "moe_intermediate_size": 768, "num_experts_per_tok": 8}, moe=True, tokens=4096
     )
-    assert moe.activations == 1024 * 1000 * 8 + 4096 * 768 * 8 * 8
+    assert moe.activations == 1024 * 1000 * 8 + 4096 * 768 * 8 * 16
     assert moe.cuda_graphs == int(0.36 * GIB)
 
 

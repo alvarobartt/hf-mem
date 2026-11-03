@@ -242,7 +242,7 @@ def kv_cache(
     full, sliding, state = kinds.count("full"), kinds.count("sliding"), kinds.count("state")
     layers = {"full": full, "sliding": sliding, "state": state, "none": len(kinds) - full - sliding - state}
     window = config.get("sliding_window") or config.get("attention_chunk_size") or max_model_len
-    sliding_tokens = min(window - 1 + batched_tokens, max_model_len)
+    sliding_tokens = min(window - 1 + 2 * batched_tokens, max_model_len)
     sliding_pages = _cdiv(sliding_tokens, BLOCK_SIZE) + (sliding_tokens < max_model_len)
     dtype_bytes = _BYTES.get(dtype, 2)
     token, full_token = int(width * dtype_bytes), int(full_width * dtype_bytes)
