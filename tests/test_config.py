@@ -153,3 +153,16 @@ def test_kv_dtype_falls_back_to_the_dominant_weight_dtype():
     weights.add("F8_E4M3", 100, 100)
     assert _config.kv_dtype({}, "auto", weights, warnings) == "F16"
     assert warnings
+
+
+def test_global_attention_layers_use_their_own_kv_heads_and_head_dim():
+    config = llama_config(
+        num_key_value_heads=16,
+        head_dim=256,
+        num_global_key_value_heads=4,
+        global_head_dim=512,
+        sliding_window=1024,
+        layer_types=["sliding_attention"] * 3 + ["full_attention"],
+    )
+    size, _ = kv(config, length=131072)
+    assert size == (131072 * 2 * 4 * 512 + 3 * sliding_tokens(1024, 131072) * 2 * 16 * 256) * 2
