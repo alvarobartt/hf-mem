@@ -2,7 +2,7 @@
 
 ---
 
-`hf-mem` estimates the memory required to run any model from the Hugging Face Hub, or from a local path, without downloading the weights. It reads the [Safetensors](https://github.com/huggingface/safetensors) and [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests), and only depends on [`httpx2`](https://github.com/pydantic/httpx2) and [`orjson`](https://github.com/ijl/orjson).
+`hf-mem` estimates the memory required to run any model from the Hugging Face Hub, or from a local path, without downloading the weights. It reads the [Safetensors](https://github.com/huggingface/safetensors) and [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests), and only depends on [`httpx2`](https://github.com/pydantic/httpx2).
 
 The estimate covers the model weights, the KV cache for generative models, and the runtime overhead of the inference engine (activations, CUDA graphs and the CUDA context), for [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers), [Sentence Transformers](https://github.com/huggingface/sentence-transformers) and GGUF models.
 
