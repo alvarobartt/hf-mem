@@ -214,6 +214,7 @@ async def _estimate_safetensors(
     token: str | None,
     gpu_memory: str | None,
     utilization: float,
+    max_num_batched_tokens: int | None,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -285,7 +286,7 @@ async def _estimate_safetensors(
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
     dtype = _config.kv_dtype(text, kv_dtype, weights, warnings)
-    tokens = _overhead.batched_tokens(gpu_memory)
+    tokens = _overhead.batched_tokens(gpu_memory, max_num_batched_tokens)
     size, layers = _config.kv_cache(text, dtype, length, batch_size, tokens)
     half = _config.kv_cache(text, dtype, max(1, length // 2), batch_size, tokens)[0]
     slope = (size - half) / (length - max(1, length // 2)) if length > 1 else 0.0
@@ -312,6 +313,7 @@ async def arun(
     hf_token: str | None = None,
     gpu_memory: str | None = None,
     gpu_memory_utilization: float = 0.92,
+    max_num_batched_tokens: int | None = None,
     progress: Progress | None = None,
 ) -> Estimate | Listing:
     source, url_file = await open_source(model_id, revision, hf_token, progress)
@@ -352,6 +354,7 @@ async def arun(
             hf_token,
             gpu_memory,
             gpu_memory_utilization,
+            max_num_batched_tokens,
         ):
             return estimate
         raise RuntimeError(f"No Safetensors or GGUF weights found for {source.name}.")
@@ -369,6 +372,7 @@ def run(
     hf_token: str | None = None,
     gpu_memory: str | None = None,
     gpu_memory_utilization: float = 0.92,
+    max_num_batched_tokens: int | None = None,
 ) -> Estimate | Listing:
     try:
         asyncio.get_running_loop()
@@ -384,6 +388,7 @@ def run(
                 hf_token,
                 gpu_memory,
                 gpu_memory_utilization,
+                max_num_batched_tokens,
             )
         )
     raise RuntimeError(

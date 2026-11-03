@@ -26,7 +26,9 @@ class Overhead:
         }
 
 
-def batched_tokens(gpu_memory: str | None) -> int:
+def batched_tokens(gpu_memory: str | None, override: int | None = None) -> int:
+    if override is not None:
+        return override
     return 2048 if gpu_memory is not None and parse_gpu_memory(gpu_memory)[1] < LARGE_GPU else 8192
 
 

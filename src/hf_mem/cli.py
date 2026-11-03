@@ -69,6 +69,11 @@ def main() -> None:
         default=0.92,
         help="Fraction of the GPU memory that can be used, defaults to 0.92 (as vLLM).",
     )
+    parser.add_argument(
+        "--max-num-batched-tokens",
+        type=int,
+        help="Tokens per batch as in vLLM, defaults to 8192 (2048 with `--gpu-memory` under 70 GiB), use 2048 for A100.",
+    )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--json", "--json-output", dest="json", action="store_true", help="Print JSON.")
     parser.add_argument("--markdown", action="store_true", help="Print a Markdown table.")
@@ -80,8 +85,10 @@ def main() -> None:
     model = args.model or args.model_id
     if model is None:
         parser.error("the model ID or local path is required, e.g. `hf-mem Qwen/Qwen3-8B`")
-    if args.batch_size < 1 or (args.max_model_len is not None and args.max_model_len < 1):
-        parser.error("`--batch-size` and `--max-model-len` must be positive")
+    if args.batch_size < 1 or any(
+        v is not None and v < 1 for v in (args.max_model_len, args.max_num_batched_tokens)
+    ):
+        parser.error("`--batch-size`, `--max-model-len` and `--max-num-batched-tokens` must be positive")
     if not 0 < args.gpu_memory_utilization <= 1:
         parser.error("`--gpu-memory-utilization` must be in (0, 1]")
     if args.experimental:
@@ -103,6 +110,7 @@ def main() -> None:
                 hf_token=args.hf_token,
                 gpu_memory=args.gpu_memory,
                 gpu_memory_utilization=args.gpu_memory_utilization,
+                max_num_batched_tokens=args.max_num_batched_tokens,
                 progress=Progress(status),
             )
         )

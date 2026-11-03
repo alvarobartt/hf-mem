@@ -204,3 +204,13 @@ def test_mistral_params_json_warns(tmp_path):
 
     assert result.kv_cache is None
     assert any("params.json" in w for w in result.warnings)
+
+
+def test_max_num_batched_tokens_scales_the_activations(tmp_path):
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config(intermediate_size=128))
+
+    default = run(str(tmp_path)).overhead
+    small = run(str(tmp_path), max_num_batched_tokens=2048).overhead
+
+    assert default.activations - small.activations == (8192 - 2048) * 128 * 16
