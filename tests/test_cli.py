@@ -124,3 +124,12 @@ def test_version_matches_pyproject() -> None:
     pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text()
     match = re.search(r'^version = "(.+)"$', pyproject, re.M)
     assert match is not None and match[1] == __version__
+
+
+def test_file_size_weights_are_shown_with_the_kv_cache(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    (tmp_path / "pytorch_model.bin").write_bytes(b"\0" * 1000)
+    write_json(str(tmp_path / "config.json"), llama_config())
+    code, out, _ = cli(monkeypatch, capsys, str(tmp_path))
+    assert code == 0 and "MODEL (0.00 GiB)" in out and "FILE SIZE" in out and "KV CACHE" in out
