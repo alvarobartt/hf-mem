@@ -164,26 +164,24 @@ def table(estimate: Estimate | Listing) -> str:
             for name, value in (
                 ("ACTIVATIONS", overhead.activations),
                 ("ENCODER", overhead.encoder),
-                ("CUDA GRAPHS", overhead.cuda_graphs),
-                ("NON-TORCH", overhead.non_torch),
-                ("CUDA CONTEXT", overhead.cuda_context),
+                ("GRAPHS", overhead.graphs),
+                ("RUNTIME", overhead.runtime),
             )
             if value
         ]
         sections.append((f"OVERHEAD ({gib(overhead.bytes)} GiB)", items))
     if fit := estimate.fit:
-        gpus = fit.gpus or fit.needed or 1
+        gpus = fit.gpus or 1
         capacity = gpus * fit.gpu_memory
-        if fit.fits:
-            text = f"FITS ON {fit.needed} x {gib(fit.gpu_memory)} GiB"
-        elif fit.needed:
-            text = f"NEEDS {fit.needed} x {gib(fit.gpu_memory)} GiB"
-        else:
-            text = f"DOES NOT FIT ON 64 x {gib(fit.gpu_memory)} GiB"
-        if kv:
+        text = f"{gib(estimate.total)} / {gib(capacity)} GiB [{estimate.total / capacity:.0%}] ON {gpus} GPU"
+        text += "S" if gpus > 1 else ""
+        if kv and fit.max_model_len:
             text += f", UP TO {fit.max_model_len} TOKENS"
-        used = f"{estimate.total / capacity:.0%} OF {gpus} GPU{'S' if gpus > 1 else ''}"
-        sections.append((None, [("GPU FIT", text, used, estimate.total / capacity)]))
+        if fit.fits and fit.needed and fit.needed < gpus:
+            verdict = f"FITS ON {fit.needed} GPU" + ("S" if fit.needed > 1 else "")
+        else:
+            verdict = "FITS" if fit.fits else f"⚠ NEEDS {fit.needed} GPUS" if fit.needed else "⚠ DOES NOT FIT"
+        sections[0][1].append(("GPU MEMORY", text, verdict, estimate.total / capacity))
     return _color(_draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH))
 
 
@@ -232,5 +230,17 @@ def markdown(estimate: Estimate | Listing) -> str:
         rows.append(
             f"| KV cache ({cache.dtype}, {cache.max_model_len} tokens x {cache.batch_size}) | {gib(cache.bytes)} GiB | |"
         )
+    if overhead := estimate.overhead:
+        parts = ", ".join(n for n, v in overhead.to_dict().items() if v and n != "bytes")
+        rows.append(f"| Overhead ({parts}) | {gib(overhead.bytes)} GiB | |")
     title = f"Memory estimate for {where}" + (f", file `{estimate.file}`" if estimate.file else "")
-    return "\n".join([title, "", *rows])
+    lines = [title, "", *rows]
+    if fit := estimate.fit:
+        gpus = f"{fit.gpus or 1} x {gib(fit.gpu_memory)} GiB"
+        verdict = f"Fits on {gpus}" if fit.fits else f"Does not fit on {gpus}"
+        if fit.needed and fit.needed != (fit.gpus or 1):
+            verdict += f", needs {fit.needed} GPU{'s' if fit.needed > 1 else ''}"
+        if estimate.kv_cache and fit.max_model_len:
+            verdict += f", up to {fit.max_model_len} tokens"
+        lines += ["", verdict + "."]
+    return "\n".join(lines)

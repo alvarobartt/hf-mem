@@ -45,22 +45,21 @@ _GATED = ("silu", "swiglu", "swish")
 class Overhead:
     activations: int
     encoder: int
-    cuda_graphs: int
-    non_torch: int
-    cuda_context: int
+    graphs: int
+    runtime: int
+    context: int
 
     @property
     def bytes(self) -> int:
-        return self.activations + self.encoder + self.cuda_graphs + self.non_torch + self.cuda_context
+        return self.activations + self.encoder + self.graphs + self.runtime
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "bytes": self.bytes,
             "activations": self.activations,
             "encoder": self.encoder,
-            "cuda_graphs": self.cuda_graphs,
-            "non_torch": self.non_torch,
-            "cuda_context": self.cuda_context,
+            "graphs": self.graphs,
+            "runtime": self.runtime,
         }
 
 
@@ -140,11 +139,12 @@ def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_b
         * (p["graph_layer"] + moe * p["graph_moe"] + hybrid * p["graph_hybrid"] + p["graph_lh"] * hidden)
         + p["graph_width"] * (hidden + intermediate)
     )
-    return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]), int(p["context"]))
+    context = int(p["context"])
+    return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]) + context, context)
 
 
 def llama_cpp() -> Overhead:
-    return Overhead(int(0.15 * GIB), 0, 0, 0, int(0.47 * GIB))
+    return Overhead(int(0.15 * GIB), 0, 0, int(0.47 * GIB), int(0.47 * GIB))
 
 
 @dataclass

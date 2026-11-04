@@ -56,7 +56,14 @@ def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[
     assert code == 0 and fit["gpus"] == 2 and fit["needed"] == 1 and fit["fits"]
     assert fit["max_model_len"] == 1024
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "4")
-    assert code == 0 and "FITS ON 1 x 4.00 GiB" in out
+    assert code == 0 and "GPU MEMORY" in out and "/ 4.00 GiB [" in out and "│ FITS " in out
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4")
+    assert "FITS ON 1 GPU" in out and "/ 8.00 GiB [" in out
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "--markdown")
+    assert "| Overhead (activations, graphs, runtime) |" in out
+    assert "Fits on 2 x 4.00 GiB, needs 1 GPU, up to 1024 tokens." in out
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "0.5")
+    assert "⚠ NEEDS 2 GPUS" in out or "⚠ DOES NOT FIT" in out
     code, _, err = cli(monkeypatch, capsys, model, "--gpu-memory", "lots")
     assert code == 1 and "--gpu-memory" in err
 

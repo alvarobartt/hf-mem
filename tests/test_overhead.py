@@ -13,12 +13,12 @@ def test_vllm_overhead_follows_the_gpu_class() -> None:
     large = _overhead.vllm(config, moe=False, hybrid=False, tokens=8192)
     assert 1.2 * GIB < small.activations < 1.6 * GIB
     assert 2.6 * GIB < large.activations < 3.0 * GIB
-    assert 0.35 * GIB < small.cuda_graphs < 0.5 * GIB
-    assert (small.non_torch, large.non_torch) == (int(0.27 * GIB), int(0.87 * GIB))
+    assert 0.35 * GIB < small.graphs < 0.5 * GIB
+    assert (small.runtime, large.runtime) == (int(0.27 * GIB) + small.context, int(0.87 * GIB) + large.context)
     moe = _overhead.vllm(
         {**config, "moe_intermediate_size": 768, "num_experts_per_tok": 8}, moe=True, hybrid=False, tokens=2048
     )
-    assert moe.cuda_graphs > small.cuda_graphs
+    assert moe.graphs > small.graphs
     assert (
         _overhead.vllm(config, moe=False, hybrid=False, tokens=2048, encoder_bytes=GIB).bytes
         == small.bytes + GIB
