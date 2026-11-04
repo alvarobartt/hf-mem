@@ -8,7 +8,7 @@ from helpers import llama_config, llama_tensors, write_gguf, write_json, write_s
 from test_gguf import ARCH, TENSORS
 
 from hf_mem import __version__
-from hf_mem._render import _where
+from hf_mem._render import _bar, _where
 from hf_mem.cli import main
 
 
@@ -139,3 +139,12 @@ def test_file_size_weights_are_shown_with_the_kv_cache(
     write_json(str(tmp_path / "config.json"), llama_config())
     code, out, _ = cli(monkeypatch, capsys, str(tmp_path))
     assert code == 0 and "MODEL (0.00 GiB)" in out and "FILE SIZE" in out and "KV CACHE" in out
+
+
+def test_bars_show_small_fractions() -> None:
+    assert _bar(0.0, 4) == "░░░░"
+    assert _bar(0.001, 4) == "▏░░░"
+    assert _bar(0.5, 4) == "██░░"
+    assert _bar(0.3, 4) == "█▎░░"
+    assert _bar(1.0, 4) == "████"
+    assert all(len(_bar(f / 100, 7)) == 7 for f in range(101))
