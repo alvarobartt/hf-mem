@@ -14,6 +14,10 @@ MAX_READ = 256 << 20
 LISTING_READ = 16 << 20
 SHARD = re.compile(r"-(\d+)-of-(\d+)\.gguf$")
 _SKIP = ("mmproj", "imatrix")
+_QUANT = re.compile(
+    r"(?:UD-)?(?:I?Q\d\w*?|T?Q\d_\d|[BM]?F\d+|NVFP4|MXFP4(?:_MOE)?)(?=(?:-\d+-of-\d+)?\.gguf$)", re.I
+)
+_MMPROJ = ("Q8_0", "F16", "BF16", "F32")
 
 # ggml type id -> (name, block size, bytes per block)
 TYPES: dict[int, tuple[str, int, int]] = {
@@ -223,11 +227,37 @@ def select_file(groups: dict[str, list[str]], file: str) -> tuple[str, list[str]
     found = {
         name: paths for name, paths in groups.items() if name == target or name.startswith(target + "/")
     } or {name: paths for name, paths in groups.items() if os.path.basename(name) == target}
+    if not found and (matches := tagged(groups, target)):
+        name = min(matches, key=lambda n: (len(os.path.basename(n)), n))
+        return name, groups[name]
     if not found:
         raise RuntimeError(f"No GGUF file matching `{file}` found.")
     if len(found) > 1:
         raise RuntimeError(f"Multiple GGUF files match `{file}`: {sorted(found)}.")
     return next(iter(found.items()))
+
+
+def tagged(groups: dict[str, list[str]], tag: str) -> list[str]:
+    pattern = re.compile(rf"(?<![a-z0-9]){re.escape(tag)}(?![a-z0-9])", re.I)
+    return [name for name in groups if pattern.search(os.path.basename(name))]
+
+
+def mmproj(files: dict[str, int], name: str) -> str | None:
+    directory = os.path.dirname(name)
+    candidates = sorted(
+        p
+        for p in files
+        if p.endswith(".gguf")
+        and "mmproj" in os.path.basename(p).lower()
+        and os.path.dirname(p) in (directory, "")
+    )
+    if not candidates:
+        return None
+    quant = _QUANT.search(os.path.basename(name))
+    for tag in ([quant[0]] if quant else []) + list(_MMPROJ):
+        if matches := tagged({p: [] for p in candidates}, tag):
+            return matches[0]
+    return candidates[0]
 
 
 def _state_bytes(metadata: dict[str, Any], arch: str) -> int:

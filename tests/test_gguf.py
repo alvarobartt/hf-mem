@@ -67,7 +67,9 @@ def test_listing_uses_file_sizes_and_per_file_metadata(tmp_path: Path) -> None:
         some(files["mtp-model-Q4_K_M.gguf"].kv_cache).bytes
         == 5 / 4 * some(files["model-Q4_K_M.gguf"].kv_cache).bytes
     )
-    assert estimate(str(tmp_path), file="BF16").weights.bytes == 2 * (256 * 1000 // 256 * 144 + 256 * 4)
+    bf16 = estimate(str(tmp_path), file="BF16")
+    assert bf16.components["Model"].bytes == 2 * (256 * 1000 // 256 * 144 + 256 * 4)
+    assert bf16.weights.bytes == bf16.components["Model"].bytes + bf16.components["mmproj"].bytes
 
 
 def test_kv_cache_variants() -> None:
@@ -192,3 +194,43 @@ def test_format_picks_the_weights(tmp_path: Path) -> None:
         run(str(tmp_path), format="safetensors")
     with pytest.raises(RuntimeError, match="No GGUF files"):
         run(str(tmp_path), format="gguf")
+
+
+def test_quantization_tags_and_mmproj(tmp_path: Path) -> None:
+    for name in ("m-Q4_K_M", "m-UD-Q4_K_M", "m-BF16", "mmproj-m-BF16", "mmproj-m-Q8_0"):
+        write_gguf(str(tmp_path / f"{name}.gguf"), {**ARCH, **TOKENIZER}, TENSORS)
+
+    write_gguf(
+        str(tmp_path / "mmproj-m-Q8_0.gguf"),
+        {
+            "general.architecture": "clip",
+            "clip.vision.embedding_length": 64,
+            "clip.vision.image_size": 224,
+            "clip.vision.patch_size": 14,
+        },
+        TENSORS,
+    )
+    q4 = estimate(str(tmp_path), file="q4_k_m")
+    assert q4.file == "m-Q4_K_M.gguf" and list(q4.components) == ["Model", "mmproj"]
+    assert some(q4.overhead).encoder == int(7.2 * 16**2 * 4 * 64)
+    assert estimate(str(tmp_path), file="UD-Q4_K_M").file == "m-UD-Q4_K_M.gguf"
+    assert (
+        _gguf.mmproj(
+            dict.fromkeys(["m-Q4_K_M.gguf", "mmproj-m-BF16.gguf", "mmproj-m-Q8_0.gguf"], 1), "m-Q4_K_M.gguf"
+        )
+        == "mmproj-m-Q8_0.gguf"
+    )
+    assert (
+        _gguf.mmproj(
+            dict.fromkeys(["m-BF16.gguf", "mmproj-m-BF16.gguf", "mmproj-m-Q8_0.gguf"], 1), "m-BF16.gguf"
+        )
+        == "mmproj-m-BF16.gguf"
+    )
+    assert _gguf.mmproj({"m-BF16.gguf": 1}, "m-BF16.gguf") is None
+    files = {some(f.file): f for f in listing(str(tmp_path)).files}
+    assert (
+        files["m-Q4_K_M.gguf"].weights.bytes
+        > estimate(str(tmp_path), file="m-Q4_K_M.gguf").components["Model"].bytes
+    )
+    with pytest.raises(RuntimeError, match="No GGUF file matching"):
+        estimate(str(tmp_path), file="Q3_K_S")

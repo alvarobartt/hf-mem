@@ -14,6 +14,7 @@ CONCURRENCY = int(os.getenv("MAX_WORKERS", 32))
 TIMEOUT = float(os.getenv("REQUEST_TIMEOUT", 30.0))
 RETRIES = 3
 
+_TAG = re.compile(r"([^/:@\s]+/[^/:@\s]+(?:@[^:\s]+)?):([\w.-]+)")
 _URL = re.compile(r"^/(?P<id>[^/]+/[^/]+)(?:/(?:tree|blob|resolve)/(?P<rev>[^/]+)(?:/(?P<file>.+))?)?/?$")
 
 
@@ -64,10 +65,13 @@ def parse_model(model: str, revision: str | None = None) -> tuple[str, str | Non
             rev, file = (unquote(match[k]) if match[k] else None for k in ("rev", "file"))
             return match["id"], revision or rev, file
         raise RuntimeError(f"`{model}` is not a valid Hugging Face Hub model URL.")
+    tag = None
+    if (match := _TAG.fullmatch(model)) and not os.path.exists(model):
+        model, tag = match[1], match[2]
     if "@" in model and not os.path.exists(model):
         model, _, rev = model.partition("@")
         revision = revision or rev
-    return model, revision, None
+    return model, revision, tag
 
 
 class Progress:

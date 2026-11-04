@@ -6,6 +6,12 @@ GIB = 1 << 30
 MIB = 1 << 20
 LARGE_GPU = 70 * GIB
 LARGEST_GPU = 160 * GIB
+# llama.cpp grows the mmproj compute buffer up to the largest image: 4096 merged tokens for dynamic resolution
+# encoders (unless `image_max_pixels` is lower, or llama.cpp caps the projector), `image_size` otherwise, and 30 s
+# of audio.
+CLIP_MAX_TOKENS = {"pixtral": 1024, "lfm2": 256}
+CLIP_DYNAMIC_TOKENS = 4096
+CLIP_AUDIO_POSITIONS = 1500
 
 # Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
 _PROFILES = {
@@ -143,8 +149,41 @@ def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_b
     return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]) + context, context)
 
 
-def llama_cpp() -> Overhead:
-    return Overhead(int(0.15 * GIB), 0, 0, int(0.47 * GIB), int(0.47 * GIB))
+def _clip_bytes(positions: int, hidden: int, ffn: int | None, gated: bool) -> int:
+    return int((18 if gated else 7.2) * positions * max(hidden, ffn or 4 * hidden))
+
+
+def mmproj_encoder(metadata: dict[str, Any]) -> int:
+    total = 0
+    if hidden := metadata.get("clip.vision.embedding_length"):
+        patch = metadata.get("clip.vision.patch_size") or 14
+        projector = metadata.get("clip.projector_type") or metadata.get("clip.vision.projector_type")
+        window = metadata.get("clip.vision.n_wa_pattern")
+        merge = metadata.get("clip.vision.spatial_merge_size") or metadata.get(
+            "clip.vision.projector.scale_factor"
+        )
+        if projector in CLIP_MAX_TOKENS:
+            patches = CLIP_MAX_TOKENS[projector] * (merge or 1) ** 2
+        elif (
+            window or "clip.vision.spatial_merge_size" in metadata or "clip.vision.image_max_pixels" in metadata
+        ):
+            patches = CLIP_DYNAMIC_TOKENS * (merge or 2) ** 2
+            if max_pixels := metadata.get("clip.vision.image_max_pixels"):
+                patches = min(patches, max_pixels // patch**2)
+        else:
+            patches = ((metadata.get("clip.vision.image_size") or 224) // patch) ** 2
+        ffn, gated = metadata.get("clip.vision.feed_forward_length"), bool(metadata.get("clip.use_silu"))
+        total += _clip_bytes(patches, hidden, ffn, gated) + (2 * patches**2 if window else 0)
+    if hidden := metadata.get("clip.audio.embedding_length"):
+        total += _clip_bytes(
+            CLIP_AUDIO_POSITIONS, hidden, metadata.get("clip.audio.feed_forward_length"), False
+        )
+    return total
+
+
+def llama_cpp(projector: dict[str, Any] | None = None) -> Overhead:
+    encoder = mmproj_encoder(projector) if projector else 0
+    return Overhead(int(0.15 * GIB), encoder, 0, int(0.47 * GIB), int(0.47 * GIB))
 
 
 @dataclass

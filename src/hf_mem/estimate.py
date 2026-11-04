@@ -162,28 +162,38 @@ async def _estimate_gguf(
 
     if file is not None or len(groups) == 1:
         name, paths = _gguf.select_file(groups, file) if file is not None else next(iter(groups.items()))
-        header = await _gguf.read_group(source, paths)
+        projector = _gguf.mmproj(source.files, name)
+        header, *extra = await asyncio.gather(
+            _gguf.read_group(source, paths), *([_gguf.read_group(source, [projector])] if projector else [])
+        )
         kv = _gguf_kv(header.metadata, max_model_len, batch_size, kv_dtype)
+        components = {"Model": header.weights, "mmproj": extra[0].weights} if extra else {}
         estimate = Estimate(
             model=source.name,
             revision=source.revision,
             url=source.url,
             format="gguf",
             file=name,
-            weights=header.weights,
+            weights=Weights().merge(header.weights).merge(extra[0].weights) if extra else header.weights,
+            components=components,
             kv_cache=kv[0] if kv else None,
-            overhead=_overhead.llama_cpp() if kv else None,
+            overhead=_overhead.llama_cpp(extra[0].metadata if extra else None) if kv else None,
             warnings=warnings,
         )
         _fit(estimate, kv[1] if kv else 0, kv[2] if kv else 0.0, gpu_memory, utilization)
         return estimate
 
     names = list(groups)
+    projectors = {name: _gguf.mmproj(source.files, name) for name in names}
+    unique = sorted({p for p in projectors.values() if p})
     first, *results = await asyncio.gather(
         _gguf.read_header(source, groups[names[0]][0]),
         *(_gguf.read_metadata(source, groups[name][0]) for name in names),
+        *(_gguf.read_metadata(source, p) for p in unique),
         return_exceptions=True,
     )
+    results, loaded = results[: len(names)], results[len(names) :]
+    projected = {p: r[0] for p, r in zip(unique, loaded) if isinstance(r, tuple)}
     files = []
     for name, result in zip(names, results):
         if isinstance(result, HubError):
@@ -202,9 +212,13 @@ async def _estimate_gguf(
                 url=source.url,
                 format="gguf",
                 file=name,
-                weights=Weights(bytes=sum(source.files[p] for p in paths) - header_size),
+                weights=Weights(
+                    bytes=sum(source.files[p] for p in paths)
+                    - header_size
+                    + (source.files[projector] if (projector := projectors[name]) else 0)
+                ),
                 kv_cache=kv[0] if kv else None,
-                overhead=_overhead.llama_cpp() if kv else None,
+                overhead=_overhead.llama_cpp(projected.get(projector) if projector else None) if kv else None,
             )
         )
     if not files:
@@ -464,7 +478,9 @@ async def arun(
         onnx = [p for p in source.files if p.endswith(".onnx")]
         target = file.strip("/") if file is not None else None
         wants_gguf = target is not None and (
-            target.endswith(".gguf") or any(p.startswith(target + "/") for p in gguf)
+            target.endswith(".gguf")
+            or any(p.startswith(target + "/") for p in gguf)
+            or bool(_gguf.tagged(_gguf.group_files(gguf), target))
         )
         wants_onnx = target is not None and (
             target.endswith(".onnx")
