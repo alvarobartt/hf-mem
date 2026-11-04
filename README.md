@@ -4,7 +4,7 @@
 
 `hf-mem` estimates the memory required to run any model from the Hugging Face Hub, or from a local path, without downloading the weights. It reads the [Safetensors](https://github.com/huggingface/safetensors) and [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests), and only depends on [`httpx2`](https://github.com/pydantic/httpx2).
 
-The estimate covers the model weights, the KV cache for generative models, and the runtime overhead of the inference engine (activations, CUDA graphs and the CUDA context), for [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers), [Sentence Transformers](https://github.com/huggingface/sentence-transformers) and GGUF models.
+The estimate covers the model weights, the KV cache for generative models, and the runtime overhead of the inference engine (activations, encoder, graphs and runtime), for [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers), [Sentence Transformers](https://github.com/huggingface/sentence-transformers) and GGUF models.
 
 ## Usage
 
@@ -60,7 +60,7 @@ uvx hf-mem unsloth/Qwen3.8-27B-GGUF --file Qwen3.8-27B-UD-Q4_K_M.gguf
 
 ### Does it fit?
 
-`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and reports whether the model fits, how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account.
+`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and adds to the summary the memory used out of the given GPUs, whether the model fits or how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account.
 
 ```bash
 uvx hf-mem meta-llama/Llama-3.1-8B-Instruct --max-model-len 32768 --gpu-memory 24
@@ -68,7 +68,7 @@ uvx hf-mem meta-llama/Llama-3.1-8B-Instruct --max-model-len 32768 --gpu-memory 2
 
 ### Local models and the cache
 
-Local directories and files work the same way, and models already downloaded to the Hugging Face cache are read from disk when unchanged on the Hub, or only from the cache with `HF_HUB_OFFLINE=1`.
+Local directories and files work the same way (including `hf download --local-dir` folders, shown with the downloaded commit), and models already downloaded to the Hugging Face cache are read from disk when unchanged on the Hub, or only from the cache with `HF_HUB_OFFLINE=1`.
 
 ```bash
 uvx hf-mem ./path/to/model
@@ -94,7 +94,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 --json
   "total": 27343113879,
   "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "cuda_graphs": 739780853, "non_torch": 934155386, "cuda_context": 1084479242},
+  "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628},
   "warnings": []
 }
 ```
@@ -133,15 +133,15 @@ hf extensions add alvarobartt/hf-mem
 
 - **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory.
 - **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus two batches of tokens in flight, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
-- **Overhead** is the memory an inference engine needs on top of the weights and the KV cache, per GPU, modeled on vLLM's memory profiling for Safetensors models and on llama.cpp's compute buffer and CUDA context for GGUF models:
+- **Overhead** is the memory an inference engine needs on top of the weights and the KV cache, per GPU, modeled on vLLM's memory profiling for Safetensors models and on llama.cpp's compute buffer and device context for GGUF models:
   - `activations`: the peak of the dummy forward pass over the batched tokens and of the sampler over the vocabulary.
   - `encoder`: the vision or audio encoder activations for the largest image or audio clip, from `config.json` and the processor configs.
-  - `cuda_graphs`: the CUDA graphs captured for decoding, as estimated by vLLM before sizing the KV cache.
-  - `non_torch` and `cuda_context`: attention, cuBLAS and NCCL workspaces, and the CUDA context, which vLLM keeps outside `--gpu-memory-utilization`.
+  - `graphs`: the CUDA (or HIP) graphs captured for decoding, as estimated by vLLM before sizing the KV cache.
+  - `runtime`: the device context, which vLLM keeps outside `--gpu-memory-utilization`, plus the attention, BLAS and collective communication workspaces.
 
-  vLLM picks its batching by GPU memory, not architecture: 16384 batched tokens on GPUs with 160 GiB or more (e.g. B200), 8192 tokens on GPUs with 70 GiB or more (e.g. H100, H200), and 2048 tokens with 256 sequences on smaller GPUs and on A100s, which are excluded by name. hf-mem follows `--gpu-memory`, or `--max-num-batched-tokens` (e.g. 2048 on A100). With the same batching, only the CUDA graphs differ between architectures (up to 0.5 GiB more on Hopper than on Ampere).
+  vLLM picks its batching by GPU memory, not architecture: 16384 batched tokens on GPUs with 160 GiB or more (e.g. B200, MI300X), 8192 tokens on GPUs with 70 GiB or more (e.g. H100, H200), and 2048 tokens with 256 sequences on smaller GPUs and on A100s, which are excluded by name. hf-mem follows `--gpu-memory`, or `--max-num-batched-tokens` (e.g. 2048 on A100). With the same batching, only the graphs differ between architectures (up to 0.5 GiB more on Hopper than on Ampere).
 
-The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4, A10G, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs), with llama.cpp, and with Diffusers and Sentence Transformers, on 40+ LLMs, MoEs, hybrid, vision, audio and omni models.
+The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4, A10G, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs), with llama.cpp, and with Diffusers and Sentence Transformers, on 40+ LLMs, MoEs, hybrid, vision, audio and omni models. AMD GPUs go through the same memory profiling, batching and graph capture in vLLM on ROCm, so the same estimate applies, but it has not been validated there and the device context and workspaces may differ.
 
 - The KV cache per request matches vLLM exactly for Llama 3, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 and Gemma 4 (sliding window), gpt-oss, Qwen3.5 (linear attention) and Nemotron-H (Mamba), and the KV cache per token matches SGLang.
 - The overhead has a median error of 10% against vLLM and lies between vLLM's reservation and SGLang's actual usage for most models (SGLang reserves a fixed share of the GPU instead), e.g. the longest context for Llama 3.1 8B on an L4 is 29,878 tokens against 30,048 in vLLM.
