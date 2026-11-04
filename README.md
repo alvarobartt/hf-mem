@@ -1,4 +1,4 @@
-<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/hf-mem.png" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/hf-mem.png" />
 
 ---
 
@@ -16,7 +16,7 @@ Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, whe
 uvx hf-mem zai-org/GLM-5.3-Flash
 ```
 
-<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/transformers.png" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/transformers.png" />
 
 For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, which as in vLLM is the model dtype unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
 
@@ -30,7 +30,7 @@ uvx hf-mem Qwen/Qwen3.8-27B --max-model-len 32768 --batch-size 4
 uvx hf-mem Qwen/Qwen-Image-2.1
 ```
 
-<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/diffusers.png" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/diffusers.png" />
 
 ### Sentence Transformers
 
@@ -38,7 +38,7 @@ uvx hf-mem Qwen/Qwen-Image-2.1
 uvx hf-mem google/embeddinggemma-2
 ```
 
-<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/sentence-transformers.png" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/sentence-transformers.png" />
 
 ### GGUF
 
@@ -48,13 +48,13 @@ GGUF repositories list every file (skipping `mmproj` and `imatrix` files), and `
 uvx hf-mem LiquidAI/LFM3-1.7B-GGUF
 ```
 
-<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/gguf.png" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/gguf.png" />
 
 ```bash
 uvx hf-mem unsloth/Qwen3.8-27B-GGUF --file Qwen3.8-27B-UD-Q4_K_M.gguf
 ```
 
-<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/main/gguf-file.png" />
+<img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/gguf-file.png" />
 
 `--file` also selects a single `*.safetensors` file or shard set, e.g. on ComfyUI repositories that ship multiple checkpoints.
 
@@ -116,7 +116,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 - `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
 - `components` (per Diffusers component or file), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are added when they apply.
 - `format` is `safetensors`, `gguf`, `onnx`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt` or `.nemo` weights.
-- GGUF listings return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
+- GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
 
 ### Python
 
@@ -129,11 +129,11 @@ print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead
 print(result.to_dict())
 ```
 
-`run` takes the same options as the CLI (`revision`, `file`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization` and `max_num_batched_tokens`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF repositories.
+`run` takes the same options as the CLI (`revision`, `file`, `format`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization` and `max_num_batched_tokens`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF and ONNX repositories.
 
 ### Agents
 
-Coding agents can use `uvx hf-mem <model> -o json` to answer questions such as how much memory a model needs or whether it fits on a given GPU (adding `--gpu-memory`), choosing a single `--file` for GGUF repositories since only one file is loaded for inference.
+Coding agents can use `uvx hf-mem <model> -o json` to answer questions such as how much memory a model needs or whether it fits on a given GPU (adding `--gpu-memory`), choosing a single `--file` for GGUF and ONNX repositories since only one file is loaded for inference.
 
 ### Extensions
 
@@ -162,19 +162,11 @@ The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4
 - vLLM profiles the vision encoder with the largest video when it has more tokens than an image (e.g. Qwen2.5-VL reserves 3 to 7 GiB more at 32K to 64K tokens), and hf-mem warns about it.
 - Inference engines can repack or offload weights, e.g. vLLM pads the gpt-oss MXFP4 experts and keeps the per-layer embeddings of Qwen3.8-Flash-Next on the CPU, and SGLang loads the gpt-oss experts in BF16 on Hopper GPUs.
 
-## Contributing
-
-`hf-mem` is intentionally lightweight, simple and opinionated, so fixes and small improvements are welcome, but please open an issue before any non-trivial change, avoid new dependencies or abstractions, and keep the changes minimal and focused. `hf-mem` is maintained by humans, so please use AI assistance thoughtfully, similarly to the [Ghostty AI Policy](https://github.com/ghostty-org/ghostty/blob/main/AI_POLICY.md).
-
-```bash
-uv run --group test pytest
-uv run --group lint pre-commit run --all-files  # ruff and mypy
-```
-
 ## References
 
 - [Safetensors Metadata parsing](https://huggingface.co/docs/safetensors/en/metadata_parsing)
 - [GGUF File format](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)
 - [GGUF on the Hugging Face Hub](https://huggingface.co/docs/hub/en/gguf)
+- [ONNX - Intermediate Representation](https://onnx.ai/onnx/repo-docs/IR.html)
 - [vLLM - Memory profiling](https://docs.vllm.ai/en/latest/configuration/conserving_memory/)
 - [usgraphics - TR-100 Machine Report](https://github.com/usgraphics/usgc-machine-report)
