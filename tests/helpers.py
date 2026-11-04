@@ -114,3 +114,55 @@ def listing(*args: Any, **kwargs: Any) -> Listing:
     result = run(*args, **kwargs)
     assert isinstance(result, Listing)
     return result
+
+
+def _varint(value: int) -> bytes:
+    out = bytearray()
+    while True:
+        out.append((value & 0x7F) | (0x80 if value > 0x7F else 0))
+        value >>= 7
+        if not value:
+            return bytes(out)
+
+
+def _field(number: int, value: int | bytes) -> bytes:
+    if isinstance(value, int):
+        return _varint(number << 3) + _varint(value)
+    return _varint(number << 3 | 2) + _varint(len(value)) + value
+
+
+_ONNX_BITS = {1: 32, 2: 8, 7: 64, 10: 16, 16: 16, 22: 4}
+
+
+def write_onnx(
+    path: str,
+    initializers: list[tuple[str, int, list[int]]],
+    inputs: list[tuple[str, int, list[int | str]]] = [],
+    external: str | None = None,
+) -> int:
+    graph, data = b"", 0
+    for name, dtype, dims in initializers:
+        size = -(-math.prod(dims) * _ONNX_BITS[dtype] // 8)
+        tensor = b"".join(_field(1, d) for d in dims) + _field(2, dtype) + _field(8, name.encode())
+        if external:
+            entries = [("location", external), ("offset", str(data)), ("length", str(size))]
+            tensor += b"".join(_field(13, _field(1, k.encode()) + _field(2, v.encode())) for k, v in entries)
+            tensor += _field(14, 1)
+        else:
+            tensor += _field(9, b"\0" * size)
+        graph += _field(5, tensor)
+        data += size
+    for name, dtype, shape_dims in inputs:
+        shape = b"".join(
+            _field(1, _field(1, d) if isinstance(d, int) else _field(2, d.encode())) for d in shape_dims
+        )
+        graph += _field(
+            11, _field(1, name.encode()) + _field(2, _field(1, _field(1, dtype) + _field(2, shape)))
+        )
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(_field(1, 8) + _field(7, graph))
+    if external:
+        with open(os.path.join(os.path.dirname(path), external), "wb") as f:
+            f.truncate(data)
+    return data

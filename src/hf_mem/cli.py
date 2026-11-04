@@ -55,7 +55,7 @@ def main() -> None:
     parser.add_argument(
         "--format",
         choices=FORMATS,
-        help="Weights format to estimate, defaults to Safetensors, then GGUF, then the weight file sizes.",
+        help="Weights format to estimate, defaults to Safetensors, then GGUF, then the weight file sizes, then ONNX.",
     )
     parser.add_argument("--max-model-len", type=int, help="Context length, defaults to the model config.")
     parser.add_argument(
@@ -65,7 +65,7 @@ def main() -> None:
         "--kv-cache-dtype",
         default="auto",
         help="KV cache dtype, `auto` uses the model dtype (Safetensors) or F16 (GGUF). "
-        f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(KV_DTYPES)}.",
+        f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(KV_DTYPES)}. ONNX: set by the graph.",
     )
     parser.add_argument(
         "--gpu-memory", help="GPU memory in GiB, e.g. `80` or `8x80`, to check whether it fits."

@@ -1,13 +1,14 @@
 import asyncio
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
-from hf_mem import _config, _gguf, _overhead, _safetensors
+from hf_mem import _config, _gguf, _onnx, _overhead, _safetensors
 from hf_mem._source import HubError, Progress, open_source
 from hf_mem._version import __version__
 from hf_mem._weights import Weights
 
-FORMATS = ("safetensors", "gguf")
+FORMATS = ("safetensors", "gguf", "onnx")
 
 
 @dataclass
@@ -209,6 +210,83 @@ async def _estimate_gguf(
     return Listing(source.name, source.revision, source.url, files, warnings)
 
 
+async def _onnx_lengths(source: Any, labels: list[str]) -> dict[str, int | None]:
+    def config(label: str) -> str | None:
+        directory = os.path.dirname(label)
+        return next((p for p in (f"{directory}/config.json", "config.json") if p in source.files), None)
+
+    paths = {label: config(label) for label in labels}
+    unique = sorted({p for p in paths.values() if p})
+    loaded = dict(zip(unique, await asyncio.gather(*(source.json(p) for p in unique), return_exceptions=True)))
+    lengths: dict[str, int | None] = {}
+    for label, path in paths.items():
+        found = loaded[path] if path else None
+        text = _config.text_config(found) if isinstance(found, dict) else None
+        length = text.get("max_position_embeddings") if text else None
+        lengths[label] = length if isinstance(length, int) else None
+    return lengths
+
+
+async def _estimate_onnx(
+    source: Any,
+    file: str | None,
+    max_model_len: int | None,
+    batch_size: int,
+    kv_dtype: str,
+    warnings: list[str],
+    gpu_memory: str | None,
+    utilization: float,
+) -> Estimate | Listing:
+    groups = _onnx.group_files(source.files)
+    if not groups:
+        raise RuntimeError(f"No ONNX files found for {source.name}.")
+    if kv_dtype != "auto":
+        raise RuntimeError("`--kv-cache-dtype` is set by the ONNX graph inputs, so only `auto` is valid.")
+    if file is not None:
+        groups = dict([_onnx.select_file(groups, file)])
+
+    labels = list(groups)
+    lengths_task = asyncio.ensure_future(_onnx_lengths(source, labels))
+    results = await asyncio.gather(
+        *(_onnx.read_group(source, groups[label]) for label in labels), return_exceptions=True
+    )
+    lengths = await lengths_task
+    files = []
+    for label, result in zip(labels, results):
+        if isinstance(result, HubError) or (isinstance(result, BaseException) and len(labels) == 1):
+            raise result
+        if isinstance(result, BaseException):
+            warnings.append(f"Skipping `{label}`: {result}")
+            continue
+        length = max_model_len or lengths[label]
+        kv = _onnx.kv_cache(result, length, batch_size) if length else None
+        estimate = Estimate(
+            model=source.name,
+            revision=source.revision,
+            url=source.url,
+            format="onnx",
+            file=label,
+            weights=result.weights,
+            kv_cache=KVCache(kv[0], kv[1], length, batch_size, {}) if kv and length else None,
+        )
+        _fit(estimate, lengths[label] or 0, kv[2] if kv else 0.0, gpu_memory, utilization)
+        files.append(estimate)
+    if not files:
+        raise RuntimeError(f"No valid ONNX files found for {source.name}.")
+    if any(not f.weights.dtypes for f in files):
+        warnings.append(
+            f"ONNX files over {_onnx.SMALL_FILE >> 20} MiB with the weights inline are estimated from their file sizes, without the "
+            "parameter count and dtypes."
+        )
+    warnings.append("The ONNX Runtime overhead (activations and workspaces) is not estimated.")
+    if len(labels) == 1:
+        files[0].warnings = warnings
+        return files[0]
+    if gpu_memory is not None:
+        warnings.append("`--gpu-memory` is only checked for a single ONNX file, use `--file` to pick one.")
+    return Listing(source.name, source.revision, source.url, files, warnings)
+
+
 async def _estimate_safetensors(
     source: Any,
     file: str | None,
@@ -386,10 +464,20 @@ async def arun(
                 gpu_memory,
                 gpu_memory_utilization,
             )
-        if gguf and format is None and file is None:
-            warnings.append(
-                "Both Safetensors and GGUF files were found, estimating the Safetensors weights; use "
-                "`--format gguf` to estimate the GGUF files."
+        onnx = [p for p in source.files if p.endswith(".onnx")]
+        wants_onnx = file is not None and (
+            file.endswith(".onnx") or file.strip("/") in _onnx.group_files(source.files)
+        )
+        if format == "onnx" or (format is None and wants_onnx):
+            return await _estimate_onnx(
+                source,
+                file,
+                max_model_len,
+                batch_size,
+                kv_cache_dtype,
+                warnings,
+                gpu_memory,
+                gpu_memory_utilization,
             )
         if estimate := await _estimate_safetensors(
             source,
@@ -404,9 +492,26 @@ async def arun(
             max_num_batched_tokens,
             format is None,
         ):
+            for other, found in (("GGUF", gguf), ("ONNX", onnx)):
+                if found and format is None and file is None:
+                    warnings.append(
+                        f"{other} files were also found and are not estimated; use `--format {other.lower()}` "
+                        "to estimate them."
+                    )
             return estimate
+        if onnx and format is None:
+            return await _estimate_onnx(
+                source,
+                file,
+                max_model_len,
+                batch_size,
+                kv_cache_dtype,
+                warnings,
+                gpu_memory,
+                gpu_memory_utilization,
+            )
         raise RuntimeError(
-            f"No {'Safetensors' if format else 'Safetensors or GGUF'} weights found for {source.name}."
+            f"No {'Safetensors' if format else 'Safetensors, GGUF or ONNX'} weights found for {source.name}."
         )
     finally:
         await source.close()
