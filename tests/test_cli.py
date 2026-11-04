@@ -1,4 +1,5 @@
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -117,3 +118,9 @@ def test_titles_shorten_paths_and_commits(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert _where("https://hf.co/org/model", "main") == "https://hf.co/org/model @ main"
     long = _where("https://hf.co/org/" + "x" * 200, None)
     assert len(long) == 72 and long.startswith("...") and long.endswith("x")
+
+
+def test_version_matches_pyproject() -> None:
+    pyproject = (Path(__file__).parents[1] / "pyproject.toml").read_text()
+    match = re.search(r'^version = "(.+)"$', pyproject, re.M)
+    assert match is not None and match[1] == __version__
