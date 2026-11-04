@@ -44,14 +44,9 @@ def main() -> None:
         prog="hf-mem",
         description="Estimate the memory required to run a model from the Hugging Face Hub or a local path.",
     )
-    parser.add_argument(
-        "model", nargs="?", help="Hub model ID (`org/name`, `org/name@revision`, or URL) or local path."
-    )
-    parser.add_argument("--model-id", help=argparse.SUPPRESS)
+    parser.add_argument("model", help="Hub model ID (`org/name`, `org/name@revision`, or URL) or local path.")
     parser.add_argument("--revision", help="Hub revision (branch, tag or commit), defaults to `main`.")
-    parser.add_argument(
-        "--file", "--gguf-file", dest="file", help="Single file, shard set or directory to estimate."
-    )
+    parser.add_argument("--file", help="Single file, shard set or directory to estimate.")
     parser.add_argument(
         "--format",
         choices=FORMATS,
@@ -82,33 +77,23 @@ def main() -> None:
         help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
-    parser.add_argument("--json", "--json-output", dest="json", action="store_true", help="Print JSON.")
+    parser.add_argument("--json", action="store_true", help="Print JSON.")
     parser.add_argument("--markdown", action="store_true", help="Print a Markdown table.")
     parser.add_argument("--version", action="version", version=f"hf-mem {__version__}")
-    for legacy in ("--experimental", "--details", "--ignore-table-width"):
-        parser.add_argument(legacy, action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    model = args.model or args.model_id
-    if model is None:
-        parser.error("the model ID or local path is required, e.g. `hf-mem Qwen/Qwen3-8B`")
     if args.batch_size < 1 or any(
         v is not None and v < 1 for v in (args.max_model_len, args.max_num_batched_tokens)
     ):
         parser.error("`--batch-size`, `--max-model-len` and `--max-num-batched-tokens` must be positive")
     if not 0 < args.gpu_memory_utilization <= 1:
         parser.error("`--gpu-memory-utilization` must be in (0, 1]")
-    if args.experimental:
-        print(
-            "hf-mem: warning: `--experimental` is no longer needed, the KV cache is always estimated.",
-            file=sys.stderr,
-        )
 
     status = _Status()
     try:
         result = asyncio.run(
             arun(
-                model,
+                args.model,
                 revision=args.revision,
                 file=args.file,
                 max_model_len=args.max_model_len,
