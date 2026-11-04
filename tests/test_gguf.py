@@ -181,8 +181,10 @@ def test_format_picks_the_weights(tmp_path: Path) -> None:
     assert estimate(str(tmp_path)).format == "gguf"
     with pytest.raises(RuntimeError, match="No Safetensors weights"):
         run(str(tmp_path), format="safetensors")
-    with pytest.raises(RuntimeError, match="not valid"):
+    with pytest.raises(RuntimeError, match="No ONNX files"):
         run(str(tmp_path), format="onnx")
+    with pytest.raises(RuntimeError, match="not valid"):
+        run(str(tmp_path), format="pt")
 
     (tmp_path / "pytorch_model.bin").write_bytes(b"\0" * 10)
     (tmp_path / "model-Q4_K_M.gguf").unlink()
