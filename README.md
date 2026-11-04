@@ -93,15 +93,15 @@ Gated and private models need a token, read from `--hf-token`, `HF_TOKEN`, or th
 
 ### JSON and Markdown
 
-`--json` prints the estimate in bytes, and `--markdown` prints a table to share in model cards, issues or pull requests.
+`-o json` (or `--output json`) prints the estimate in bytes, and `-o markdown` prints a table to share in model cards, issues or pull requests.
 
 ```bash
-uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 --json
+uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 ```
 
 ```json
 {
-  "hf_mem": "1.0.0",
+  "version": "hf-mem@1.0.0",
   "model": "Qwen/Qwen3-8B",
   "revision": "main",
   "format": "safetensors",
@@ -133,7 +133,7 @@ print(result.to_dict())
 
 ### Agents
 
-Coding agents can use `uvx hf-mem <model> --json` to answer questions such as how much memory a model needs or whether it fits on a given GPU (adding `--gpu-memory`), choosing a single `--file` for GGUF repositories since only one file is loaded for inference.
+Coding agents can use `uvx hf-mem <model> -o json` to answer questions such as how much memory a model needs or whether it fits on a given GPU (adding `--gpu-memory`), choosing a single `--file` for GGUF repositories since only one file is loaded for inference.
 
 ### Extensions
 

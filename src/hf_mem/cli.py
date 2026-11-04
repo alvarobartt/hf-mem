@@ -77,8 +77,13 @@ def main() -> None:
         help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
-    parser.add_argument("--json", action="store_true", help="Print JSON.")
-    parser.add_argument("--markdown", action="store_true", help="Print a Markdown table.")
+    parser.add_argument(
+        "-o",
+        "--output",
+        choices=("table", "json", "markdown"),
+        default="table",
+        help="Output format, defaults to `table`.",
+    )
     parser.add_argument("--version", action="version", version=f"hf-mem {__version__}")
     args = parser.parse_args()
 
@@ -115,9 +120,9 @@ def main() -> None:
         parser.exit(130)
     status.clear()
 
-    if args.json:
+    if args.output == "json":
         print(json.dumps(result.to_dict()))
         return
     for warning in result.warnings:
         print(f"hf-mem: warning: {warning}", file=sys.stderr)
-    print(markdown(result) if args.markdown else table(result))
+    print(markdown(result) if args.output == "markdown" else table(result))
