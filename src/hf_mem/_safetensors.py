@@ -14,7 +14,7 @@ PROBE_SIZE = 100_000
 MAX_HEADER_SIZE = 100_000_000
 SHARD = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
 _MODEL_SHARD = re.compile(r"model-\d+-of-(\d+)\.safetensors")
-WEIGHT_EXTENSIONS = (".bin", ".pt", ".pth", ".ckpt", ".nemo", ".onnx", ".onnx_data")
+WEIGHT_EXTENSIONS = (".bin", ".pt", ".pth", ".ckpt", ".nemo")
 _EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
 POOL_MIN_FILES: int | None = None
 
