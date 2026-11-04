@@ -8,7 +8,7 @@ The estimate covers the model weights, the KV cache for generative models, and t
 
 ## Usage
 
-Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, where `<model>` is a Hub model ID (optionally with `@revision`), a Hub URL, or a local path.
+Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, where `<model>` is a Hub model ID (optionally with `@revision`, and with `:<quantization>` for GGUF), a Hub URL, or a local path.
 
 ### Transformers
 
@@ -42,7 +42,7 @@ uvx hf-mem google/embeddinggemma-2
 
 ### GGUF
 
-GGUF repositories list every file (skipping `mmproj` and `imatrix` files), and `--file` estimates a single file, which can also be a directory or any shard of a sharded file.
+GGUF repositories list every file, and a quantization tag as in llama.cpp (`<model>:Q4_K_M`, case-insensitive) or `--file` (a tag, file, directory or any shard of a sharded file) estimates a single one. The `mmproj` projector of vision and audio models is included as llama.cpp does, picking the one with the same quantization, or else Q8_0, F16, BF16 or F32.
 
 ```bash
 uvx hf-mem LiquidAI/LFM3-1.7B-GGUF
@@ -51,7 +51,7 @@ uvx hf-mem LiquidAI/LFM3-1.7B-GGUF
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/gguf.png" />
 
 ```bash
-uvx hf-mem unsloth/Qwen3.8-27B-GGUF --file Qwen3.8-27B-UD-Q4_K_M.gguf
+uvx hf-mem unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M
 ```
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/gguf-file.png" />
