@@ -84,6 +84,17 @@ class Progress:
             self.callback(self.done, self.total)
 
 
+def _local_revision(root: str) -> str | None:
+    folder = os.path.join(root, ".cache", "huggingface", "download")
+    if not os.path.isdir(folder):
+        return None
+    for name in sorted(os.listdir(folder), key=lambda n: n != "config.json.metadata"):
+        if name.endswith(".metadata"):
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                return f.readline().strip() or None
+    return None
+
+
 class LocalSource:
     def __init__(self, root: str, files: dict[str, int], name: str, progress: Progress) -> None:
         self.root, self.files, self.name, self.progress = root, files, name, progress
@@ -99,7 +110,9 @@ class LocalSource:
                 full = os.path.join(directory, filename)
                 if not filename.startswith(".") and os.path.isfile(full):
                     files[os.path.relpath(full, root).replace(os.sep, "/")] = os.path.getsize(full)
-        return cls(root, files, name or root, progress or Progress())
+        source = cls(root, files, name or root, progress or Progress())
+        source.revision = _local_revision(root)
+        return source
 
     async def json(self, path: str) -> Any:
         self.progress.start()
