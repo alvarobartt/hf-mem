@@ -99,7 +99,7 @@ def test_local_dir_revision_from_download_metadata(tmp_path: Path) -> None:
 
 
 def test_invalid_model(tmp_path: Path) -> None:
-    with pytest.raises(RuntimeError, match="neither a local path"):
+    with pytest.raises(RuntimeError, match="does not exist"):
         estimate(str(tmp_path / "missing"))
 
 

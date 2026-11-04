@@ -147,13 +147,17 @@ def test_version_matches_pyproject() -> None:
     assert match is not None and match[1] == __version__
 
 
-def test_file_size_weights_are_shown_with_the_kv_cache(
+def test_errors_are_actionable(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
 ) -> None:
     (tmp_path / "pytorch_model.bin").write_bytes(b"\0" * 1000)
-    write_json(str(tmp_path / "config.json"), llama_config())
-    code, out, _ = cli(monkeypatch, capsys, str(tmp_path))
-    assert code == 0 and "MODEL (0.00 GiB)" in out and "FILE SIZE" in out and "KV CACHE" in out
+    (tmp_path / "optimizer.pt").write_bytes(b"\0" * 10)
+    code, _, err = cli(monkeypatch, capsys, str(tmp_path))
+    assert code == 1 and "only has PyTorch pickle weights (e.g. `pytorch_model.bin`)" in err
+    code, _, err = cli(monkeypatch, capsys, str(tmp_path / "missing"))
+    assert code == 1 and "does not exist" in err
+    code, _, err = cli(monkeypatch, capsys, "not-a-model")
+    assert code == 1 and "is not a Hub model ID (`org/name`)" in err
 
 
 def test_bars_show_small_fractions() -> None:

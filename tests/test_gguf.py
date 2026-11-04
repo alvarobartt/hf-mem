@@ -136,7 +136,7 @@ def test_invalid_files(tmp_path: Path) -> None:
     write_gguf(str(tmp_path / "Q8_0/b.gguf"), ARCH, TENSORS)
     with pytest.raises(RuntimeError, match="Multiple GGUF files"):
         run(str(tmp_path), file="Q8_0")
-    with pytest.raises(RuntimeError, match="not valid for GGUF"):
+    with pytest.raises(RuntimeError, match="not a llama.cpp KV cache type"):
         run(str(tmp_path), file="ok-Q4_0.gguf", kv_cache_dtype="bfloat16")
 
 
@@ -183,16 +183,18 @@ def test_format_picks_the_weights(tmp_path: Path) -> None:
     assert estimate(str(tmp_path)).format == "gguf"
     with pytest.raises(RuntimeError, match="No Safetensors weights"):
         run(str(tmp_path), format="safetensors")
-    with pytest.raises(RuntimeError, match="No ONNX files"):
+    with pytest.raises(
+        RuntimeError, match="No ONNX weights found .* which has GGUF weights, use `--format gguf`"
+    ):
         run(str(tmp_path), format="onnx")
     with pytest.raises(RuntimeError, match="not valid"):
         run(str(tmp_path), format="pt")
 
     (tmp_path / "pytorch_model.bin").write_bytes(b"\0" * 10)
     (tmp_path / "model-Q4_K_M.gguf").unlink()
-    with pytest.raises(RuntimeError, match="No Safetensors weights"):
+    with pytest.raises(RuntimeError, match="only has PyTorch pickle weights"):
         run(str(tmp_path), format="safetensors")
-    with pytest.raises(RuntimeError, match="No GGUF files"):
+    with pytest.raises(RuntimeError, match="only has PyTorch pickle weights"):
         run(str(tmp_path), format="gguf")
 
 

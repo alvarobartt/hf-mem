@@ -104,7 +104,7 @@ def test_onnx_comes_after_safetensors_and_file_sizes(tmp_path: Path) -> None:
     assert estimate(str(tmp_path)).format == "onnx"
 
     (tmp_path / "pytorch_model.bin").write_bytes(b"\0" * 10)
-    assert estimate(str(tmp_path)).format == "file-sizes"
+    assert estimate(str(tmp_path)).format == "onnx"
     assert estimate(str(tmp_path), format="onnx").format == "onnx"
     assert estimate(str(tmp_path), file="onnx/model.onnx").format == "onnx"
 

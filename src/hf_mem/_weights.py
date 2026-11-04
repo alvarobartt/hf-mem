@@ -31,3 +31,8 @@ class Weights:
         if self.dtypes:
             out["dtypes"] = {d: {"bytes": w.bytes, "params": w.params} for d, w in self.sorted_dtypes()}
         return out
+
+
+def choices(names: list[str], limit: int = 8) -> str:
+    shown = ", ".join(f"`{n}`" for n in sorted(names)[:limit])
+    return shown + (f" and {len(names) - limit} more" if len(names) > limit else "")

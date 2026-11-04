@@ -106,10 +106,11 @@ def _gguf_kv(
     length = max_model_len or context_length
     if not isinstance(length, int):
         return None
-    dtype = "F16" if dtype == "auto" else dtype
-    if dtype not in _gguf.KV_DTYPES:
+    requested, dtype = dtype, "F16" if dtype == "auto" else dtype.upper()
+    if dtype not in _gguf.CACHE_TYPES:
         raise RuntimeError(
-            f"`--kv-cache-dtype={dtype}` is not valid for GGUF files, use any of {sorted(_gguf.KV_DTYPES)}."
+            f"`--kv-cache-dtype={requested}` is not a llama.cpp KV cache type, use one of "
+            f"{', '.join(t.lower() for t in _gguf.CACHE_TYPES)}."
         )
     result = _gguf.kv_cache(metadata, length, batch_size, dtype)
     if result is None:
@@ -156,7 +157,7 @@ async def _estimate_gguf(
 ) -> Estimate | Listing:
     groups = _gguf.group_files(_gguf.gguf_paths(source.files))
     if not groups:
-        raise RuntimeError(f"No GGUF files found for {source.name}.")
+        raise RuntimeError(_no_weights(source, "gguf"))
 
     if file is not None or len(groups) == 1:
         name, paths = _gguf.select_file(groups, file) if file is not None else next(iter(groups.items()))
@@ -259,7 +260,7 @@ async def _estimate_onnx(
 ) -> Estimate | Listing:
     groups = _onnx.group_files(source.files)
     if not groups:
-        raise RuntimeError(f"No ONNX files found for {source.name}.")
+        raise RuntimeError(_no_weights(source, "onnx"))
     if kv_dtype != "auto":
         raise RuntimeError("`--kv-cache-dtype` is set by the ONNX graph inputs, so only `auto` is valid.")
     if file is not None:
@@ -325,7 +326,6 @@ async def _estimate_safetensors(
     gpu_memory: str | None,
     utilization: float,
     max_num_batched_tokens: int | None,
-    fallback: bool = True,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -336,22 +336,9 @@ async def _estimate_safetensors(
     ]
     try:
         selected = await _safetensors.discover(source, file, warnings)
-        if selected:
-            components, experts = await _safetensors.read_components(source, selected, warnings)
-            fmt = "safetensors"
-        elif fallback and (components := _safetensors.from_file_sizes(files, file)):
-            experts = {}
-            fmt = "file-sizes"
-            warnings.append(
-                "No Safetensors or GGUF weights found, so the estimate is based on the weight file sizes."
-            )
-            if len(components) > 1:
-                warnings.append(
-                    f"{len(components)} weight files were found and are counted as separate components, assuming "
-                    "all of them are loaded; use `--file` to pick one."
-                )
-        else:
+        if not selected:
             return None
+        components, experts = await _safetensors.read_components(source, selected, warnings)
         try:
             config = await config_task if config_task else {}
         except (RuntimeError, ValueError) as e:
@@ -365,6 +352,8 @@ async def _estimate_safetensors(
         for task in (config_task, *processor_tasks):
             if task and not task.done():
                 task.cancel()
+            elif task and not task.cancelled():
+                task.exception()
 
     weights = Weights()
     for component in components.values():
@@ -373,7 +362,7 @@ async def _estimate_safetensors(
         model=source.name,
         revision=source.revision,
         url=source.url,
-        format=fmt,
+        format="safetensors",
         weights=weights,
         components=components,
         file=file,
@@ -381,7 +370,10 @@ async def _estimate_safetensors(
     )
 
     if not config and "params.json" in files:
-        warnings.append("KV cache estimation skipped, as Mistral `params.json` configs are not supported.")
+        warnings.append(
+            "KV cache estimation skipped, as Mistral `params.json` configs are not supported, estimate a version of "
+            "the model with a Transformers `config.json` for the KV cache."
+        )
     if not config or "config_sentence_transformers.json" in files or not _config.is_generative(config, files):
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
@@ -450,6 +442,34 @@ async def _estimate_safetensors(
     return estimate
 
 
+_PICKLES = (".bin", ".pt", ".pth", ".ckpt", ".nemo")
+
+
+def _no_weights(source: Any, format: str | None) -> str:
+    files = list(source.files)
+    found = [
+        name
+        for name, present in (
+            ("Safetensors", any(p.endswith(".safetensors") for p in files)),
+            ("GGUF", any(p.endswith(".gguf") for p in files)),
+            ("ONNX", any(p.endswith(".onnx") for p in files)),
+        )
+        if present
+    ]
+    if format and found:
+        name = {"safetensors": "Safetensors", "gguf": "GGUF", "onnx": "ONNX"}[format]
+        return (
+            f"No {name} weights found for `{source.name}`, which has {' and '.join(found)} weights, use "
+            f"`--format {found[0].lower()}` or drop `--format`."
+        )
+    if pickles := sorted((p for p in files if p.endswith(_PICKLES)), key=lambda p: -source.files[p]):
+        return (
+            f"`{source.name}` only has PyTorch pickle weights (e.g. `{pickles[0]}`), which hf-mem cannot read without "
+            "loading them; estimate a version of the model in Safetensors, GGUF or ONNX instead."
+        )
+    return f"No Safetensors, GGUF or ONNX weights found for `{source.name}`."
+
+
 async def arun(
     model_id: str,
     revision: str | None = None,
@@ -467,7 +487,7 @@ async def arun(
     if gpu_memory is not None:
         _overhead.parse_gpu_memory(gpu_memory)
     if format not in (None, *FORMATS):
-        raise RuntimeError(f"`--format={format}` is not valid, use any of {list(FORMATS)}.")
+        raise RuntimeError(f"`--format={format}` is not valid, use one of {', '.join(FORMATS)}.")
     source, url_file = await open_source(model_id, revision, hf_token, progress)
     file = file or url_file
     warnings: list[str] = []
@@ -490,13 +510,7 @@ async def arun(
             for p in source.files
         )
         only_onnx = onnx and not any(p.endswith(".safetensors") for p in source.files) and not gguf
-        if format == "onnx" or (
-            format is None
-            and (
-                (wants_onnx and not wants_gguf)
-                or (only_onnx and not _safetensors.from_file_sizes(source.files, file))
-            )
-        ):
+        if format == "onnx" or (format is None and ((wants_onnx and not wants_gguf) or only_onnx)):
             return await _estimate_onnx(
                 source,
                 file,
@@ -529,7 +543,6 @@ async def arun(
             gpu_memory,
             gpu_memory_utilization,
             max_num_batched_tokens,
-            format is None,
         ):
             for other, found in (("GGUF", gguf), ("ONNX", onnx)):
                 if found and format is None and file is None:
@@ -549,9 +562,7 @@ async def arun(
                 gpu_memory,
                 gpu_memory_utilization,
             )
-        raise RuntimeError(
-            f"No {'Safetensors' if format else 'Safetensors, GGUF or ONNX'} weights found for {source.name}."
-        )
+        raise RuntimeError(_no_weights(source, format))
     finally:
         await source.close()
 
