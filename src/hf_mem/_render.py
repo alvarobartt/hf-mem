@@ -27,8 +27,10 @@ def short(n: float) -> str:
 
 
 def _bar(fraction: float, width: int) -> str:
-    filled = round(min(max(fraction, 0.0), 1.0) * width)
-    return "█" * filled + "░" * (width - filled)
+    eighths = round(min(max(fraction, 0.0), 1.0) * width * 8)
+    full, rest = divmod(max(eighths, 1) if fraction > 0 else eighths, 8)
+    bar = "█" * full + ("▏▎▍▌▋▊▉"[rest - 1] if rest else "")
+    return bar + "░" * (width - len(bar))
 
 
 def _fit(name: str, width: int) -> str:
