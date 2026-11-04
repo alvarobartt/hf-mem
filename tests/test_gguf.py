@@ -1,7 +1,16 @@
 from pathlib import Path
 
 import pytest
-from helpers import estimate, listing, some, write_gguf
+from helpers import (
+    estimate,
+    listing,
+    llama_config,
+    llama_tensors,
+    some,
+    write_gguf,
+    write_json,
+    write_safetensors,
+)
 
 from hf_mem import Listing, _gguf, run
 from hf_mem._source import LocalSource
@@ -156,3 +165,28 @@ def test_listing_warns_that_the_gpu_fit_needs_a_file(tmp_path: Path) -> None:
     assert any("`--gpu-memory` is only checked" in w for w in result.warnings)
     with pytest.raises(RuntimeError, match="--gpu-memory"):
         listing(str(tmp_path), gpu_memory="lots")
+
+
+def test_format_picks_the_weights(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config())
+    write_gguf(str(tmp_path / "model-Q4_K_M.gguf"), {**ARCH, **TOKENIZER}, TENSORS)
+
+    default = estimate(str(tmp_path))
+    assert default.format == "safetensors" and any("--format gguf" in w for w in default.warnings)
+    assert estimate(str(tmp_path), format="gguf").format == "gguf"
+    assert not run(str(tmp_path), format="safetensors").warnings
+
+    (tmp_path / "model.safetensors").unlink()
+    assert estimate(str(tmp_path)).format == "gguf"
+    with pytest.raises(RuntimeError, match="No Safetensors weights"):
+        run(str(tmp_path), format="safetensors")
+    with pytest.raises(RuntimeError, match="not valid"):
+        run(str(tmp_path), format="onnx")
+
+    (tmp_path / "pytorch_model.bin").write_bytes(b"\0" * 10)
+    (tmp_path / "model-Q4_K_M.gguf").unlink()
+    with pytest.raises(RuntimeError, match="No Safetensors weights"):
+        run(str(tmp_path), format="safetensors")
+    with pytest.raises(RuntimeError, match="No GGUF files"):
+        run(str(tmp_path), format="gguf")

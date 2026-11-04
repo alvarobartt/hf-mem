@@ -7,6 +7,8 @@ from hf_mem._source import HubError, Progress, open_source
 from hf_mem._version import __version__
 from hf_mem._weights import Weights
 
+FORMATS = ("safetensors", "gguf")
+
 
 @dataclass
 class KVCache:
@@ -218,6 +220,7 @@ async def _estimate_safetensors(
     gpu_memory: str | None,
     utilization: float,
     max_num_batched_tokens: int | None,
+    fallback: bool = True,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -231,7 +234,7 @@ async def _estimate_safetensors(
         if selected:
             components, experts = await _safetensors.read_components(source, selected, warnings)
             fmt = "safetensors"
-        elif components := _safetensors.from_file_sizes(files, file):
+        elif fallback and (components := _safetensors.from_file_sizes(files, file)):
             experts = {}
             fmt = "file-sizes"
             warnings.append(
@@ -354,9 +357,12 @@ async def arun(
     gpu_memory_utilization: float = 0.92,
     max_num_batched_tokens: int | None = None,
     progress: Progress | None = None,
+    format: str | None = None,
 ) -> Estimate | Listing:
     if gpu_memory is not None:
         _overhead.parse_gpu_memory(gpu_memory)
+    if format not in (None, *FORMATS):
+        raise RuntimeError(f"`--format={format}` is not valid, use any of {list(FORMATS)}.")
     source, url_file = await open_source(model_id, revision, hf_token, progress)
     file = file or url_file
     warnings: list[str] = []
@@ -369,7 +375,7 @@ async def arun(
             _safetensors.SHARD.sub("", p) in {"model.safetensors", "model.safetensors.index.json"}
             for p in source.files
         )
-        if gguf and (wants_gguf or not has_safetensors):
+        if format == "gguf" or (format is None and gguf and (wants_gguf or not has_safetensors)):
             return await _estimate_gguf(
                 source,
                 file,
@@ -380,10 +386,10 @@ async def arun(
                 gpu_memory,
                 gpu_memory_utilization,
             )
-        if gguf and file is None:
+        if gguf and format is None and file is None:
             warnings.append(
-                "Both Safetensors and GGUF files were found, estimating the Safetensors weights; use `--file` "
-                "to estimate a GGUF file."
+                "Both Safetensors and GGUF files were found, estimating the Safetensors weights; use "
+                "`--format gguf` to estimate the GGUF files."
             )
         if estimate := await _estimate_safetensors(
             source,
@@ -396,9 +402,12 @@ async def arun(
             gpu_memory,
             gpu_memory_utilization,
             max_num_batched_tokens,
+            format is None,
         ):
             return estimate
-        raise RuntimeError(f"No Safetensors or GGUF weights found for {source.name}.")
+        raise RuntimeError(
+            f"No {'Safetensors' if format else 'Safetensors or GGUF'} weights found for {source.name}."
+        )
     finally:
         await source.close()
 
@@ -414,6 +423,7 @@ def run(
     gpu_memory: str | None = None,
     gpu_memory_utilization: float = 0.92,
     max_num_batched_tokens: int | None = None,
+    format: str | None = None,
 ) -> Estimate | Listing:
     try:
         asyncio.get_running_loop()
@@ -430,6 +440,7 @@ def run(
                 gpu_memory,
                 gpu_memory_utilization,
                 max_num_batched_tokens,
+                format=format,
             )
         )
     raise RuntimeError(
