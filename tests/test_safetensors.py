@@ -184,7 +184,7 @@ def test_weights_from_file_sizes(tmp_path: Path) -> None:
 
 def test_no_weights(tmp_path: Path) -> None:
     write_json(str(tmp_path / "config.json"), llama_config())
-    with pytest.raises(RuntimeError, match="No Safetensors or GGUF weights"):
+    with pytest.raises(RuntimeError, match="No Safetensors, GGUF or ONNX weights"):
         estimate(str(tmp_path))
 
 
@@ -259,15 +259,6 @@ def test_index_with_missing_files_uses_the_uploaded_ones(tmp_path: Path) -> None
 
     assert result.weights.bytes == first
     assert any("2 files that are not in the repository" in w for w in result.warnings)
-
-
-def test_onnx_only_repositories_are_not_summed(tmp_path: Path) -> None:
-    for variant in ("model", "model_fp16", "model_q4"):
-        (tmp_path / "onnx" / f"{variant}.onnx").parent.mkdir(exist_ok=True)
-        (tmp_path / "onnx" / f"{variant}.onnx").write_bytes(b"\0" * 100)
-
-    with pytest.raises(RuntimeError, match="No Safetensors or GGUF weights"):
-        estimate(str(tmp_path))
 
 
 def test_invalid_files_are_skipped_in_multi_file_repositories(tmp_path: Path) -> None:
