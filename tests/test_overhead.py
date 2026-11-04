@@ -124,28 +124,54 @@ def test_batched_tokens_override() -> None:
     assert _overhead.batched_tokens("8x80", 2048) == 2048
 
 
+V = "clip.vision."
+
+
 @pytest.mark.parametrize(
     "metadata, mib",
     [
-        # Measured with llama.cpp `server-cuda` on an A100: gemma-3-4b-it, Qwen2.5-VL-7B, ultravox-v0_5-llama-3_2-1b
+        # llama.cpp `server-cuda` on an A100, with the largest image: gemma-3-4b-it, Qwen2.5-VL-7B, LFM3-VL-2B,
+        # LFM2.5-VL-3B and the ultravox-v0_5-llama-3_2-1b audio encoder
         (
             {
-                "clip.vision.embedding_length": 1152,
-                "clip.vision.feed_forward_length": 4304,
-                "clip.vision.image_size": 896,
-                "clip.vision.patch_size": 14,
+                V + "embedding_length": 1152,
+                V + "feed_forward_length": 4304,
+                V + "image_size": 896,
+                V + "patch_size": 14,
             },
             121.25,
         ),
         (
             {
-                "clip.vision.embedding_length": 1280,
-                "clip.vision.feed_forward_length": 3420,
-                "clip.vision.image_size": 560,
-                "clip.vision.patch_size": 14,
-                "clip.vision.n_wa_pattern": 8,
+                V + "embedding_length": 1280,
+                V + "feed_forward_length": 3420,
+                V + "patch_size": 14,
+                V + "n_wa_pattern": 8,
+                "clip.use_silu": True,
             },
-            569.70,
+            1459.7,
+        ),
+        (
+            {
+                V + "embedding_length": 1024,
+                V + "feed_forward_length": 2560,
+                V + "patch_size": 16,
+                V + "spatial_merge_size": 2,
+                V + "image_max_pixels": 16777216,
+                "clip.use_silu": True,
+            },
+            718.1,
+        ),
+        (
+            {
+                V + "embedding_length": 1152,
+                V + "feed_forward_length": 4304,
+                V + "image_size": 256,
+                V + "patch_size": 16,
+                V + "projector.scale_factor": 2,
+                "clip.projector_type": "lfm2",
+            },
+            30.31,
         ),
         ({"clip.audio.embedding_length": 1280, "clip.audio.feed_forward_length": 5120}, 51.27),
     ],
