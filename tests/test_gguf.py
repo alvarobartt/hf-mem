@@ -1,5 +1,5 @@
 import pytest
-from helpers import write_gguf
+from helpers import llama_config, llama_tensors, write_gguf, write_json, write_safetensors
 
 from hf_mem import Estimate, Listing, _gguf, run
 from hf_mem._source import LocalSource
@@ -144,3 +144,28 @@ def test_listing_stops_at_large_embedded_metadata(tmp_path, monkeypatch):
     assert len(result.files) == 2
     assert all(f.kv_cache is None for f in result.files)
     assert sum(reads) < 8 << 20
+
+
+def test_format_picks_the_weights(tmp_path):
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config())
+    write_gguf(str(tmp_path / "model-Q4_K_M.gguf"), {**ARCH, **TOKENIZER}, TENSORS)
+
+    default = run(str(tmp_path))
+    assert default.format == "safetensors" and any("--format gguf" in w for w in default.warnings)
+    assert run(str(tmp_path), format="gguf").format == "gguf"
+    assert not run(str(tmp_path), format="safetensors").warnings
+
+    (tmp_path / "model.safetensors").unlink()
+    assert run(str(tmp_path)).format == "gguf"
+    with pytest.raises(RuntimeError, match="No Safetensors weights"):
+        run(str(tmp_path), format="safetensors")
+    with pytest.raises(RuntimeError, match="not valid"):
+        run(str(tmp_path), format="onnx")
+
+    (tmp_path / "pytorch_model.bin").write_bytes(b"\0" * 10)
+    (tmp_path / "model-Q4_K_M.gguf").unlink()
+    with pytest.raises(RuntimeError, match="No Safetensors weights"):
+        run(str(tmp_path), format="safetensors")
+    with pytest.raises(RuntimeError, match="No GGUF files"):
+        run(str(tmp_path), format="gguf")

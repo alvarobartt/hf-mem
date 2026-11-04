@@ -9,7 +9,7 @@ from hf_mem._gguf import KV_DTYPES
 from hf_mem._render import markdown, table
 from hf_mem._source import HubError, Progress
 from hf_mem._version import __version__
-from hf_mem.estimate import arun
+from hf_mem.estimate import FORMATS, arun
 
 
 class _Status:
@@ -49,6 +49,11 @@ def main() -> None:
     parser.add_argument("--revision", help="Hub revision (branch, tag or commit), defaults to `main`.")
     parser.add_argument(
         "--file", "--gguf-file", dest="file", help="Single file, shard set or directory to estimate."
+    )
+    parser.add_argument(
+        "--format",
+        choices=FORMATS,
+        help="Weights format to estimate, defaults to Safetensors, then GGUF, then the weight file sizes.",
     )
     parser.add_argument("--max-model-len", type=int, help="Context length, defaults to the model config.")
     parser.add_argument(
@@ -91,6 +96,7 @@ def main() -> None:
                 kv_cache_dtype=args.kv_cache_dtype,
                 hf_token=args.hf_token,
                 progress=Progress(status),
+                format=args.format,
             )
         )
     except (RuntimeError, HubError) as e:

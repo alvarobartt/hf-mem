@@ -7,6 +7,8 @@ from hf_mem._source import HubError, Progress, open_source
 from hf_mem._version import __version__
 from hf_mem._weights import Weights
 
+FORMATS = ("safetensors", "gguf")
+
 
 @dataclass
 class KVCache:
@@ -170,6 +172,7 @@ async def _estimate_safetensors(
     kv_dtype: str,
     warnings: list[str],
     token: str | None,
+    fallback: bool = True,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -178,7 +181,7 @@ async def _estimate_safetensors(
         if selected:
             components, experts = await _safetensors.read_components(source, selected)
             fmt = "safetensors"
-        elif components := _safetensors.from_file_sizes(files, file):
+        elif fallback and (components := _safetensors.from_file_sizes(files, file)):
             experts = {}
             fmt = "file-sizes"
             warnings.append(
@@ -252,7 +255,10 @@ async def arun(
     kv_cache_dtype: str = "auto",
     hf_token: str | None = None,
     progress: Progress | None = None,
+    format: str | None = None,
 ) -> Estimate | Listing:
+    if format not in (None, *FORMATS):
+        raise RuntimeError(f"`--format={format}` is not valid, use any of {list(FORMATS)}.")
     source, url_file = await open_source(model_id, revision, hf_token, progress)
     file = file or url_file
     warnings: list[str] = []
@@ -265,18 +271,20 @@ async def arun(
             _safetensors.SHARD.sub("", p) in {"model.safetensors", "model.safetensors.index.json"}
             for p in source.files
         )
-        if gguf and (wants_gguf or not has_safetensors):
+        if format == "gguf" or (format is None and gguf and (wants_gguf or not has_safetensors)):
             return await _estimate_gguf(source, file, max_model_len, batch_size, kv_cache_dtype, warnings)
-        if gguf and file is None:
+        if gguf and format is None and file is None:
             warnings.append(
-                "Both Safetensors and GGUF files were found, estimating the Safetensors weights; use `--file` "
-                "to estimate a GGUF file."
+                "Both Safetensors and GGUF files were found, estimating the Safetensors weights; use "
+                "`--format gguf` to estimate the GGUF files."
             )
         if estimate := await _estimate_safetensors(
-            source, file, max_model_len, batch_size, kv_cache_dtype, warnings, hf_token
+            source, file, max_model_len, batch_size, kv_cache_dtype, warnings, hf_token, format is None
         ):
             return estimate
-        raise RuntimeError(f"No Safetensors or GGUF weights found for {source.name}.")
+        raise RuntimeError(
+            f"No {'Safetensors' if format else 'Safetensors or GGUF'} weights found for {source.name}."
+        )
     finally:
         await source.close()
 
@@ -289,11 +297,14 @@ def run(
     batch_size: int = 1,
     kv_cache_dtype: str = "auto",
     hf_token: str | None = None,
+    format: str | None = None,
 ) -> Estimate | Listing:
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        return asyncio.run(arun(model_id, revision, file, max_model_len, batch_size, kv_cache_dtype, hf_token))
+        return asyncio.run(
+            arun(model_id, revision, file, max_model_len, batch_size, kv_cache_dtype, hf_token, format=format)
+        )
     raise RuntimeError(
         "`hf_mem.run(...)` cannot be called from a running event loop, use `await hf_mem.arun(...)`."
     )
