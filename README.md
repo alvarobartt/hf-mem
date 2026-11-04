@@ -58,6 +58,8 @@ uvx hf-mem unsloth/Qwen3.8-27B-GGUF --file Qwen3.8-27B-UD-Q4_K_M.gguf
 
 `--file` also selects a single `*.safetensors` file or shard set, e.g. on ComfyUI repositories that ship multiple checkpoints.
 
+Repositories with both Safetensors and GGUF weights are estimated from the Safetensors weights, and `--format gguf` estimates the GGUF files instead (`--format safetensors` skips the fallback to the `.bin` / `.pt` file sizes).
+
 ### Does it fit?
 
 `--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and adds to the summary the memory used out of the given GPUs, whether the model fits or how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account.
@@ -101,7 +103,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 --json
 
 - `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
 - `components` (per Diffusers component or file), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are added when they apply.
-- `format` is `safetensors`, `gguf`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt`, `.nemo` or `.onnx` weights.
+- `format` is `safetensors`, `gguf`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt` or `.nemo` weights.
 - GGUF listings return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
 
 ### Python
