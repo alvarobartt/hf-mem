@@ -215,7 +215,7 @@ def test_max_num_batched_tokens_selects_the_vllm_profile(tmp_path: Path) -> None
     small = some(estimate(str(tmp_path), max_num_batched_tokens=2048).overhead)
 
     assert default.activations > small.activations
-    assert default.non_torch > small.non_torch
+    assert default.runtime > small.runtime
 
 
 def test_vision_encoder_overhead(tmp_path: Path) -> None:

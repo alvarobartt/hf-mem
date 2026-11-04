@@ -135,7 +135,7 @@ def _fit(
         gpu_memory=gpu_memory,
         utilization=utilization,
         kv_heads=kv_heads,
-        context=estimate.overhead.cuda_context if estimate.overhead else 0,
+        context=estimate.overhead.context if estimate.overhead else 0,
     )
 
 
