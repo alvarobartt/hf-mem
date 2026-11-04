@@ -189,6 +189,8 @@ def llama_cpp(projector: dict[str, Any] | None = None) -> Overhead:
 @dataclass
 class Fit:
     gpu_memory: int
+    usable: int
+    required: int
     gpus: int | None
     needed: int | None
     max_model_len: int
@@ -200,6 +202,8 @@ class Fit:
     def to_dict(self) -> dict[str, Any]:
         return {
             "gpu_memory": self.gpu_memory,
+            "usable": self.usable,
+            "required": self.required,
             "gpus": self.gpus,
             "needed": self.needed,
             "fits": self.fits,
@@ -247,4 +251,12 @@ def fit(
     n = gpus or 1
     budget = n * usable - weights - kv_fixed
     longest = math.floor(budget / per_token(n)) if kv_per_token > 0 and budget > 0 else 0
-    return Fit(size, gpus, needed, min(longest, context_length))
+    required = weights + kv_fixed + per_token(n) * max_model_len + n * overhead
+    return Fit(
+        size,
+        int(min(size * utilization, size - context) + context),
+        int(required),
+        gpus,
+        needed,
+        min(longest, context_length),
+    )
