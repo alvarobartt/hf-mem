@@ -172,9 +172,9 @@ def parse_gpu_memory(value: str) -> tuple[int | None, int]:
     count, sep, size = value.lower().removesuffix("gib").removesuffix("gb").rpartition("x")
     try:
         gpus, memory = (int(count) if sep else None), int(float(size) * GIB)
-    except ValueError:
+    except (ValueError, OverflowError):
         gpus = memory = 0
-    if gpus == 0 or memory <= 0:
+    if (gpus is not None and gpus < 1) or memory <= 0:
         raise RuntimeError(f"`--gpu-memory={value}` must look like `80` or `8x80` (GiB per GPU).")
     return gpus, memory
 
