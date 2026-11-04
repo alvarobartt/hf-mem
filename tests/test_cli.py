@@ -7,6 +7,7 @@ from helpers import llama_config, llama_tensors, write_gguf, write_json, write_s
 from test_gguf import ARCH, TENSORS
 
 from hf_mem import __version__
+from hf_mem._render import _where
 from hf_mem.cli import main
 
 
@@ -98,3 +99,14 @@ def test_errors(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[s
 def test_version(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     code, out, _ = cli(monkeypatch, capsys, "--version")
     assert code == 0 and out.strip() == f"hf-mem {__version__}"
+
+
+def test_titles_shorten_paths_and_commits(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    (tmp_path / "cwd").mkdir()
+    monkeypatch.chdir(tmp_path / "cwd")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    assert _where(str(tmp_path / "cwd" / "m"), "a" * 40) == "m @ aaaaaaa"
+    assert _where(str(tmp_path / "home" / "m"), None) == "~/m"
+    assert _where("https://hf.co/org/model", "main") == "https://hf.co/org/model @ main"
+    long = _where("https://hf.co/org/" + "x" * 200, None)
+    assert len(long) == 72 and long.startswith("...") and long.endswith("x")

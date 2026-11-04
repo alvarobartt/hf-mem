@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 
 from hf_mem._version import __version__
@@ -7,6 +8,7 @@ from hf_mem.estimate import Estimate, Listing
 
 NAME_WIDTH = 14
 MAX_FILE_WIDTH = 64
+MAX_TITLE_WIDTH = 72
 
 Item = tuple[str, str, str, float]
 Section = tuple[str | None, list[Item]]
@@ -67,10 +69,30 @@ def _draw(titles: list[str], sections: list[Section], name_width: int) -> list[s
     return lines
 
 
+def _shorten(text: str, width: int = MAX_TITLE_WIDTH) -> str:
+    return text if len(text) <= width else "..." + text[3 - width :]
+
+
+def _where(url: str, revision: str | None) -> str:
+    if os.path.isabs(url):
+        home = os.path.expanduser("~")
+        try:
+            relative = os.path.relpath(url)
+        except ValueError:
+            relative = ".."
+        if not relative.startswith(".."):
+            url = relative
+        elif url.startswith(home + os.sep):
+            url = "~" + url[len(home) :]
+    if revision and re.fullmatch(r"[0-9a-f]{40}", revision):
+        revision = revision[:7]
+    return _shorten(f"{url} @ {revision}" if revision else url)
+
+
 def _titles(url: str, revision: str | None, file: str | None, kv: object) -> list[str]:
-    titles = ["INFERENCE MEMORY ESTIMATE FOR", f"{url} @ {revision}" if revision else url]
+    titles = ["INFERENCE MEMORY ESTIMATE FOR", _where(url, revision)]
     if file:
-        titles.append(f"FOR `{file}`")
+        titles.append(_shorten(f"FOR `{file}`"))
     if kv is not None:
         titles.append(f"w/ max-model-len={kv.max_model_len}, batch-size={kv.batch_size}")  # type: ignore[attr-defined]
     return titles
