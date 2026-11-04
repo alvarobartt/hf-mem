@@ -42,17 +42,18 @@ def test_table(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[st
 
 
 def test_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
-    code, out, _ = cli(monkeypatch, capsys, model, "--json", "--max-model-len", "10", "--batch-size", "2")
+    code, out, _ = cli(monkeypatch, capsys, model, "-o", "json", "--max-model-len", "10", "--batch-size", "2")
     data = json.loads(out)
     assert code == 0
-    keys = ["hf_mem", "model", "revision", "format", "total", "weights", "kv_cache", "overhead", "warnings"]
+    keys = ["version", "model", "revision", "format", "total", "weights", "kv_cache", "overhead", "warnings"]
     assert list(data) == keys
+    assert data["version"] == f"hf-mem@{__version__}"
     assert data["kv_cache"]["max_model_len"] == 10 and data["kv_cache"]["batch_size"] == 2
     assert data["total"] == data["weights"]["bytes"] + data["kv_cache"]["bytes"] + data["overhead"]["bytes"]
 
 
 def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
-    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "--json")
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "-o", "json")
     fit = json.loads(out)["fit"]
     assert code == 0 and fit["gpus"] == 2 and fit["needed"] == 1 and fit["fits"]
     assert fit["max_model_len"] == 1024
@@ -60,7 +61,7 @@ def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[
     assert code == 0 and "GPU MEMORY" in out and "/ 4.00 GiB [" in out and "│ FITS " in out
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4")
     assert "FITS ON 1 GPU" in out and "/ 8.00 GiB [" in out
-    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "--markdown")
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "--output", "markdown")
     assert "| Overhead (activations, graphs, runtime) |" in out
     assert "Fits on 2 x 4.00 GiB, needs 1 GPU, up to 1024 tokens." in out
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "0.5")
@@ -70,13 +71,21 @@ def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[
 
 
 def test_markdown(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
-    code, out, _ = cli(monkeypatch, capsys, model, "--markdown")
+    code, out, _ = cli(monkeypatch, capsys, model, "--output", "markdown")
     assert code == 0
     assert "| **Total** |" in out and "| KV cache (BF16, 1024 tokens x 1) |" in out
 
 
 def test_removed_flags(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
-    for flag in ("--model-id", "--experimental", "--json-output", "--details", "--gguf-file"):
+    for flag in (
+        "--model-id",
+        "--experimental",
+        "--json",
+        "--markdown",
+        "--json-output",
+        "--details",
+        "--gguf-file",
+    ):
         code, _, err = cli(monkeypatch, capsys, model, flag, "x")
         assert code == 2 and "unrecognized arguments" in err
 
@@ -86,7 +95,7 @@ def test_gguf_listing_table(
 ) -> None:
     for quant in ("Q4_K_M", "Q8_0"):
         write_gguf(str(tmp_path / f"m-{quant}.gguf"), ARCH, TENSORS)
-    code, out, _ = cli(monkeypatch, capsys, str(tmp_path), "--file", "m-Q8_0.gguf", "--json")
+    code, out, _ = cli(monkeypatch, capsys, str(tmp_path), "--file", "m-Q8_0.gguf", "-o", "json")
     assert code == 0 and json.loads(out)["file"] == "m-Q8_0.gguf"
     code, out, _ = cli(monkeypatch, capsys, str(tmp_path))
     assert code == 0 and "FILES" in out and "m-Q4_K_M.gguf" in out

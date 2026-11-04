@@ -50,7 +50,11 @@ class Estimate:
         return self.weights.bytes + kv + (self.overhead.bytes if self.overhead else 0)
 
     def to_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {"hf_mem": __version__, "model": self.model, "revision": self.revision}
+        out: dict[str, Any] = {
+            "version": f"hf-mem@{__version__}",
+            "model": self.model,
+            "revision": self.revision,
+        }
         if self.file is not None:
             out["file"] = self.file
         out["format"] = self.format
@@ -78,7 +82,7 @@ class Listing:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "hf_mem": __version__,
+            "version": f"hf-mem@{__version__}",
             "model": self.model,
             "revision": self.revision,
             "format": self.files[0].format,
