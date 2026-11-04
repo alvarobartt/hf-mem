@@ -261,13 +261,13 @@ def test_index_with_missing_files_uses_the_uploaded_ones(tmp_path: Path) -> None
     assert any("2 files that are not in the repository" in w for w in result.warnings)
 
 
-def test_onnx_weights_from_file_sizes(tmp_path: Path) -> None:
-    (tmp_path / "model.onnx").write_bytes(b"\0" * 100)
-    (tmp_path / "model.onnx_data").write_bytes(b"\0" * 1000)
+def test_onnx_only_repositories_are_not_summed(tmp_path: Path) -> None:
+    for variant in ("model", "model_fp16", "model_q4"):
+        (tmp_path / "onnx" / f"{variant}.onnx").parent.mkdir(exist_ok=True)
+        (tmp_path / "onnx" / f"{variant}.onnx").write_bytes(b"\0" * 100)
 
-    result = estimate(str(tmp_path))
-
-    assert (result.format, result.weights.bytes) == ("file-sizes", 1100)
+    with pytest.raises(RuntimeError, match="No Safetensors or GGUF weights"):
+        estimate(str(tmp_path))
 
 
 def test_invalid_files_are_skipped_in_multi_file_repositories(tmp_path: Path) -> None:
