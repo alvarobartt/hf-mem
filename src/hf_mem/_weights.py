@@ -27,7 +27,7 @@ class Weights:
         return sorted(self.dtypes.items(), key=lambda item: item[1].bytes, reverse=True)
 
     def to_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {"bytes": self.bytes, "params": self.params}
+        out: dict[str, Any] = {"bytes": self.bytes, "params": self.params or None}
         if self.dtypes:
             out["dtypes"] = {d: {"bytes": w.bytes, "params": w.params} for d, w in self.sorted_dtypes()}
         return out

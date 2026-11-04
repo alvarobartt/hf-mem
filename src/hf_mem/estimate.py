@@ -55,19 +55,17 @@ class Estimate:
             "model": self.model,
             "revision": self.revision,
         }
-        if self.file is not None:
-            out["file"] = self.file
+        out["file"] = self.file
         out["format"] = self.format
         out["total"] = self.total
         out["weights"] = self.weights.to_dict()
-        if len(self.components) > 1:
-            out["components"] = {name: w.to_dict() for name, w in self.components.items()}
+        out["components"] = (
+            {name: w.to_dict() for name, w in self.components.items()} if len(self.components) > 1 else None
+        )
         out["kv_cache"] = self.kv_cache.to_dict() if self.kv_cache else None
         out["overhead"] = self.overhead.to_dict() if self.overhead else None
-        if self.moe is not None:
-            out["moe"] = self.moe.to_dict()
-        if self.fit is not None:
-            out["fit"] = self.fit.to_dict()
+        out["moe"] = self.moe.to_dict() if self.moe else None
+        out["fit"] = self.fit.to_dict() if self.fit else None
         out["warnings"] = self.warnings
         return out
 
@@ -90,7 +88,7 @@ class Listing:
                 {
                     "file": f.file,
                     "total": f.total,
-                    "weights": {"bytes": f.weights.bytes, "params": f.weights.params},
+                    "weights": {"bytes": f.weights.bytes, "params": f.weights.params or None},
                     "kv_cache": f.kv_cache.to_dict() if f.kv_cache else None,
                     "overhead": f.overhead.to_dict() if f.overhead else None,
                 }

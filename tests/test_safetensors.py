@@ -5,6 +5,7 @@ import pytest
 from helpers import estimate, llama_config, llama_tensors, some, write_json, write_safetensors
 
 from hf_mem import Estimate, _safetensors
+from hf_mem._render import table
 from hf_mem._source import LocalSource
 
 
@@ -148,9 +149,11 @@ def test_moe_breakdown(tmp_path: Path) -> None:
     write_safetensors(str(tmp_path / "model.safetensors"), tensors)
     write_json(str(tmp_path / "config.json"), llama_config(num_local_experts=4, num_experts_per_tok=2))
 
-    moe = estimate(str(tmp_path)).moe
+    result = estimate(str(tmp_path))
+    moe = result.moe
 
     assert moe is not None
+    assert "EXPERTS (4 x 16.38K PARAMS, 0.00 GiB)" in table(result)
     assert (moe.experts, moe.active) == (4, 2)
     assert moe.expert.bytes == 2 * 128 * 64 * 2
     assert moe.experts_total.bytes == 4 * moe.expert.bytes

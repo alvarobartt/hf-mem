@@ -45,7 +45,21 @@ def test_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str
     code, out, _ = cli(monkeypatch, capsys, model, "-o", "json", "--max-model-len", "10", "--batch-size", "2")
     data = json.loads(out)
     assert code == 0
-    keys = ["version", "model", "revision", "format", "total", "weights", "kv_cache", "overhead", "warnings"]
+    keys = [
+        "version",
+        "model",
+        "revision",
+        "file",
+        "format",
+        "total",
+        "weights",
+        "components",
+        "kv_cache",
+        "overhead",
+        "moe",
+        "fit",
+        "warnings",
+    ]
     assert list(data) == keys
     assert data["version"] == f"hf-mem@{__version__}"
     assert data["kv_cache"]["max_model_len"] == 10 and data["kv_cache"]["batch_size"] == 2
@@ -99,6 +113,7 @@ def test_gguf_listing_table(
     assert code == 0 and json.loads(out)["file"] == "m-Q8_0.gguf"
     code, out, _ = cli(monkeypatch, capsys, str(tmp_path))
     assert code == 0 and "FILES" in out and "m-Q4_K_M.gguf" in out
+    assert "GiB WEIGHTS +" in out and "GiB OVERHEAD)" in out
 
 
 def test_errors(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:

@@ -83,6 +83,9 @@ def test_fit() -> None:
     fit = _overhead.fit(weights=10 * GIB, gpu_memory="20", utilization=0.9, **args)
     assert (fit.needed, fit.fits) == (1, True)
     assert fit.max_model_len == int((18 * GIB - GIB - 10 * GIB) / 1024)
+    assert (fit.usable, fit.required) == (int(18 * GIB), 10 * GIB + 1024 * 1000 + GIB)
+    replicated = _overhead.fit(weights=10 * GIB, gpu_memory="4x20", utilization=0.9, kv_heads=1, **args)
+    assert replicated.required == 10 * GIB + 4 * 1024 * 1000 + 4 * GIB
 
     fit = _overhead.fit(weights=30 * GIB, gpu_memory="20", utilization=0.9, **args)
     assert (fit.needed, fit.fits, fit.max_model_len) == (2, False, 0)

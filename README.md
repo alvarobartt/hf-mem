@@ -74,7 +74,7 @@ Safetensors weights are estimated first, then GGUF, then the file sizes of `.bin
 
 ### Does it fit?
 
-`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and adds to the summary the memory used out of the given GPUs, whether the model fits or how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account.
+`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and adds to the summary the memory required on the given GPUs out of the usable memory, whether the model fits or how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account.
 
 ```bash
 uvx hf-mem meta-llama/Llama-3.1-8B-Instruct --max-model-len 32768 --gpu-memory 24
@@ -104,17 +104,22 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
   "version": "hf-mem@1.0.0",
   "model": "Qwen/Qwen3-8B",
   "revision": "main",
+  "file": null,
   "format": "safetensors",
   "total": 27343113879,
   "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
+  "components": null,
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
   "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628},
+  "moe": null,
+  "fit": null,
   "warnings": []
 }
 ```
 
 - `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
-- `components` (per Diffusers component or file), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are added when they apply.
+- `file`, `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when estimated from file sizes.
+- `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
 - `format` is `safetensors`, `gguf`, `onnx`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt` or `.nemo` weights.
 - GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
 

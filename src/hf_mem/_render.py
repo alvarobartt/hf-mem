@@ -6,7 +6,7 @@ from hf_mem._version import __version__
 from hf_mem._weights import Weights
 from hf_mem.estimate import Estimate, Listing
 
-NAME_WIDTH = 14
+NAME_WIDTH = 15
 MAX_FILE_WIDTH = 64
 MAX_TITLE_WIDTH = 72
 
@@ -132,8 +132,10 @@ def table(estimate: Estimate | Listing) -> str:
     if estimate.moe is not None:
         moe = estimate.moe
         sections.append((heading("MODEL", moe.base), _dtype_items(moe.base, total)))
-        expert = f"{moe.experts} x EXPERTS ({short(moe.expert.params)} PARAMS EACH, {gib(moe.expert.bytes)} GiB EACH)"
-        sections.append((expert, _dtype_items(moe.expert, total)))
+        experts = (
+            f"EXPERTS ({moe.experts} x {short(moe.expert.params)} PARAMS, {gib(moe.experts_total.bytes)} GiB)"
+        )
+        sections.append((experts, _dtype_items(moe.experts_total, total)))
     else:
         many = len(estimate.components) > 1
         for name, component in (estimate.components or {"MODEL": weights}).items():
@@ -174,16 +176,15 @@ def table(estimate: Estimate | Listing) -> str:
         sections.append((f"OVERHEAD ({gib(overhead.bytes)} GiB)", items))
     if fit := estimate.fit:
         gpus = fit.gpus or 1
-        capacity = gpus * fit.gpu_memory
-        text = f"{gib(estimate.total)} / {gib(capacity)} GiB [{estimate.total / capacity:.0%}] ON {gpus} GPU"
-        text += "S" if gpus > 1 else ""
+        capacity = gpus * fit.usable
+        text = f"{gib(fit.required)} / {gib(capacity)} GiB [{fit.required / capacity:.0%}] ON {gpus} x {gib(fit.gpu_memory)} GiB"
         if kv and fit.max_model_len:
             text += f", UP TO {fit.max_model_len} TOKENS"
         if fit.fits and fit.needed and fit.needed < gpus:
             verdict = f"FITS ON {fit.needed} GPU" + ("S" if fit.needed > 1 else "")
         else:
             verdict = "FITS" if fit.fits else f"⚠ NEEDS {fit.needed} GPUS" if fit.needed else "⚠ DOES NOT FIT"
-        sections[0][1].append(("GPU MEMORY", text, verdict, estimate.total / capacity))
+        sections[0][1].append(("GPU MEMORY", text, verdict, fit.required / capacity))
     return _color(_draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH))
 
 
@@ -195,7 +196,9 @@ def _listing(listing: Listing) -> str:
     for f in listing.files:
         text = f"{gib(f.total)} GiB"
         if f.kv_cache:
-            text += f" ({gib(f.weights.bytes)} GiB WEIGHTS + {gib(f.kv_cache.bytes)} GiB KV)"
+            parts = [f"{gib(f.weights.bytes)} GiB WEIGHTS", f"{gib(f.kv_cache.bytes)} GiB KV"]
+            parts += [f"{gib(f.overhead.bytes)} GiB OVERHEAD"] if f.overhead else []
+            text += f" ({' + '.join(parts)})"
         items.append(("", text, f.file or "", f.total / largest))
     titles = _titles(listing.url, listing.revision, None, kv)
     return _color(_draw(titles, [("FILES", items)], name_width))
