@@ -144,7 +144,7 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
         return _TORCH[requested]
     if requested != "auto":
         raise RuntimeError(
-            f"`--kv-cache-dtype={requested}` is not valid for Safetensors models, use any of {KV_CACHE_DTYPES}."
+            f"`--kv-cache-dtype={requested}` is not a vLLM KV cache dtype, use one of {', '.join(KV_CACHE_DTYPES)}."
         )
 
     quantization = config.get("quantization_config") or {}

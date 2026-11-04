@@ -70,7 +70,7 @@ The weights are the initializers in the ONNX graph, and the KV cache comes from 
 
 ### Picking a format
 
-Safetensors weights are estimated first, then GGUF, then the file sizes of `.bin` / `.pt` weights, and finally ONNX. `--format safetensors`, `--format gguf` or `--format onnx` picks one, and a warning mentions the GGUF or ONNX files that were found next to the Safetensors weights.
+Safetensors weights are estimated first, then GGUF, and finally ONNX, while PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, as they cannot be read without loading them. `--format safetensors`, `--format gguf` or `--format onnx` picks one, and a warning mentions the GGUF or ONNX files that were found next to the Safetensors weights.
 
 ### Does it fit?
 
@@ -118,9 +118,9 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 ```
 
 - `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
-- `file`, `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when estimated from file sizes.
+- `file`, `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
 - `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
-- `format` is `safetensors`, `gguf`, `onnx`, or `file-sizes` for repositories with only `.bin`, `.pt`, `.ckpt` or `.nemo` weights.
+- `format` is `safetensors`, `gguf` or `onnx`.
 - GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
 
 ### Python

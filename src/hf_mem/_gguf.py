@@ -6,7 +6,7 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
-from hf_mem._weights import Weights
+from hf_mem._weights import Weights, choices
 
 FIRST_READ = 1 << 20
 PREFIX_READ = 1 << 17
@@ -55,6 +55,8 @@ TYPES: dict[int, tuple[str, int, int]] = {
     39: ("MXFP4", 32, 17),
 }
 KV_DTYPES = {name: size / block for name, block, size in TYPES.values()}
+# KV cache types accepted by llama.cpp's `--cache-type-k` / `--cache-type-v`
+CACHE_TYPES = ("F16", "BF16", "F32", "Q8_0", "Q4_0", "Q4_1", "IQ4_NL", "Q5_0", "Q5_1")
 
 _SCALAR = {0: "B", 1: "b", 2: "H", 3: "h", 4: "I", 5: "i", 6: "f", 7: "?", 10: "Q", 11: "q", 12: "d"}
 _SWA_PATTERN = {"gemma2": 2, "gemma3": 6, "gemma3n": 5, "cohere2": 4}
@@ -231,14 +233,16 @@ def select_file(groups: dict[str, list[str]], file: str) -> tuple[str, list[str]
         name = min(matches, key=lambda n: (len(os.path.basename(n)), n))
         return name, groups[name]
     if not found:
-        raise RuntimeError(f"No GGUF file matching `{file}` found.")
+        raise RuntimeError(
+            f"No GGUF file matching `{file}` found, use a quantization tag or one of {choices(list(groups))}."
+        )
     if len(found) > 1:
-        raise RuntimeError(f"Multiple GGUF files match `{file}`: {sorted(found)}.")
+        raise RuntimeError(f"Multiple GGUF files match `{file}`, use one of {choices(list(found))}.")
     return next(iter(found.items()))
 
 
 def tagged(groups: dict[str, list[str]], tag: str) -> list[str]:
-    pattern = re.compile(rf"(?<![a-z0-9]){re.escape(tag)}(?![a-z0-9])", re.I)
+    pattern = re.compile(rf"(?<![a-z0-9_]){re.escape(tag)}(?![a-z0-9_])", re.I)
     return [name for name in groups if pattern.search(os.path.basename(name))]
 
 

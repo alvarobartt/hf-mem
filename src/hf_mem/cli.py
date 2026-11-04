@@ -6,7 +6,7 @@ import time
 
 from hf_mem import _safetensors
 from hf_mem._config import KV_CACHE_DTYPES
-from hf_mem._gguf import KV_DTYPES
+from hf_mem._gguf import CACHE_TYPES
 from hf_mem._render import markdown, table
 from hf_mem._source import HubError, Progress
 from hf_mem._version import __version__
@@ -60,7 +60,7 @@ def main() -> None:
         "--kv-cache-dtype",
         default="auto",
         help="KV cache dtype, `auto` uses the model dtype (Safetensors) or F16 (GGUF). "
-        f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(KV_DTYPES)}. ONNX: set by the graph.",
+        f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(t.lower() for t in CACHE_TYPES)}. ONNX: set by the graph.",
     )
     parser.add_argument(
         "--gpu-memory", help="GPU memory in GiB, e.g. `80` or `8x80`, to check whether it fits."

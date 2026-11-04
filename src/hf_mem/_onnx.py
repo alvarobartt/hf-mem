@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from hf_mem._weights import Weights
+from hf_mem._weights import Weights, choices
 
 CHUNK = 1 << 20
 SMALL_FILE = 16 << 20
@@ -88,10 +88,10 @@ def select_file(groups: dict[str, list[str]], file: str) -> tuple[str, list[str]
         if label == target or target in paths or label.startswith(target + "/")
     } or {label: paths for label, paths in groups.items() if os.path.basename(label) == target}
     if not found:
-        raise RuntimeError(f"No ONNX file matching `{file}` found.")
+        raise RuntimeError(f"No ONNX file matching `{file}` found, use one of {choices(list(groups))}.")
     if len(found) == 1:
         return next(iter(found.items()))
-    raise RuntimeError(f"Multiple ONNX files match `{file}`: {sorted(found)}.")
+    raise RuntimeError(f"Multiple ONNX files match `{file}`, use one of {choices(list(found))}.")
 
 
 class _Reader:

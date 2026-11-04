@@ -19,7 +19,12 @@ _URL = re.compile(r"^/(?P<id>[^/]+/[^/]+)(?:/(?:tree|blob|resolve)/(?P<rev>[^/]+
 
 
 class HubError(RuntimeError):
-    pass
+    def __init__(self, message: str, status: int | None = None) -> None:
+        super().__init__(message)
+        self.status = status
+
+
+_AUTH = "authenticate with `--hf-token`, `HF_TOKEN` or `hf auth login`"
 
 
 def _truthy(name: str) -> bool:
@@ -160,6 +165,7 @@ class HubSource:
         }
         if token:
             self._headers["Authorization"] = f"Bearer {token}"
+        self.authenticated = bool(token)
         self._semaphore = asyncio.Semaphore(CONCURRENCY)
         self._client = httpx2.AsyncClient(
             limits=httpx2.Limits(max_keepalive_connections=CONCURRENCY, max_connections=CONCURRENCY),
@@ -178,18 +184,39 @@ class HubSource:
                         response = await self._client.get(url, headers={**self._headers, **(headers or {})})
                     except httpx2.TransportError as e:
                         if attempt == RETRIES - 1:
-                            raise HubError(f"Request to {url} failed: {e!r}") from e
+                            raise HubError(
+                                f"Could not reach {ENDPOINT} ({type(e).__name__}: {e}), check the connection, or set "
+                                "`HF_HUB_OFFLINE=1` to read models from the local cache."
+                            ) from e
                     else:
                         if response.status_code not in {429, 500, 502, 503, 504} or attempt == RETRIES - 1:
                             if response.is_error:
-                                raise HubError(
-                                    response.headers.get("x-error-message")
-                                    or f"HTTP {response.status_code} for {url}"
-                                )
+                                raise self._error(response)
                             return response
                     await asyncio.sleep(0.5 * 2**attempt)
             finally:
                 self.progress.finish()
+
+    def _error(self, response: Any) -> HubError:
+        status, message = response.status_code, response.headers.get("x-error-message") or ""
+        page = f"https://hf.co/{self.name}"
+        if status == 404 and "rev" in message.lower():
+            text = (
+                f"Revision `{self.revision}` not found for `{self.name}`, see the branches and tags at {page}."
+            )
+        elif status in {401, 404} and "restricted" not in message.lower():
+            text = f"`{self.name}` was not found on the Hub" + (
+                ", or the token has no access to it."
+                if self.authenticated
+                else f", or it is private ({_AUTH})."
+            )
+        elif status in {401, 403}:
+            text = f"`{self.name}` is gated, request access at {page}" + (
+                "." if self.authenticated else f" and {_AUTH}."
+            )
+        else:
+            text = f"The Hub returned HTTP {status} for `{self.name}`" + (f": {message}" if message else ".")
+        return HubError(text, status)
 
     async def list(self) -> None:
         url: str | None = (
@@ -252,15 +279,22 @@ async def open_source(
 
     model_id, revision, file = parse_model(model, revision)
     revision = revision or "main"
+    if model.startswith((".", "/", "~")) or os.sep in model.strip(os.sep) and model_id.count("/") != 1:
+        raise RuntimeError(f"The local path `{model}` does not exist.")
     if model_id.count("/") != 1:
-        raise RuntimeError(f"`{model}` is neither a local path nor a Hugging Face Hub model ID (`org/name`).")
+        raise RuntimeError(
+            f"`{model}` is not a Hub model ID (`org/name`), a Hub URL or an existing local path."
+        )
 
     if _truthy("HF_HUB_OFFLINE"):
         if snapshot := _cache_snapshot(model_id, revision):
             source = LocalSource.open(snapshot, name=model_id, progress=progress)
             source.revision, source.url = revision, f"https://hf.co/{model_id}"
             return source, file
-        raise RuntimeError(f"`HF_HUB_OFFLINE` is set but {model_id} @ {revision} is not in the local cache.")
+        raise RuntimeError(
+            f"`{model_id}` @ `{revision}` is not in the local cache and `HF_HUB_OFFLINE` is set, download it first "
+            f"with `hf download {model_id}` or unset `HF_HUB_OFFLINE`."
+        )
 
     hub = HubSource(model_id, revision, _token(token), progress)
     try:

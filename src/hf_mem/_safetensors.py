@@ -8,13 +8,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from hf_mem._source import HubError
-from hf_mem._weights import Weights
+from hf_mem._weights import Weights, choices
 
 PROBE_SIZE = 100_000
 MAX_HEADER_SIZE = 100_000_000
 SHARD = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
 _MODEL_SHARD = re.compile(r"model-\d+-of-(\d+)\.safetensors")
-WEIGHT_EXTENSIONS = (".bin", ".pt", ".pth", ".ckpt", ".nemo")
 _EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
 POOL_MIN_FILES: int | None = None
 
@@ -96,7 +95,9 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
     if file is not None:
         selected = _select(groups, file)
         if not selected:
-            raise RuntimeError(f"No Safetensors file matching `{file}` found.")
+            raise RuntimeError(
+                f"No Safetensors file matching `{file}` found, use one of {choices(list(groups))}."
+            )
         return selected
 
     if "model_index.json" in files:
@@ -198,19 +199,6 @@ def _pool() -> Any:
         return ProcessPoolExecutor(min(os.cpu_count() or 1, 8))
     except (ImportError, NotImplementedError, OSError):
         return None
-
-
-def from_file_sizes(files: dict[str, int], file: str | None) -> dict[str, Weights]:
-    paths = [p for p in files if p.endswith(WEIGHT_EXTENSIONS) and "optimizer" not in p and "training" not in p]
-    if file is not None:
-        target = file.strip("/")
-        paths = [p for p in paths if p == target or p.startswith(target + "/") or os.path.basename(p) == target]
-    root = [p for p in paths if "/" not in p and os.path.basename(p).startswith("pytorch_model")]
-    weights: dict[str, Weights] = {}
-    for path in root or paths:
-        name = "Transformer" if root else re.sub(r"-\d+-of-\d+(?=\.\w+$)", "", path).rsplit(".", 1)[0]
-        weights.setdefault(name, Weights()).bytes += files[path]
-    return weights
 
 
 def _int(config: dict[str, Any], *keys: str) -> int | None:

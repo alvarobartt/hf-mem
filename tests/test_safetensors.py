@@ -31,7 +31,7 @@ def test_kv_cache_options(tmp_path: Path) -> None:
 
     assert some(result.kv_cache).bytes == 2 * 4 * 2 * 32 * 112 * 3
     assert some(result.kv_cache).dtype == "F8_E4M3"
-    with pytest.raises(RuntimeError, match="not valid for Safetensors"):
+    with pytest.raises(RuntimeError, match="not a vLLM KV cache dtype"):
         estimate(str(tmp_path), kv_cache_dtype="Q4_K")
 
 
@@ -174,15 +174,13 @@ def test_moe_breakdown_skipped_for_non_uniform_experts(tmp_path: Path) -> None:
     assert any("not uniform" in w for w in result.warnings)
 
 
-def test_weights_from_file_sizes(tmp_path: Path) -> None:
+def test_pickle_weights_are_not_estimated(tmp_path: Path) -> None:
     for name, size in {"pytorch_model.bin": 1000, "optimizer.pt": 99, "README.md": 5}.items():
         with open(tmp_path / name, "wb") as f:
             f.truncate(size)
 
-    result = estimate(str(tmp_path))
-
-    assert result.format == "file-sizes"
-    assert result.weights.bytes == 1000
+    with pytest.raises(RuntimeError, match="only has PyTorch pickle weights \\(e.g. `pytorch_model.bin`\\)"):
+        estimate(str(tmp_path))
 
 
 def test_no_weights(tmp_path: Path) -> None:
