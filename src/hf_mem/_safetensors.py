@@ -16,6 +16,8 @@ SHARD = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
 _MODEL_SHARD = re.compile(r"model-\d+-of-(\d+)\.safetensors")
 _EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
 POOL_MIN_FILES: int | None = None
+# Sub-models loaded next to the main model, e.g. the audio tokenizer that decodes the generated speech
+AUXILIARY = ("audio_tokenizer", "speech_tokenizer", "audio_decoder", "vocoder", "codec")
 
 
 @dataclass
@@ -126,7 +128,12 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
                 )
                 paths = paths or sorted(p for ps in groups.values() for p in ps)
         if "config_sentence_transformers.json" not in files:
-            return {"Transformer": paths}
+            auxiliary = {
+                name: ps
+                for name in AUXILIARY
+                if (ps := [p for g, ps in groups.items() if os.path.dirname(g) == name for p in ps])
+            }
+            return {"Transformer": paths, **auxiliary}
         components = {"0_Transformer": paths}
         if "modules.json" in files:
             for module in await source.json("modules.json"):

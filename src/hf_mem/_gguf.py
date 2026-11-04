@@ -182,6 +182,14 @@ async def read_header(source: Any, path: str) -> Header:
             raise RuntimeError(f"`{path}` is not a valid GGUF file ({e}).") from e
 
 
+def _complete(metadata: dict[str, Any]) -> bool:
+    arch = metadata.get("general.architecture")
+    keys = ["block_count", "context_length", "embedding_length", "attention.head_count"]
+    if any(k.startswith(f"{arch}.ssm.") for k in metadata) or f"{arch}.full_attention_interval" in metadata:
+        keys += ["ssm.conv_kernel", "ssm.state_size", "ssm.inner_size", "ssm.group_count"]
+    return all(f"{arch}.{k}" in metadata for k in keys)
+
+
 async def read_metadata(source: Any, path: str) -> tuple[dict[str, Any], bool]:
     size, buf = source.files[path], b""
     end, prefix = min(PREFIX_READ, size), True
@@ -190,7 +198,7 @@ async def read_metadata(source: Any, path: str) -> tuple[dict[str, Any], bool]:
             buf += await source.read(path, len(buf), end)
         try:
             metadata, _, _, tokenizer = _metadata(buf, prefix)
-            if not prefix or not tokenizer or f"{metadata.get('general.architecture')}.block_count" in metadata:
+            if not prefix or not tokenizer or _complete(metadata):
                 return metadata, tokenizer or not prefix
             prefix = False
             continue

@@ -316,3 +316,17 @@ def test_fit_is_not_capped_below_the_requested_length(tmp_path: Path) -> None:
     result = estimate(str(tmp_path), max_model_len=4096, gpu_memory="80")
 
     assert some(result.fit).fits and some(result.fit).max_model_len >= 4096
+
+
+def test_audio_tokenizers_are_added_as_components(tmp_path: Path) -> None:
+    model = write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    tokenizer = write_safetensors(
+        str(tmp_path / "audio_tokenizer" / "model.safetensors"), {"w": ("BF16", [64, 64])}
+    )
+    write_safetensors(str(tmp_path / "variant" / "model.safetensors"), {"w": ("BF16", [64, 64])})
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    result = estimate(str(tmp_path))
+
+    assert list(result.components) == ["Transformer", "audio_tokenizer"]
+    assert result.weights.bytes == model + tokenizer and result.kv_cache is not None

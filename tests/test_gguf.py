@@ -236,3 +236,16 @@ def test_quantization_tags_and_mmproj(tmp_path: Path) -> None:
     )
     with pytest.raises(RuntimeError, match="No GGUF file matching"):
         estimate(str(tmp_path), file="Q3_K_S")
+
+
+def test_listing_reads_architecture_keys_after_the_tokenizer(tmp_path: Path) -> None:
+    keys = list(ARCH)
+    interleaved = {k: ARCH[k] for k in keys[:3]} | TOKENIZER | {k: ARCH[k] for k in keys[3:]}
+    for quant in ("Q4_K_M", "Q8_0"):
+        write_gguf(str(tmp_path / f"model-{quant}.gguf"), interleaved, TENSORS)
+
+    files = listing(str(tmp_path), max_model_len=512).files
+
+    assert all(f.kv_cache for f in files)
+    single = estimate(str(tmp_path), file="Q4_K_M", max_model_len=512)
+    assert some(files[0].kv_cache).bytes == some(single.kv_cache).bytes
