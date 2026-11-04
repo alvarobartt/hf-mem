@@ -200,8 +200,19 @@ def test_quantization_tags_and_mmproj(tmp_path: Path) -> None:
     for name in ("m-Q4_K_M", "m-UD-Q4_K_M", "m-BF16", "mmproj-m-BF16", "mmproj-m-Q8_0"):
         write_gguf(str(tmp_path / f"{name}.gguf"), {**ARCH, **TOKENIZER}, TENSORS)
 
+    write_gguf(
+        str(tmp_path / "mmproj-m-Q8_0.gguf"),
+        {
+            "general.architecture": "clip",
+            "clip.vision.embedding_length": 64,
+            "clip.vision.image_size": 224,
+            "clip.vision.patch_size": 14,
+        },
+        TENSORS,
+    )
     q4 = estimate(str(tmp_path), file="q4_k_m")
     assert q4.file == "m-Q4_K_M.gguf" and list(q4.components) == ["Model", "mmproj"]
+    assert some(q4.overhead).encoder == int(7.2 * 16**2 * 4 * 64)
     assert estimate(str(tmp_path), file="UD-Q4_K_M").file == "m-UD-Q4_K_M.gguf"
     assert (
         _gguf.mmproj(

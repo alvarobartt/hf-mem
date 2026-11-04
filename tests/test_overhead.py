@@ -122,3 +122,35 @@ def test_fit_replicates_kv_heads_across_gpus() -> None:
 
 def test_batched_tokens_override() -> None:
     assert _overhead.batched_tokens("8x80", 2048) == 2048
+
+
+@pytest.mark.parametrize(
+    "metadata, mib",
+    [
+        # Measured with llama.cpp `server-cuda` on an A100: gemma-3-4b-it, Qwen2.5-VL-7B, ultravox-v0_5-llama-3_2-1b
+        (
+            {
+                "clip.vision.embedding_length": 1152,
+                "clip.vision.feed_forward_length": 4304,
+                "clip.vision.image_size": 896,
+                "clip.vision.patch_size": 14,
+            },
+            121.25,
+        ),
+        (
+            {
+                "clip.vision.embedding_length": 1280,
+                "clip.vision.feed_forward_length": 3420,
+                "clip.vision.image_size": 560,
+                "clip.vision.patch_size": 14,
+                "clip.vision.n_wa_pattern": 8,
+            },
+            569.70,
+        ),
+        ({"clip.audio.embedding_length": 1280, "clip.audio.feed_forward_length": 5120}, 51.27),
+    ],
+)
+def test_mmproj_encoder_matches_llama_cpp(metadata: dict[str, Any], mib: float) -> None:
+    assert abs(_overhead.mmproj_encoder(metadata) / (1 << 20) / mib - 1) < 0.05
+    assert _overhead.llama_cpp(metadata).encoder == _overhead.mmproj_encoder(metadata)
+    assert _overhead.llama_cpp().encoder == 0

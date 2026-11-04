@@ -177,18 +177,23 @@ async def _estimate_gguf(
             weights=Weights().merge(header.weights).merge(extra[0].weights) if extra else header.weights,
             components=components,
             kv_cache=kv[0] if kv else None,
-            overhead=_overhead.llama_cpp() if kv else None,
+            overhead=_overhead.llama_cpp(extra[0].metadata if extra else None) if kv else None,
             warnings=warnings,
         )
         _fit(estimate, kv[1] if kv else 0, kv[2] if kv else 0.0, gpu_memory, utilization)
         return estimate
 
     names = list(groups)
+    projectors = {name: _gguf.mmproj(source.files, name) for name in names}
+    unique = sorted({p for p in projectors.values() if p})
     first, *results = await asyncio.gather(
         _gguf.read_header(source, groups[names[0]][0]),
         *(_gguf.read_metadata(source, groups[name][0]) for name in names),
+        *(_gguf.read_metadata(source, p) for p in unique),
         return_exceptions=True,
     )
+    results, loaded = results[: len(names)], results[len(names) :]
+    projected = {p: r[0] for p, r in zip(unique, loaded) if isinstance(r, tuple)}
     files = []
     for name, result in zip(names, results):
         if isinstance(result, HubError):
@@ -210,10 +215,10 @@ async def _estimate_gguf(
                 weights=Weights(
                     bytes=sum(source.files[p] for p in paths)
                     - header_size
-                    + (source.files[projector] if (projector := _gguf.mmproj(source.files, name)) else 0)
+                    + (source.files[projector] if (projector := projectors[name]) else 0)
                 ),
                 kv_cache=kv[0] if kv else None,
-                overhead=_overhead.llama_cpp() if kv else None,
+                overhead=_overhead.llama_cpp(projected.get(projector) if projector else None) if kv else None,
             )
         )
     if not files:

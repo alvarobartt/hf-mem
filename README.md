@@ -42,7 +42,7 @@ uvx hf-mem google/embeddinggemma-2
 
 ### GGUF
 
-GGUF repositories list every file, and a quantization tag as in llama.cpp (`<model>:Q4_K_M`, case-insensitive) or `--file` (a tag, file, directory or any shard of a sharded file) estimates a single one. The `mmproj` projector of vision and audio models is included as llama.cpp does, picking the one with the same quantization, or else Q8_0, F16, BF16 or F32.
+GGUF repositories list every file, and a quantization tag as in llama.cpp (`<model>:Q4_K_M`, case-insensitive) or `--file` (a tag, file, directory or any shard of a sharded file) estimates a single one. The `mmproj` projector of vision and audio models is included as llama.cpp does, picking the one with the same quantization, or else Q8_0, F16, BF16 or F32, together with the compute buffer of its encoders in the overhead.
 
 ```bash
 uvx hf-mem LiquidAI/LFM3-1.7B-GGUF
@@ -149,7 +149,7 @@ hf extensions add alvarobartt/hf-mem
 - **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus two batches of tokens in flight, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
 - **Overhead** is the memory an inference engine needs on top of the weights and the KV cache, per GPU, modeled on vLLM's memory profiling for Safetensors models and on llama.cpp's compute buffer and device context for GGUF models:
   - `activations`: the peak of the dummy forward pass over the batched tokens and of the sampler over the vocabulary.
-  - `encoder`: the vision or audio encoder activations for the largest image or audio clip, from `config.json` and the processor configs.
+  - `encoder`: the vision or audio encoder activations for the largest image or audio clip, from `config.json` and the processor configs, or from the `mmproj` metadata for GGUF (llama.cpp reserves it for a 92x92 patch grid on dynamic resolution encoders, `image_size` otherwise, and 30 seconds of audio).
   - `graphs`: the CUDA (or HIP) graphs captured for decoding, as estimated by vLLM before sizing the KV cache.
   - `runtime`: the device context, which vLLM keeps outside `--gpu-memory-utilization`, plus the attention, BLAS and collective communication workspaces.
 
@@ -160,6 +160,7 @@ The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4
 - The KV cache per request matches vLLM exactly for Llama 3, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 and Gemma 4 (sliding window), gpt-oss, Qwen3.5 (linear attention) and Nemotron-H (Mamba), and the KV cache per token matches SGLang.
 - The overhead has a median error of 10% against vLLM and lies between vLLM's reservation and SGLang's actual usage for most models (SGLang reserves a fixed share of the GPU instead), e.g. the longest context for Llama 3.1 8B on an L4 is 29,878 tokens against 30,048 in vLLM.
 - vLLM profiles the vision encoder with the largest video when it has more tokens than an image (e.g. Qwen2.5-VL reserves 3 to 7 GiB more at 32K to 64K tokens), and hf-mem warns about it.
+- The `mmproj` encoder buffer matches llama.cpp within 5% for Gemma 3, Qwen2.5-VL, Qwen2.5-Omni, Qwen3.8, SmolVLM2, InternVL3 and Ultravox, while LFM3-VL reserves 2.5x more for its convolution blocks, and Pixtral is estimated for full 1024px images, as llama.cpp only reserves it for 256px images at startup.
 - Inference engines can repack or offload weights, e.g. vLLM pads the gpt-oss MXFP4 experts and keeps the per-layer embeddings of Qwen3.8-Flash-Next on the CPU, and SGLang loads the gpt-oss experts in BF16 on Hopper GPUs.
 
 ## References
