@@ -4,6 +4,7 @@ import json
 import sys
 import time
 
+from hf_mem import _safetensors
 from hf_mem._config import KV_CACHE_DTYPES
 from hf_mem._gguf import KV_DTYPES
 from hf_mem._render import markdown, table
@@ -38,6 +39,7 @@ class _Status:
 
 
 def main() -> None:
+    _safetensors.POOL_MIN_FILES = 32
     parser = argparse.ArgumentParser(
         prog="hf-mem",
         description="Estimate the memory required to run a model from the Hugging Face Hub or a local path.",

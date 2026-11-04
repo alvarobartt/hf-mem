@@ -70,7 +70,7 @@ def test_parse_gpu_memory(value: str, expected: tuple[int | None, int]) -> None:
     assert _overhead.parse_gpu_memory(value) == expected
 
 
-@pytest.mark.parametrize("value", ["", "x80", "0x80", "8x", "eighty", "-1"])
+@pytest.mark.parametrize("value", ["", "x80", "0x80", "-2x80", "8x", "eighty", "-1", "inf", "1e400"])
 def test_parse_gpu_memory_errors(value: str) -> None:
     with pytest.raises(RuntimeError):
         _overhead.parse_gpu_memory(value)

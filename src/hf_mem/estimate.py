@@ -130,7 +130,7 @@ def _fit(
         kv_fixed=int(kv.bytes - slope * kv.max_model_len) if kv else 0,
         kv_per_token=slope,
         max_model_len=kv.max_model_len if kv else 0,
-        context_length=context_length,
+        context_length=max(context_length, kv.max_model_len if kv else 0),
         overhead=estimate.overhead.bytes if estimate.overhead else 0,
         gpu_memory=gpu_memory,
         utilization=utilization,
@@ -195,13 +195,15 @@ async def _estimate_gguf(
                 url=source.url,
                 format="gguf",
                 file=name,
-                weights=Weights(bytes=sum(source.files[p] for p in paths) - header_size * len(paths)),
+                weights=Weights(bytes=sum(source.files[p] for p in paths) - header_size),
                 kv_cache=kv[0] if kv else None,
                 overhead=_overhead.llama_cpp() if kv else None,
             )
         )
     if not files:
         raise RuntimeError(f"No valid GGUF files found for {source.name}.")
+    if gpu_memory is not None:
+        warnings.append("`--gpu-memory` is only checked for a single GGUF file, use `--file` to pick one.")
     return Listing(source.name, source.revision, source.url, files, warnings)
 
 
@@ -284,7 +286,7 @@ async def _estimate_safetensors(
                 text = _config.text_config({**await referenced.json("config.json"), **config["text_config"]})
             finally:
                 await referenced.close()
-        except RuntimeError:
+        except (RuntimeError, ValueError):
             pass
     if text is None:
         warnings.append("KV cache estimation skipped, as no text decoder config was found in `config.json`.")
@@ -353,6 +355,8 @@ async def arun(
     max_num_batched_tokens: int | None = None,
     progress: Progress | None = None,
 ) -> Estimate | Listing:
+    if gpu_memory is not None:
+        _overhead.parse_gpu_memory(gpu_memory)
     source, url_file = await open_source(model_id, revision, hf_token, progress)
     file = file or url_file
     warnings: list[str] = []

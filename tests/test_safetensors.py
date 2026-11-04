@@ -5,6 +5,7 @@ import pytest
 from helpers import estimate, llama_config, llama_tensors, some, write_json, write_safetensors
 
 from hf_mem import Estimate, _safetensors
+from hf_mem._source import LocalSource
 
 
 def test_dense_model_with_kv_cache(tmp_path: Path) -> None:
@@ -287,3 +288,39 @@ def test_80_gib_gpus_warn_about_a100(tmp_path: Path) -> None:
 
     assert any("A100" in w for w in estimate(str(tmp_path), gpu_memory="80").warnings)
     assert not any("A100" in w for w in estimate(str(tmp_path), gpu_memory="141").warnings)
+
+
+def test_malformed_and_oversized_headers_are_skipped(tmp_path: Path) -> None:
+    good = write_safetensors(str(tmp_path / "lora-a.safetensors"), {"w": ("BF16", [64, 64])})
+    (tmp_path / "lora-b.safetensors").write_bytes(b'\x0b\0\0\0\0\0\0\0{"w": {}}')
+    (tmp_path / "lora-c.safetensors").write_bytes(b"\xff" * 8 + b"{}")
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == good
+    assert any("Skipping 2 invalid" in w for w in result.warnings)
+
+
+def test_file_prefers_the_exact_path_over_the_basename(tmp_path: Path) -> None:
+    root = write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_safetensors(str(tmp_path / "other" / "model.safetensors"), {"w": ("BF16", [64, 64])})
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    assert estimate(str(tmp_path), file="model.safetensors").weights.bytes == root
+    assert estimate(str(tmp_path / "model.safetensors")).weights.bytes == root
+
+
+def test_local_file_lists_only_its_folder(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_safetensors(str(tmp_path / "nested" / "deep" / "model.safetensors"), llama_tensors())
+    source = LocalSource.open(str(tmp_path), recursive=False)
+    assert list(source.files) == ["model.safetensors"]
+
+
+def test_fit_is_not_capped_below_the_requested_length(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config(max_position_embeddings=1024))
+
+    result = estimate(str(tmp_path), max_model_len=4096, gpu_memory="80")
+
+    assert some(result.fit).fits and some(result.fit).max_model_len >= 4096

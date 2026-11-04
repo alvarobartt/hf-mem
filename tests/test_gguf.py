@@ -147,3 +147,12 @@ def test_listing_stops_at_large_embedded_metadata(tmp_path: Path, monkeypatch: p
     assert len(result.files) == 2
     assert all(f.kv_cache is None for f in result.files)
     assert sum(reads) < 8 << 20
+
+
+def test_listing_warns_that_the_gpu_fit_needs_a_file(tmp_path: Path) -> None:
+    for quant in ("Q4_K_M", "Q8_0"):
+        write_gguf(str(tmp_path / f"model-{quant}.gguf"), {**ARCH, **TOKENIZER}, TENSORS)
+    result = listing(str(tmp_path), gpu_memory="24")
+    assert any("`--gpu-memory` is only checked" in w for w in result.warnings)
+    with pytest.raises(RuntimeError, match="--gpu-memory"):
+        listing(str(tmp_path), gpu_memory="lots")

@@ -221,10 +221,8 @@ def select_file(groups: dict[str, list[str]], file: str) -> tuple[str, list[str]
     if match := SHARD.search(target):
         target = target[: match.start()] + ".gguf"
     found = {
-        name: paths
-        for name, paths in groups.items()
-        if name == target or os.path.basename(name) == target or name.startswith(target + "/")
-    }
+        name: paths for name, paths in groups.items() if name == target or name.startswith(target + "/")
+    } or {name: paths for name, paths in groups.items() if os.path.basename(name) == target}
     if not found:
         raise RuntimeError(f"No GGUF file matching `{file}` found.")
     if len(found) > 1:

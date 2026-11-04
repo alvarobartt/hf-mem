@@ -17,6 +17,8 @@ from hf_mem import _source
         ("Qwen/Qwen3-8B@refs/pr/1", ("Qwen/Qwen3-8B", "refs/pr/1", None)),
         ("https://huggingface.co/Qwen/Qwen3-8B", ("Qwen/Qwen3-8B", None, None)),
         ("https://hf.co/Qwen/Qwen3-8B/tree/dev", ("Qwen/Qwen3-8B", "dev", None)),
+        ("https://hf.co/org/m/tree/refs%2Fpr%2F1", ("org/m", "refs/pr/1", None)),
+        ("https://hf.co/org/m/blob/main/a%20b.gguf", ("org/m", "main", "a b.gguf")),
         (
             "https://huggingface.co/org/m-GGUF/blob/main/q/m-Q4_K_M.gguf",
             ("org/m-GGUF", "main", "q/m-Q4_K_M.gguf"),
