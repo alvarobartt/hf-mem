@@ -39,12 +39,15 @@ _DATA = re.compile(r"(?<=\.onnx)[._]data(?:_\d+)?$")
 _PAST_INPUT = re.compile(rb"\x5a[\x80-\xff]{0,3}[\x00-\x7f]\x0a[\x00-\x7f]past_")
 _PARTS = ("embed_tokens", "vision_encoder", "audio_encoder", "speech_encoder", "encoder_model")
 _DECODERS = ("decoder_model_merged", "decoder_model", "decoder_with_past_model")
+# Weight input of the ONNX Runtime ops that pack sub-byte weights into UINT8 blobs
+_QUANTIZED = {"MatMulNBits": 1, "GatherBlockQuantized": 0}
 
 
 @dataclass
 class Graph:
     weights: Weights = field(default_factory=Weights)
-    cache: list[tuple[str, int, int]] = field(default_factory=list)
+    cache: list[tuple[str, int, int, bool]] = field(default_factory=list)
+    packed: dict[str, int] = field(default_factory=dict)
 
 
 def group_files(files: dict[str, int]) -> dict[str, list[str]]:
@@ -63,8 +66,8 @@ def group_files(files: dict[str, int]) -> dict[str, list[str]]:
         for part, path in parts.items():
             if part not in _PARTS and part not in _DECODERS:
                 groups[path] = [path]
-        decoder = next((d for d in _DECODERS if d in parts), None)
-        if loaded := [parts[p] for p in (*_PARTS, decoder) if p in parts]:
+        decoders = ["decoder_model_merged"] if "decoder_model_merged" in parts else list(_DECODERS[1:])
+        if loaded := [parts[p] for p in (*_PARTS, *decoders) if p in parts]:
             names = [os.path.basename(p)[:-5].removesuffix(f"_{variant}") for p in loaded]
             label = (
                 loaded[0]
@@ -88,8 +91,6 @@ def select_file(groups: dict[str, list[str]], file: str) -> tuple[str, list[str]
         raise RuntimeError(f"No ONNX file matching `{file}` found.")
     if len(found) == 1:
         return next(iter(found.items()))
-    if all(label.startswith(target + "/") for label in found):
-        return target, [p for paths in found.values() for p in paths]
     raise RuntimeError(f"Multiple ONNX files match `{file}`: {sorted(found)}.")
 
 
@@ -145,15 +146,39 @@ def _packed(data: bytes) -> list[int]:
 
 
 async def _tensor(reader: _Reader, start: int, end: int, graph: Graph) -> None:
-    dtype, dims = 0, list[int]()
+    dtype, dims, name = 0, list[int](), ""
     async for number, wire, a, b in reader.fields(start, end):
         if number == 1:
             dims.extend([a] if wire == 0 else _packed(await reader.read(a, b - a)))
         elif number == 2:
             dtype = a
-    name, bits = TYPES.get(dtype, (f"TYPE{dtype}", 8))
-    params = math.prod(dims)
-    graph.weights.add(name, params, math.ceil(params * bits / 8))
+        elif number == 8:
+            name = (await reader.read(a, b - a)).decode(errors="replace")
+    label, bits = TYPES.get(dtype, (f"TYPE{dtype}", 8))
+    elements = math.prod(dims)
+    graph.weights.add(label, elements * graph.packed.get(name, 1), math.ceil(elements * bits / 8))
+
+
+async def _node(reader: _Reader, start: int, end: int, graph: Graph) -> None:
+    inputs, op, bits = list[str](), "", 4
+    async for number, _, a, b in reader.fields(start, end):
+        if number == 1:
+            inputs.append((await reader.read(a, b - a)).decode(errors="replace"))
+        elif number == 4:
+            op = (await reader.read(a, b - a)).decode(errors="replace")
+            if op not in _QUANTIZED:
+                return
+        elif number == 5:
+            attribute, value = "", None
+            async for key, wire, c, d in reader.fields(a, b):
+                if key == 1:
+                    attribute = (await reader.read(c, d - c)).decode(errors="replace")
+                elif key == 3 and wire == 0:
+                    value = c
+            if attribute == "bits" and value:
+                bits = value
+    if op in _QUANTIZED and len(inputs) > _QUANTIZED[op] and 0 < bits < 8:
+        graph.packed[inputs[_QUANTIZED[op]]] = 8 // bits
 
 
 async def _dims(reader: _Reader, start: int, end: int) -> list[int | None]:
@@ -184,7 +209,7 @@ async def _input(reader: _Reader, start: int, end: int, graph: Graph) -> None:
     if name.startswith("past_"):
         dtype_name, bits = TYPES.get(dtype, ("F32", 32))
         static = math.prod(d for d in dims if d)
-        graph.cache.append((dtype_name, static * bits // 8, sum(not d for d in dims)))
+        graph.cache.append((dtype_name, static * bits // 8, sum(not d for d in dims), ".encoder." in name))
 
 
 async def _walk(reader: _Reader, graph: Graph) -> None:
@@ -192,7 +217,9 @@ async def _walk(reader: _Reader, graph: Graph) -> None:
         if number != 7 or wire != 2:
             continue
         async for field_number, field_wire, a, b in reader.fields(start, end):
-            if field_number == 5 and field_wire == 2:
+            if field_number == 1 and field_wire == 2:
+                await _node(reader, a, b, graph)
+            elif field_number == 5 and field_wire == 2:
                 await _tensor(reader, a, b, graph)
             elif field_number == 11 and field_wire == 2:
                 await _input(reader, a, b, graph)
@@ -229,14 +256,20 @@ async def read_group(source: Any, paths: list[str]) -> Graph:
     return merged
 
 
-def kv_cache(graph: Graph, max_model_len: int, batch_size: int) -> tuple[int, str, float] | None:
+def kv_cache(
+    graph: Graph, max_model_len: int, batch_size: int, encoder_length: int | None = None
+) -> tuple[int, str, float] | None:
     if not graph.cache:
         return None
-    per_token = sum(b for _, b, symbolic in graph.cache if symbolic >= 2)
-    per_sequence = sum(b for _, b, symbolic in graph.cache if symbolic < 2)
-    dtypes = [d for d, _, _ in graph.cache]
+    per_token = sum(b for _, b, symbolic, encoder in graph.cache if symbolic >= 2 and not encoder)
+    fixed = sum(
+        b * ((encoder_length or max_model_len) if symbolic >= 2 else 1)
+        for _, b, symbolic, encoder in graph.cache
+        if encoder or symbolic < 2
+    )
+    dtypes = [d for d, *_ in graph.cache]
     return (
-        (per_token * max_model_len + per_sequence) * batch_size,
+        (per_token * max_model_len + fixed) * batch_size,
         max(set(dtypes), key=dtypes.count),
         float(per_token * batch_size),
     )

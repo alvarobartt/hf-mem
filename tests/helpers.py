@@ -139,8 +139,14 @@ def write_onnx(
     initializers: list[tuple[str, int, list[int]]],
     inputs: list[tuple[str, int, list[int | str]]] = [],
     external: str | None = None,
+    nodes: list[tuple[str, list[str], int]] = [],
 ) -> int:
     graph, data = b"", 0
+    for op, names, bits in nodes:
+        attribute = _field(1, b"bits") + _field(3, bits)
+        graph += _field(
+            1, b"".join(_field(1, n.encode()) for n in names) + _field(4, op.encode()) + _field(5, attribute)
+        )
     for name, dtype, dims in initializers:
         size = -(-math.prod(dims) * _ONNX_BITS[dtype] // 8)
         tensor = b"".join(_field(1, d) for d in dims) + _field(2, dtype) + _field(8, name.encode())

@@ -81,7 +81,7 @@ class Listing:
             "hf_mem": __version__,
             "model": self.model,
             "revision": self.revision,
-            "format": "gguf",
+            "format": self.files[0].format,
             "files": [
                 {
                     "file": f.file,
@@ -210,7 +210,7 @@ async def _estimate_gguf(
     return Listing(source.name, source.revision, source.url, files, warnings)
 
 
-async def _onnx_lengths(source: Any, labels: list[str]) -> dict[str, int | None]:
+async def _onnx_lengths(source: Any, labels: list[str]) -> dict[str, tuple[int | None, int | None]]:
     def config(label: str) -> str | None:
         directory = os.path.dirname(label)
         return next((p for p in (f"{directory}/config.json", "config.json") if p in source.files), None)
@@ -218,12 +218,16 @@ async def _onnx_lengths(source: Any, labels: list[str]) -> dict[str, int | None]
     paths = {label: config(label) for label in labels}
     unique = sorted({p for p in paths.values() if p})
     loaded = dict(zip(unique, await asyncio.gather(*(source.json(p) for p in unique), return_exceptions=True)))
-    lengths: dict[str, int | None] = {}
+    lengths: dict[str, tuple[int | None, int | None]] = {}
     for label, path in paths.items():
         found = loaded[path] if path else None
-        text = _config.text_config(found) if isinstance(found, dict) else None
-        length = text.get("max_position_embeddings") if text else None
-        lengths[label] = length if isinstance(length, int) else None
+        text = (_config.text_config(found) or {}) if isinstance(found, dict) else {}
+        encoder = found.get("max_source_positions") if isinstance(found, dict) else None
+        length = text.get("max_position_embeddings")
+        lengths[label] = (
+            length if isinstance(length, int) else None,
+            encoder if isinstance(encoder, int) else None,
+        )
     return lengths
 
 
@@ -258,8 +262,14 @@ async def _estimate_onnx(
         if isinstance(result, BaseException):
             warnings.append(f"Skipping `{label}`: {result}")
             continue
-        length = max_model_len or lengths[label]
-        kv = _onnx.kv_cache(result, length, batch_size) if length else None
+        context, encoder_length = lengths[label]
+        length = max_model_len or context
+        kv = _onnx.kv_cache(result, length, batch_size, encoder_length) if length else None
+        if result.cache and not length:
+            warnings.append(
+                f"KV cache estimation skipped for `{label}`, as no context length was found in `config.json`; "
+                "set `--max-model-len`."
+            )
         estimate = Estimate(
             model=source.name,
             revision=source.revision,
@@ -269,7 +279,8 @@ async def _estimate_onnx(
             weights=result.weights,
             kv_cache=KVCache(kv[0], kv[1], length, batch_size, {}) if kv and length else None,
         )
-        _fit(estimate, lengths[label] or 0, kv[2] if kv else 0.0, gpu_memory, utilization)
+        if len(labels) == 1:
+            _fit(estimate, context or 0, kv[2] if kv else 0.0, gpu_memory, utilization)
         files.append(estimate)
     if not files:
         raise RuntimeError(f"No valid ONNX files found for {source.name}.")
@@ -446,15 +457,29 @@ async def arun(
     warnings: list[str] = []
     try:
         gguf = _gguf.gguf_paths(source.files)
-        wants_gguf = file is not None and (
-            file.endswith(".gguf") or any(p.startswith(file.strip("/") + "/") for p in gguf)
+        onnx = [p for p in source.files if p.endswith(".onnx")]
+        target = file.strip("/") if file is not None else None
+        wants_gguf = target is not None and (
+            target.endswith(".gguf") or any(p.startswith(target + "/") for p in gguf)
+        )
+        wants_onnx = target is not None and (
+            target.endswith(".onnx")
+            or any(p.startswith(target + "/") for p in onnx)
+            or target in _onnx.group_files(source.files)
         )
         has_safetensors = "model_index.json" in source.files or any(
             _safetensors.SHARD.sub("", p) in {"model.safetensors", "model.safetensors.index.json"}
             for p in source.files
         )
-        if format == "gguf" or (format is None and gguf and (wants_gguf or not has_safetensors)):
-            return await _estimate_gguf(
+        only_onnx = onnx and not any(p.endswith(".safetensors") for p in source.files) and not gguf
+        if format == "onnx" or (
+            format is None
+            and (
+                (wants_onnx and not wants_gguf)
+                or (only_onnx and not _safetensors.from_file_sizes(source.files, file))
+            )
+        ):
+            return await _estimate_onnx(
                 source,
                 file,
                 max_model_len,
@@ -464,12 +489,8 @@ async def arun(
                 gpu_memory,
                 gpu_memory_utilization,
             )
-        onnx = [p for p in source.files if p.endswith(".onnx")]
-        wants_onnx = file is not None and (
-            file.endswith(".onnx") or file.strip("/") in _onnx.group_files(source.files)
-        )
-        if format == "onnx" or (format is None and wants_onnx):
-            return await _estimate_onnx(
+        if format == "gguf" or (format is None and gguf and (wants_gguf or not has_safetensors)):
+            return await _estimate_gguf(
                 source,
                 file,
                 max_model_len,

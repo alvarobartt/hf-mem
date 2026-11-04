@@ -7,10 +7,12 @@ from helpers import (
     llama_config,
     llama_tensors,
     some,
+    write_gguf,
     write_json,
     write_onnx,
     write_safetensors,
 )
+from test_gguf import ARCH, TENSORS, TOKENIZER
 
 from hf_mem import _onnx
 
@@ -122,3 +124,51 @@ def test_invalid_onnx_files(tmp_path: Path) -> None:
     assert any("Skipping `model_fp16.onnx`" in w for w in result.warnings)
     with pytest.raises(RuntimeError, match="not a valid ONNX file"):
         estimate(str(tmp_path), file="model_fp16.onnx")
+
+
+def test_review_fixes(tmp_path: Path) -> None:
+    write_onnx(
+        str(tmp_path / "onnx" / "model_q4.onnx"),
+        [("w_quant", 2, [64, 2, 16]), ("emb_quant", 2, [100, 32])],
+        nodes=[
+            ("MatMulNBits", ["x", "w_quant", "scales"], 4),
+            ("GatherBlockQuantized", ["emb_quant", "ids"], 4),
+        ],
+    )
+    write_onnx(str(tmp_path / "onnx" / "model.onnx"), WEIGHTS, PAST)
+    write_json(str(tmp_path / "config.json"), llama_config(max_position_embeddings=64))
+
+    q4 = estimate(str(tmp_path), file="onnx/model_q4.onnx")
+    assert q4.weights.params == (64 * 2 * 16 + 100 * 32) * 2 and q4.weights.bytes == 64 * 2 * 16 + 100 * 32
+    result = listing(str(tmp_path))
+    assert result.to_dict()["format"] == "onnx"
+    with pytest.raises(RuntimeError, match="Multiple ONNX files"):
+        estimate(str(tmp_path), file="onnx")
+
+    write_gguf(str(tmp_path / "model-Q4_K_M.gguf"), {**ARCH, **TOKENIZER}, TENSORS)
+    assert estimate(str(tmp_path), file="onnx/model.onnx").format == "onnx"
+    assert estimate(str(tmp_path)).format == "gguf"
+
+    (tmp_path / "config.json").unlink()
+    no_length = estimate(str(tmp_path), file="onnx/model.onnx")
+    assert no_length.kv_cache is None and any("--max-model-len" in w for w in no_length.warnings)
+
+
+def test_decoder_with_past_and_encoder_caches(tmp_path: Path) -> None:
+    cross: list[tuple[str, int, list[int | str]]] = [
+        (f"past_key_values.0.{side}.{kind}", 1, ["batch", 2, f"{side}_sequence_length", 16])
+        for side in ("decoder", "encoder")
+        for kind in ("key", "value")
+    ]
+    write_onnx(str(tmp_path / "onnx" / "encoder_model.onnx"), WEIGHTS)
+    write_onnx(str(tmp_path / "onnx" / "decoder_model.onnx"), WEIGHTS)
+    write_onnx(str(tmp_path / "onnx" / "decoder_with_past_model.onnx"), WEIGHTS, cross)
+    write_json(
+        str(tmp_path / "config.json"), {**llama_config(max_position_embeddings=100), "max_source_positions": 10}
+    )
+
+    result = estimate(str(tmp_path))
+
+    assert result.file == "onnx/encoder_model+decoder_model+decoder_with_past_model"
+    per_token = 2 * 2 * 16 * 4
+    assert some(result.kv_cache).bytes == per_token * 100 + per_token * 10
