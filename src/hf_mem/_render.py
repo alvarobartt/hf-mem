@@ -136,7 +136,7 @@ def table(estimate: Estimate | Listing) -> str:
             title = heading(name if many else "MODEL", component) if many or kv else None
             if component.dtypes:
                 sections.append((title, _dtype_items(component, total)))
-            elif many:
+            elif many or kv:
                 sections.append(
                     (
                         title,
