@@ -1,6 +1,6 @@
 [project]
 name = "hf-mem"
-version = "0.6.0"
+version = "1.0.0"
 description = "A CLI to estimate inference memory requirements for Hugging Face models, written in Python."
 readme = "README.md"
 authors = [
@@ -24,12 +24,29 @@ build-backend = "uv_build"
 
 [dependency-groups]
 lint = [
+    "mypy>=1.18",
     "pre-commit>=4.5.1",
+    "pytest>=8",
     "ruff>=0.14.10",
+]
+test = [
+    "pytest>=8",
 ]
 
 [tool.uv.dependency-groups]
 lint = { requires-python = ">=3.11" }
+
+[tool.pytest.ini_options]
+pythonpath = ["tests"]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src", "tests"]
+mypy_path = ["tests"]
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
 
 [tool.ruff]
 line-length = 112

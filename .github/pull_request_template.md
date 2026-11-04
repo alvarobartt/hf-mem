@@ -4,5 +4,5 @@
 
 ---
 
-- [ ] I have read and followed the guidelines in [`CONTRIBUTING.md`](/CONTRIBUTING.md).
+- [ ] I have read and followed the contributing guidelines in the [`README.md`](/README.md#contributing).
 - [ ] This has been discussed over an issue or discussion.

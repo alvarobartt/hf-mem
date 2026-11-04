@@ -5,3 +5,11 @@ repos:
       - id: ruff-check
         args: [--fix, --select, "I"]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        pass_filenames: false
