@@ -3,6 +3,7 @@ import re
 import sys
 
 from hf_mem._version import __version__
+from hf_mem._weights import Weights
 from hf_mem.estimate import Estimate, Listing
 
 NAME_WIDTH = 14
@@ -97,7 +98,7 @@ def _titles(url: str, revision: str | None, file: str | None, kv: object) -> lis
     return titles
 
 
-def _dtype_items(weights, total: int) -> list[Item]:
+def _dtype_items(weights: Weights, total: int) -> list[Item]:
     width = max(len(f"{short(w.params)} PARAMS") for _, w in weights.sorted_dtypes())
     return [
         (
@@ -115,10 +116,11 @@ def table(estimate: Estimate | Listing) -> str:
         return _listing(estimate)
     total, kv, weights = estimate.total or 1, estimate.kv_cache, estimate.weights
     params = f"{short(weights.params)} PARAMS" if weights.params else "FROM FILE SIZES"
-    summary = f"{gib(estimate.total)} GiB ({params}{' + KV CACHE' if kv else ''})"
+    parts = [params] + (["KV CACHE"] if kv else []) + (["OVERHEAD"] if estimate.overhead else [])
+    summary = f"{gib(estimate.total)} GiB ({' + '.join(parts)})"
     sections: list[Section] = [(None, [("TOTAL MEMORY", summary, "REQUIREMENTS", 1.0)])]
 
-    def heading(name: str, w) -> str:
+    def heading(name: str, w: Weights) -> str:
         return (
             f"{name.upper()} ({short(w.params)} PARAMS, {gib(w.bytes)} GiB)"
             if w.params
@@ -156,6 +158,30 @@ def table(estimate: Estimate | Listing) -> str:
         sections.append(
             (title, [(kv.dtype, f"{gib(kv.bytes)} / {gib(total)} GiB", f"{tokens} TOKENS", kv.bytes / total)])
         )
+    if overhead := estimate.overhead:
+        items = [
+            (name, f"{gib(value)} / {gib(total)} GiB", "", value / total)
+            for name, value in (
+                ("ACTIVATIONS", overhead.activations),
+                ("ENCODER", overhead.encoder),
+                ("GRAPHS", overhead.graphs),
+                ("RUNTIME", overhead.runtime),
+            )
+            if value
+        ]
+        sections.append((f"OVERHEAD ({gib(overhead.bytes)} GiB)", items))
+    if fit := estimate.fit:
+        gpus = fit.gpus or 1
+        capacity = gpus * fit.gpu_memory
+        text = f"{gib(estimate.total)} / {gib(capacity)} GiB [{estimate.total / capacity:.0%}] ON {gpus} GPU"
+        text += "S" if gpus > 1 else ""
+        if kv and fit.max_model_len:
+            text += f", UP TO {fit.max_model_len} TOKENS"
+        if fit.fits and fit.needed and fit.needed < gpus:
+            verdict = f"FITS ON {fit.needed} GPU" + ("S" if fit.needed > 1 else "")
+        else:
+            verdict = "FITS" if fit.fits else f"⚠ NEEDS {fit.needed} GPUS" if fit.needed else "⚠ DOES NOT FIT"
+        sections[0][1].append(("GPU MEMORY", text, verdict, estimate.total / capacity))
     return _color(_draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH))
 
 
@@ -200,9 +226,21 @@ def markdown(estimate: Estimate | Listing) -> str:
         rows.append(
             f"| {label} | {gib(component.bytes)} GiB | {short(component.params) if component.params else '-'} |"
         )
-    if kv := estimate.kv_cache:
+    if cache := estimate.kv_cache:
         rows.append(
-            f"| KV cache ({kv.dtype}, {kv.max_model_len} tokens x {kv.batch_size}) | {gib(kv.bytes)} GiB | |"
+            f"| KV cache ({cache.dtype}, {cache.max_model_len} tokens x {cache.batch_size}) | {gib(cache.bytes)} GiB | |"
         )
+    if overhead := estimate.overhead:
+        parts = ", ".join(n for n, v in overhead.to_dict().items() if v and n != "bytes")
+        rows.append(f"| Overhead ({parts}) | {gib(overhead.bytes)} GiB | |")
     title = f"Memory estimate for {where}" + (f", file `{estimate.file}`" if estimate.file else "")
-    return "\n".join([title, "", *rows])
+    lines = [title, "", *rows]
+    if fit := estimate.fit:
+        gpus = f"{fit.gpus or 1} x {gib(fit.gpu_memory)} GiB"
+        verdict = f"Fits on {gpus}" if fit.fits else f"Does not fit on {gpus}"
+        if fit.needed and fit.needed != (fit.gpus or 1):
+            verdict += f", needs {fit.needed} GPU{'s' if fit.needed > 1 else ''}"
+        if estimate.kv_cache and fit.max_model_len:
+            verdict += f", up to {fit.max_model_len} tokens"
+        lines += ["", verdict + "."]
+    return "\n".join(lines)

@@ -3,7 +3,7 @@ from typing import Any
 from hf_mem._weights import Weights
 
 KV_CACHE_DTYPES = ["auto", "bfloat16", "float16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
-MAX_NUM_BATCHED_TOKENS = 4096
+MAX_NUM_BATCHED_TOKENS = 8192
 BLOCK_SIZE = 16
 
 _BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I8": 1}
@@ -30,13 +30,24 @@ _DEFAULTS = {
         "sliding_window": 4096,
         "sliding_window_pattern": 2,
         "max_position_embeddings": 8192,
+        "vocab_size": 256000,
     },
     "gemma3_text": {
         "head_dim": 256,
         "sliding_window": 4096,
         "sliding_window_pattern": 6,
         "max_position_embeddings": 131072,
+        "num_attention_heads": 8,
         "num_key_value_heads": 4,
+        "vocab_size": 262208,
+    },
+    "qwen2": {
+        "hidden_size": 4096,
+        "num_hidden_layers": 32,
+        "num_attention_heads": 32,
+        "num_key_value_heads": 32,
+        "max_position_embeddings": 32768,
+        "vocab_size": 151936,
     },
 }
 _TEXT_KEYS = ("text_config", "language_config", "llm_config", "lfm", "thinker_config", "talker_config")
@@ -59,7 +70,7 @@ _SLIDING = ("sliding", "local", "chunked", "swa")
 
 def normalize(config: dict[str, Any]) -> dict[str, Any]:
     config = {
-        **_DEFAULTS.get(config.get("model_type"), {}),
+        **_DEFAULTS.get(str(config.get("model_type")), {}),
         **{k: v for k, v in config.items() if v is not None},
     }
     for key, aliases in _ALIASES.items():
@@ -204,8 +215,23 @@ def _state(config: dict[str, Any], dtype_bytes: float) -> tuple[int, int]:
     return 0, 2
 
 
+def kv_heads(config: dict[str, Any]) -> int:
+    config = normalize(config)
+    if config.get("kv_lora_rank"):
+        return 1
+    return (
+        config.get("num_global_key_value_heads")
+        or config["num_key_value_heads"]
+        or config["num_attention_heads"]
+    )
+
+
 def kv_cache(
-    config: dict[str, Any], dtype: str, max_model_len: int, batch_size: int
+    config: dict[str, Any],
+    dtype: str,
+    max_model_len: int,
+    batch_size: int,
+    batched_tokens: int = MAX_NUM_BATCHED_TOKENS,
 ) -> tuple[int, dict[str, int]]:
     config = normalize(config)
     heads: int = config["num_attention_heads"]
@@ -225,7 +251,7 @@ def kv_cache(
     full, sliding, state = kinds.count("full"), kinds.count("sliding"), kinds.count("state")
     layers = {"full": full, "sliding": sliding, "state": state, "none": len(kinds) - full - sliding - state}
     window = config.get("sliding_window") or config.get("attention_chunk_size") or max_model_len
-    sliding_tokens = min(window - 1 + MAX_NUM_BATCHED_TOKENS, max_model_len)
+    sliding_tokens = min(window - 1 + 2 * batched_tokens, max_model_len)
     sliding_pages = _cdiv(sliding_tokens, BLOCK_SIZE) + (sliding_tokens < max_model_len)
     dtype_bytes = _BYTES.get(dtype, 2)
     token, full_token = int(width * dtype_bytes), int(full_width * dtype_bytes)

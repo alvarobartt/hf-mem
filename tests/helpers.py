@@ -2,8 +2,9 @@ import json
 import math
 import os
 import struct
-from typing import Any
+from typing import Any, TypeVar
 
+from hf_mem import Estimate, Listing, run
 from hf_mem._gguf import TYPES
 
 _BITS = {"F64": 64, "F32": 32, "F16": 16, "BF16": 16, "I64": 64, "I32": 32, "F8_E4M3": 8, "U8": 8, "I8": 8}
@@ -93,3 +94,81 @@ def llama_tensors(layers: int = 4) -> dict[str, tuple[str, list[int]]]:
         tensors[f"model.layers.{i}.mlp.up_proj.weight"] = ("BF16", [512, 256])
         tensors[f"model.layers.{i}.input_layernorm.weight"] = ("F32", [256])
     return tensors
+
+
+T = TypeVar("T")
+
+
+def some(value: T | None) -> T:
+    assert value is not None
+    return value
+
+
+def estimate(*args: Any, **kwargs: Any) -> Estimate:
+    result = run(*args, **kwargs)
+    assert isinstance(result, Estimate)
+    return result
+
+
+def listing(*args: Any, **kwargs: Any) -> Listing:
+    result = run(*args, **kwargs)
+    assert isinstance(result, Listing)
+    return result
+
+
+def _varint(value: int) -> bytes:
+    out = bytearray()
+    while True:
+        out.append((value & 0x7F) | (0x80 if value > 0x7F else 0))
+        value >>= 7
+        if not value:
+            return bytes(out)
+
+
+def _field(number: int, value: int | bytes) -> bytes:
+    if isinstance(value, int):
+        return _varint(number << 3) + _varint(value)
+    return _varint(number << 3 | 2) + _varint(len(value)) + value
+
+
+_ONNX_BITS = {1: 32, 2: 8, 7: 64, 10: 16, 16: 16, 22: 4}
+
+
+def write_onnx(
+    path: str,
+    initializers: list[tuple[str, int, list[int]]],
+    inputs: list[tuple[str, int, list[int | str]]] = [],
+    external: str | None = None,
+    nodes: list[tuple[str, list[str], int]] = [],
+) -> int:
+    graph, data = b"", 0
+    for op, names, bits in nodes:
+        attribute = _field(1, b"bits") + _field(3, bits)
+        graph += _field(
+            1, b"".join(_field(1, n.encode()) for n in names) + _field(4, op.encode()) + _field(5, attribute)
+        )
+    for name, dtype, dims in initializers:
+        size = -(-math.prod(dims) * _ONNX_BITS[dtype] // 8)
+        tensor = b"".join(_field(1, d) for d in dims) + _field(2, dtype) + _field(8, name.encode())
+        if external:
+            entries = [("location", external), ("offset", str(data)), ("length", str(size))]
+            tensor += b"".join(_field(13, _field(1, k.encode()) + _field(2, v.encode())) for k, v in entries)
+            tensor += _field(14, 1)
+        else:
+            tensor += _field(9, b"\0" * size)
+        graph += _field(5, tensor)
+        data += size
+    for name, dtype, shape_dims in inputs:
+        shape = b"".join(
+            _field(1, _field(1, d) if isinstance(d, int) else _field(2, d.encode())) for d in shape_dims
+        )
+        graph += _field(
+            11, _field(1, name.encode()) + _field(2, _field(1, _field(1, dtype) + _field(2, shape)))
+        )
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(_field(1, 8) + _field(7, graph))
+    if external:
+        with open(os.path.join(os.path.dirname(path), external), "wb") as f:
+            f.truncate(data)
+    return data

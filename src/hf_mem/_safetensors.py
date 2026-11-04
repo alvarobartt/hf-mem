@@ -7,14 +7,16 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
+from hf_mem._source import HubError
 from hf_mem._weights import Weights
 
 PROBE_SIZE = 100_000
+MAX_HEADER_SIZE = 100_000_000
 SHARD = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
 _MODEL_SHARD = re.compile(r"model-\d+-of-(\d+)\.safetensors")
 WEIGHT_EXTENSIONS = (".bin", ".pt", ".pth", ".ckpt", ".nemo")
 _EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
-POOL_MIN_FILES = 32
+POOL_MIN_FILES: int | None = None
 
 
 @dataclass
@@ -40,6 +42,8 @@ async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
     if len(head) < 8:
         raise RuntimeError(f"`{path}` is not a valid Safetensors file.")
     size = struct.unpack("<Q", head[:8])[0]
+    if size > MAX_HEADER_SIZE:
+        raise RuntimeError(f"`{path}` is not a valid Safetensors file.")
     if size + 8 > len(head):
         head += await source.read(path, len(head), size + 8)
     return head[8 : size + 8]
@@ -74,15 +78,13 @@ def _select(groups: dict[str, list[str]], file: str) -> dict[str, list[str]]:
     target = file.strip("/").removesuffix(".safetensors")
     target = SHARD.sub("", target + ".safetensors").removesuffix(".safetensors")
     return {
-        name: paths
-        for name, paths in groups.items()
-        if name == target or name.startswith(target + "/") or os.path.basename(name) == target
-    }
+        name: paths for name, paths in groups.items() if name == target or name.startswith(target + "/")
+    } or {name: paths for name, paths in groups.items() if os.path.basename(name) == target}
 
 
 def _complete(paths: list[str]) -> bool:
-    totals = {m.group(1) if (m := _MODEL_SHARD.fullmatch(p)) else None for p in paths}
-    return len(totals) == 1 and None not in totals and int(totals.pop()) == len(paths)
+    totals = {m.group(1) if (m := _MODEL_SHARD.fullmatch(p)) else "" for p in paths}
+    return len(totals) == 1 and "" not in totals and int(next(iter(totals))) == len(paths)
 
 
 async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[str, list[str]]:
@@ -114,7 +116,14 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
         paths = groups.get("model", [])
         if "model.safetensors.index.json" in files and not _complete(paths):
             index = await source.json("model.safetensors.index.json")
-            paths = sorted(set(index["weight_map"].values()))
+            indexed = sorted(set((index.get("weight_map") or {}).values())) or paths
+            paths = [p for p in indexed if p in files]
+            if len(paths) < len(indexed):
+                warnings.append(
+                    f"`model.safetensors.index.json` references {len(indexed) - len(paths)} files that are not in "
+                    "the repository, so the estimate only covers the uploaded `*.safetensors` files."
+                )
+                paths = paths or sorted(p for ps in groups.values() for p in ps)
         if "config_sentence_transformers.json" not in files:
             return {"Transformer": paths}
         components = {"0_Transformer": paths}
@@ -137,32 +146,41 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
 
 
 async def read_components(
-    source: Any, components: dict[str, list[str]]
+    source: Any, components: dict[str, list[str]], warnings: list[str] | None = None
 ) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]]]:
     paths = sorted({p for ps in components.values() for p in ps})
     semaphore, probe = asyncio.Semaphore(32), [PROBE_SIZE]
     summaries: dict[str, tuple[dict[str, list[int]], dict[tuple[int, str], list[int]]]] = {}
-    pool = _pool() if len(paths) >= POOL_MIN_FILES else None
+    pool = _pool() if POOL_MIN_FILES and len(paths) >= POOL_MIN_FILES else None
     loop = asyncio.get_running_loop()
 
     async def read(path: str) -> None:
         async with semaphore:
             raw = await read_header(source, path, probe[0])
-        probe[0] = max(probe[0], len(raw) + 8)
         try:
             summaries[path] = await loop.run_in_executor(pool, summarize, raw) if pool else summarize(raw)
-        except ValueError as e:
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
             raise RuntimeError(f"`{path}` is not a valid Safetensors file.") from e
+        probe[0] = max(probe[0], len(raw) + 8)
 
     try:
-        await asyncio.gather(*(read(p) for p in paths))
+        results = await asyncio.gather(*(read(p) for p in paths), return_exceptions=True)
     finally:
         if pool:
             pool.shutdown(cancel_futures=True)
+    failed = {p: r for p, r in zip(paths, results) if isinstance(r, BaseException)}
+    if failed:
+        error = next(iter(failed.values()))
+        broken = [name for name, ps in components.items() if any(p in failed for p in ps)]
+        if not isinstance(error, RuntimeError) or isinstance(error, HubError) or len(broken) == len(components):
+            raise error
+        components = {name: ps for name, ps in components.items() if name not in broken}
+        if warnings is not None:
+            warnings.append(f"Skipping {len(broken)} invalid `*.safetensors` files, e.g. {error}")
     weights: dict[str, Weights] = {}
     experts: dict[str, dict[int, Weights]] = {}
     for name, component_paths in components.items():
-        component, merged = Weights(), {}
+        component, merged = Weights(), dict[int, Weights]()
         for path in component_paths:
             dtypes, by_expert = summaries[path]
             for dtype, (params, nbytes) in dtypes.items():

@@ -4,6 +4,7 @@ import json
 import sys
 import time
 
+from hf_mem import _safetensors
 from hf_mem._config import KV_CACHE_DTYPES
 from hf_mem._gguf import KV_DTYPES
 from hf_mem._render import markdown, table
@@ -38,6 +39,7 @@ class _Status:
 
 
 def main() -> None:
+    _safetensors.POOL_MIN_FILES = 32
     parser = argparse.ArgumentParser(
         prog="hf-mem",
         description="Estimate the memory required to run a model from the Hugging Face Hub or a local path.",
@@ -48,7 +50,7 @@ def main() -> None:
     parser.add_argument(
         "--format",
         choices=FORMATS,
-        help="Weights format to estimate, defaults to Safetensors, then GGUF, then the weight file sizes.",
+        help="Weights format to estimate, defaults to Safetensors, then GGUF, then the weight file sizes, then ONNX.",
     )
     parser.add_argument("--max-model-len", type=int, help="Context length, defaults to the model config.")
     parser.add_argument(
@@ -58,7 +60,21 @@ def main() -> None:
         "--kv-cache-dtype",
         default="auto",
         help="KV cache dtype, `auto` uses the model dtype (Safetensors) or F16 (GGUF). "
-        f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(KV_DTYPES)}.",
+        f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(KV_DTYPES)}. ONNX: set by the graph.",
+    )
+    parser.add_argument(
+        "--gpu-memory", help="GPU memory in GiB, e.g. `80` or `8x80`, to check whether it fits."
+    )
+    parser.add_argument(
+        "--gpu-memory-utilization",
+        type=float,
+        default=0.92,
+        help="Fraction of the GPU memory that can be used, defaults to 0.92 (as vLLM).",
+    )
+    parser.add_argument(
+        "--max-num-batched-tokens",
+        type=int,
+        help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--json", action="store_true", help="Print JSON.")
@@ -66,8 +82,13 @@ def main() -> None:
     parser.add_argument("--version", action="version", version=f"hf-mem {__version__}")
     args = parser.parse_args()
 
-    if args.batch_size < 1 or (args.max_model_len is not None and args.max_model_len < 1):
-        parser.error("`--batch-size` and `--max-model-len` must be positive")
+    if args.batch_size < 1 or any(
+        v is not None and v < 1 for v in (args.max_model_len, args.max_num_batched_tokens)
+    ):
+        parser.error("`--batch-size`, `--max-model-len` and `--max-num-batched-tokens` must be positive")
+    if not 0 < args.gpu_memory_utilization <= 1:
+        parser.error("`--gpu-memory-utilization` must be in (0, 1]")
+
     status = _Status()
     try:
         result = asyncio.run(
@@ -79,6 +100,9 @@ def main() -> None:
                 batch_size=args.batch_size,
                 kv_cache_dtype=args.kv_cache_dtype,
                 hf_token=args.hf_token,
+                gpu_memory=args.gpu_memory,
+                gpu_memory_utilization=args.gpu_memory_utilization,
+                max_num_batched_tokens=args.max_num_batched_tokens,
                 progress=Progress(status),
                 format=args.format,
             )
