@@ -75,13 +75,10 @@ def test_markdown(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     assert "| **Total** |" in out and "| KV cache (BF16, 1024 tokens x 1) |" in out
 
 
-def test_legacy_flags(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
-    code, out, err = cli(
-        monkeypatch, capsys, "--model-id", model, "--experimental", "--json-output", "--details"
-    )
-    assert code == 0
-    assert json.loads(out)["kv_cache"] is not None
-    assert "--experimental" in err
+def test_removed_flags(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
+    for flag in ("--model-id", "--experimental", "--json-output", "--details", "--gguf-file"):
+        code, _, err = cli(monkeypatch, capsys, model, flag, "x")
+        assert code == 2 and "unrecognized arguments" in err
 
 
 def test_gguf_listing_table(
@@ -89,7 +86,7 @@ def test_gguf_listing_table(
 ) -> None:
     for quant in ("Q4_K_M", "Q8_0"):
         write_gguf(str(tmp_path / f"m-{quant}.gguf"), ARCH, TENSORS)
-    code, out, _ = cli(monkeypatch, capsys, str(tmp_path), "--gguf-file", "m-Q8_0.gguf", "--json")
+    code, out, _ = cli(monkeypatch, capsys, str(tmp_path), "--file", "m-Q8_0.gguf", "--json")
     assert code == 0 and json.loads(out)["file"] == "m-Q8_0.gguf"
     code, out, _ = cli(monkeypatch, capsys, str(tmp_path))
     assert code == 0 and "FILES" in out and "m-Q4_K_M.gguf" in out
