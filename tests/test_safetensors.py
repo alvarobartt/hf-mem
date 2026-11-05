@@ -330,3 +330,26 @@ def test_audio_tokenizers_are_added_as_components(tmp_path: Path) -> None:
 
     assert list(result.components) == ["Transformer", "audio_tokenizer"]
     assert result.weights.bytes == model + tokenizer and result.kv_cache is not None
+
+
+def test_engram_and_ngram_tables_are_offloaded_to_cpu(tmp_path: Path) -> None:
+    tensors = {
+        **llama_tensors(),
+        "layers.1.engram.embed.weight": ("F8_E4M3", [1000, 64]),
+        "layers.1.engram.embed.scale": ("F8_E4M3", [1000, 2]),
+        "layers.1.engram.wkv.weight": ("BF16", [64, 64]),
+        "model.layers.2.ple.ple_embedding.ngram_embedding.shard_0.weight": ("BF16", [500, 64]),
+    }
+    write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    result = estimate(str(tmp_path))
+
+    offloaded = some(result.offloaded)
+    assert offloaded.bytes == 1000 * 64 + 1000 * 2 + 500 * 64 * 2
+    assert "BF16" in result.weights.dtypes and result.weights.bytes == write_safetensors(
+        str(tmp_path / "gpu" / "model.safetensors"),
+        {**llama_tensors(), "layers.1.engram.wkv.weight": ("BF16", [64, 64])},
+    )
+    assert any("pinned host memory" in w for w in result.warnings)
+    assert result.to_dict()["offloaded"]["bytes"] == offloaded.bytes

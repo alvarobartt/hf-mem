@@ -117,10 +117,17 @@ def table(estimate: Estimate | Listing) -> str:
     if isinstance(estimate, Listing):
         return _listing(estimate)
     total, kv, weights = estimate.total or 1, estimate.kv_cache, estimate.weights
-    params = f"{short(weights.params)} PARAMS" if weights.params else "FROM FILE SIZES"
+    offloaded = estimate.offloaded
+    all_params = weights.params + (offloaded.params if offloaded else 0)
+    params = f"{short(all_params)} PARAMS" if weights.params else "FROM FILE SIZES"
     parts = [params] + (["KV CACHE"] if kv else []) + (["OVERHEAD"] if estimate.overhead else [])
     summary = f"{gib(estimate.total)} GiB ({' + '.join(parts)})"
     sections: list[Section] = [(None, [("TOTAL MEMORY", summary, "REQUIREMENTS", 1.0)])]
+    if offloaded:
+        cpu = f"{gib(offloaded.bytes)} GiB ({short(offloaded.params)} PARAMS OFFLOADED, NOT ON GPU)"
+        sections[0][1].append(
+            ("CPU MEMORY", cpu, "HOST MEMORY", offloaded.bytes / (estimate.total + offloaded.bytes))
+        )
 
     def heading(name: str, w: Weights) -> str:
         return (
@@ -231,6 +238,8 @@ def markdown(estimate: Estimate | Listing) -> str:
         rows.append(
             f"| {label} | {gib(component.bytes)} GiB | {short(component.params) if component.params else '-'} |"
         )
+    if offloaded := estimate.offloaded:
+        rows.append(f"| Offloaded to CPU memory | {gib(offloaded.bytes)} GiB | {short(offloaded.params)} |")
     if cache := estimate.kv_cache:
         rows.append(
             f"| KV cache ({cache.dtype}, {cache.max_model_len} tokens x {cache.batch_size}) | {gib(cache.bytes)} GiB | |"

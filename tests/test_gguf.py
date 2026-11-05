@@ -249,3 +249,18 @@ def test_listing_reads_architecture_keys_after_the_tokenizer(tmp_path: Path) -> 
     assert all(f.kv_cache for f in files)
     single = estimate(str(tmp_path), file="Q4_K_M", max_model_len=512)
     assert some(files[0].kv_cache).bytes == some(single.kv_cache).bytes
+
+
+def test_llama_cpp_keeps_the_token_embeddings_on_the_cpu(tmp_path: Path) -> None:
+    embd, q = ("token_embd.weight", 1, [256, 1000]), ("blk.0.attn_q.weight", 8, [256, 256])
+    write_gguf(
+        str(tmp_path / "untied" / "m.gguf"), {**ARCH, **TOKENIZER}, [embd, ("output.weight", 1, [256, 2000]), q]
+    )
+    write_gguf(str(tmp_path / "tied" / "m.gguf"), {**ARCH, **TOKENIZER}, [embd, q])
+    embd_bytes, output_bytes, q_bytes = 256 * 1000 * 2, 256 * 2000 * 2, 256 * 256 // 32 * 34
+
+    separate, tied = estimate(str(tmp_path / "untied")), estimate(str(tmp_path / "tied"))
+
+    assert some(separate.offloaded).bytes == some(tied.offloaded).bytes == embd_bytes
+    assert separate.weights.bytes == output_bytes + q_bytes
+    assert tied.weights.bytes == embd_bytes + q_bytes

@@ -1,4 +1,5 @@
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -211,6 +212,17 @@ class Fit:
         }
 
 
+def mxfp4_padding(experts: int, intermediate: int, hidden: int) -> Callable[[int], int]:
+    # vLLM rounds the MXFP4 expert shards up to its kernel tiles (128 intermediate, 256 hidden on Hopper)
+
+    def extra(n: int) -> int:
+        shard = max(1, intermediate // n)
+        factor = (-(-shard // 128) * 128 / shard) * (-(-hidden // 256) * 256 / hidden)
+        return int(experts * (factor - 1))
+
+    return extra
+
+
 def parse_gpu_memory(value: str) -> tuple[int | None, int]:
     count, sep, size = value.lower().removesuffix("gib").removesuffix("gb").rpartition("x")
     try:
@@ -233,22 +245,28 @@ def fit(
     utilization: float,
     kv_heads: int | None = None,
     context: int = 0,
+    padding: Callable[[int], int] | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
     usable = min(size * utilization, size - context) - (overhead - context)
+    base = weights
 
     def per_token(n: int) -> float:
         return kv_per_token * (max(1.0, n / kv_heads) if kv_heads else 1.0)
+
+    def padded(n: int) -> int:
+        return base + (padding(n) if padding else 0)
 
     needed = next(
         (
             n
             for n in (1, 2, 4, 8, 16, 32, 64)
-            if weights + kv_fixed + per_token(n) * max_model_len <= n * usable
+            if padded(n) + kv_fixed + per_token(n) * max_model_len <= n * usable
         ),
         None,
     )
     n = gpus or 1
+    weights = padded(n)
     budget = n * usable - weights - kv_fixed
     longest = math.floor(budget / per_token(n)) if kv_per_token > 0 and budget > 0 else 0
     required = weights + kv_fixed + per_token(n) * max_model_len + n * overhead

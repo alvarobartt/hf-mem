@@ -170,3 +170,62 @@ def test_global_attention_layers_use_their_own_kv_heads_and_head_dim() -> None:
     )
     size, _ = kv(config, length=131072)
     assert size == (131072 * 2 * 4 * 512 + 3 * sliding_tokens(1024, 131072) * 2 * 16 * 256) * 2
+
+
+def test_deepseek_v41_compressed_kv_cache() -> None:
+    config = {
+        "num_hidden_layers": 4,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 1,
+        "hidden_size": 64,
+        "kv_lora_rank": 512,
+        "sliding_window": 128,
+        "compress_ratios": [0, 2, 1, 0],
+        "kv_source_layer_ids": [1, 2],
+        "index_source_layer_ids": [1, 2],
+        "index_head_dim": 128,
+    }
+    size, layers = _config.kv_cache(config, "F8_E4M3", 4096, 1, batched_tokens=1024)
+    sliding = 4 * _config._cdiv(127 + 2048, 32) * 32 * _config.DSV4_RECORD
+    per_token = (_config.DSV4_RECORD + _config.DSV4_INDEX_RECORD) * 1.5
+    assert size == int(sliding + per_token * 4096)
+    assert layers["compressed"] == 2 and layers["sliding"] == 4
+    assert _config.kv_dtype(config, "auto", Weights(), []) == "F8_E4M3"
+
+
+def test_kimi_linear_attention_config() -> None:
+    config = {
+        "model_type": "kimi_linear",
+        "num_hidden_layers": 4,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 8,
+        "hidden_size": 64,
+        "kv_lora_rank": 32,
+        "qk_rope_head_dim": 8,
+        "linear_attn_config": {
+            "full_attn_layers": [4],
+            "kda_layers": [1, 2, 3],
+            "num_heads": 4,
+            "head_dim": 16,
+            "short_conv_kernel_size": 4,
+        },
+    }
+    assert _config.layer_kinds(_config.normalize(config)) == ["state", "state", "state", "full"]
+    size, layers = _config.kv_cache(config, "BF16", 1024, 1)
+    assert (layers["full"], layers["state"]) == (1, 3)
+
+
+def test_indexer_cache_only_on_indexer_layers() -> None:
+    base = {
+        "num_hidden_layers": 4,
+        "num_attention_heads": 8,
+        "hidden_size": 64,
+        "kv_lora_rank": 512,
+        "qk_rope_head_dim": 64,
+    }
+    plain = _config.kv_cache(base, "BF16", 1024, 1)[0]
+    every = _config.kv_cache({**base, "index_head_dim": 128}, "BF16", 1024, 1)[0]
+    some_layers = _config.kv_cache(
+        {**base, "index_head_dim": 128, "indexer_types": ["full", "shared", "shared", "full"]}, "BF16", 1024, 1
+    )[0]
+    assert every - plain == 4 * 1024 * 132 and some_layers - plain == 2 * 1024 * 132

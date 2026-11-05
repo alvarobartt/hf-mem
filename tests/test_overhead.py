@@ -183,3 +183,17 @@ def test_mmproj_encoder_matches_llama_cpp(metadata: dict[str, Any], mib: float) 
     assert abs(_overhead.mmproj_encoder(metadata) / (1 << 20) / mib - 1) < 0.05
     assert _overhead.llama_cpp(metadata).encoder == _overhead.mmproj_encoder(metadata)
     assert _overhead.llama_cpp().encoder == 0
+
+
+def test_mxfp4_experts_are_padded_to_the_vllm_tiles() -> None:
+    # gpt-oss-120b on 1 GPU (2880 -> 2944 intermediate, 2880 -> 3072 hidden) and DeepSeek-V4.1 on 8 GPUs (288 -> 384)
+    gpt_oss = _overhead.mxfp4_padding(100, 2880, 2880)
+    assert gpt_oss(1) == int(100 * (2944 / 2880 * 3072 / 2880 - 1))
+    deepseek = _overhead.mxfp4_padding(300, 2304, 5120)
+    assert 99 <= deepseek(8) <= 100 and deepseek(1) == 0
+    args: dict[str, Any] = dict(kv_fixed=0, kv_per_token=0, max_model_len=0, context_length=0, overhead=0)
+    plain = _overhead.fit(weights=60 * GIB, gpu_memory="64", utilization=1.0, **args)
+    padded = _overhead.fit(
+        weights=60 * GIB, gpu_memory="64", utilization=1.0, padding=lambda n: 8 * GIB, **args
+    )
+    assert plain.fits and not padded.fits and padded.required == 68 * GIB

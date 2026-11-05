@@ -5,6 +5,11 @@ from hf_mem._weights import Weights
 KV_CACHE_DTYPES = ["auto", "bfloat16", "float16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
 MAX_NUM_BATCHED_TOKENS = 8192
 BLOCK_SIZE = 16
+# DeepSeek-V4.1 in vLLM: packed FP8 (`fp8_ds_mla`) KV and indexer records per compressed token, fitted on vLLM 0.33
+DSV4_RECORD = 584
+DSV4_INDEX_RECORD = 148
+# FP8 indexer key scale of the DeepSeek-V3.2 and GLM-5 sparse attention indexers
+DSV4_INDEX_SCALE = 4
 
 _BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I8": 1}
 _TORCH = {
@@ -76,6 +81,25 @@ def normalize(config: dict[str, Any]) -> dict[str, Any]:
     for key, aliases in _ALIASES.items():
         if config.get(key) is None:
             config[key] = next((config[a] for a in aliases if isinstance(config.get(a), int)), None)
+    if isinstance(linear := config.get("linear_attn_config"), dict) and config.get("layer_types") is None:
+        full, heads, head_dim = (
+            set(linear.get("full_attn_layers") or []),
+            linear.get("num_heads"),
+            linear.get("head_dim"),
+        )
+        config["layer_types"] = [
+            "full_attention" if i + 1 in full else "linear_attention"
+            for i in range(config["num_hidden_layers"] or 0)
+        ]
+        for key, value in (
+            ("linear_num_value_heads", heads),
+            ("linear_num_key_heads", heads),
+            ("linear_key_head_dim", head_dim),
+            ("linear_value_head_dim", head_dim),
+            ("linear_conv_kernel_dim", linear.get("short_conv_kernel_size")),
+            ("mamba_ssm_dtype", "float32"),
+        ):
+            config.setdefault(key, value)
     if config["num_hidden_layers"] is None:
         layers = (
             config.get("layer_types")
@@ -147,6 +171,8 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
             f"`--kv-cache-dtype={requested}` is not a vLLM KV cache dtype, use one of {', '.join(KV_CACHE_DTYPES)}."
         )
 
+    if config.get("compress_ratios"):
+        return "F8_E4M3"
     quantization = config.get("quantization_config") or {}
     scheme = quantization.get("kv_cache_scheme") or {}
     if scheme.get("num_bits") == 8 or quantization.get("kv_cache_quant_algo") == "FP8":
@@ -226,6 +252,16 @@ def kv_heads(config: dict[str, Any]) -> int:
     )
 
 
+def _compressed(config: dict[str, Any], max_model_len: int, batched_tokens: int) -> tuple[int, dict[str, int]]:
+    ratios: list[int] = config["compress_ratios"]
+    sources: list[int] = config["kv_source_layer_ids"]
+    window = config.get("sliding_window") or 128
+    sliding = min(window - 1 + 2 * batched_tokens, max_model_len)
+    per_token = (DSV4_RECORD + DSV4_INDEX_RECORD) * sum(1 / ratios[i] for i in sources if ratios[i])
+    size = len(ratios) * _cdiv(sliding, 32) * 32 * DSV4_RECORD + per_token * max_model_len
+    return int(size), {"compressed": len(sources), "sliding": len(ratios), "full": 0, "state": 0, "none": 0}
+
+
 def kv_cache(
     config: dict[str, Any],
     dtype: str,
@@ -234,11 +270,14 @@ def kv_cache(
     batched_tokens: int = MAX_NUM_BATCHED_TOKENS,
 ) -> tuple[int, dict[str, int]]:
     config = normalize(config)
+    if config.get("compress_ratios") and config.get("kv_source_layer_ids") is not None:
+        size, counts = _compressed(config, max_model_len, batched_tokens)
+        return size * batch_size, counts
     heads: int = config["num_attention_heads"]
     kv_heads: int = config["num_key_value_heads"] or heads
     head_dim: int = config.get("head_dim") or (config["hidden_size"] or 0) // heads
     if rank := config.get("kv_lora_rank"):
-        width = full_width = rank + (config.get("qk_rope_head_dim") or 0) + (config.get("index_head_dim") or 0)
+        width = full_width = rank + (config.get("qk_rope_head_dim") or 0)
     else:
         width = 2 * kv_heads * head_dim
         full_width = (
@@ -247,6 +286,13 @@ def kv_cache(
             * (config.get("global_head_dim") or head_dim)
         )
 
+    indexer = 0
+    if index := config.get("index_head_dim"):
+        types = config.get("indexer_types")
+        indexed = types.count("full") if isinstance(types, list) else len(layer_kinds(config))
+        indexer = (
+            indexed * _cdiv(max_model_len, BLOCK_SIZE) * BLOCK_SIZE * (index + DSV4_INDEX_SCALE) * batch_size
+        )
     kinds = layer_kinds(config)
     full, sliding, state = kinds.count("full"), kinds.count("sliding"), kinds.count("state")
     layers = {"full": full, "sliding": sliding, "state": state, "none": len(kinds) - full - sliding - state}
@@ -257,14 +303,14 @@ def kv_cache(
     token, full_token = int(width * dtype_bytes), int(full_width * dtype_bytes)
     if not state:
         size = full * _cdiv(max_model_len, BLOCK_SIZE) * full_token + sliding * sliding_pages * token
-        return size * BLOCK_SIZE * batch_size, layers
+        return size * BLOCK_SIZE * batch_size + indexer, layers
 
     state_bytes, state_pages = _state(config, dtype_bytes)
     if not full + sliding:
-        return state * state_pages * state_bytes * batch_size, layers
+        return state * state_pages * state_bytes * batch_size + indexer, layers
     block = max(BLOCK_SIZE, _cdiv(_cdiv(state_bytes, token), BLOCK_SIZE) * BLOCK_SIZE)
     group = min(n for n in (full, sliding, state) if n)
     size = _cdiv(full, group) * _cdiv(max_model_len, block) * full_token
     size += _cdiv(sliding, group) * (_cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len)) * token
     size += _cdiv(state, group) * state_pages * token
-    return group * size * block * batch_size, layers
+    return group * size * block * batch_size + indexer, layers
