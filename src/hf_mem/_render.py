@@ -138,11 +138,12 @@ def table(estimate: Estimate | Listing) -> str:
         sections.append((experts, _dtype_items(moe.experts_total, total)))
     else:
         many = len(estimate.components) > 1
+        headed = many or kv is not None or estimate.overhead is not None
         for name, component in (estimate.components or {"MODEL": weights}).items():
-            title = heading(name if many else "MODEL", component) if many or kv else None
+            title = heading(name if many else "MODEL", component) if headed else None
             if component.dtypes:
                 sections.append((title, _dtype_items(component, total)))
-            elif many or kv:
+            elif headed:
                 sections.append(
                     (
                         title,

@@ -126,6 +126,52 @@ def test_sentence_transformers_adds_dense_modules(tmp_path: Path) -> None:
     assert result.kv_cache is None
 
 
+def test_encoder_overhead_follows_the_tei_warmup(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    config = {
+        "architectures": ["BertForMaskedLM"],
+        "hidden_size": 64,
+        "num_hidden_layers": 2,
+        "num_attention_heads": 4,
+        "intermediate_size": 128,
+        "vocab_size": 1000,
+    }
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path))
+    overhead = some(result.overhead)
+
+    assert overhead.activations == overhead.bytes == 16384 * (6 * 64 + 2 * 1000) * 2
+    assert result.kv_cache is None and result.total == result.weights.bytes + overhead.bytes
+    small = some(estimate(str(tmp_path), max_num_batched_tokens=512).overhead)
+    assert small.bytes == 512 * (6 * 64 + 2 * 1000) * 2
+    fit = estimate(str(tmp_path), gpu_memory="24")
+    assert some(fit.overhead).bytes == overhead.bytes and some(fit.fit).required == result.total
+
+
+def test_pooled_masked_lms_skip_the_vocabulary(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "1_Pooling/config.json"), {"pooling_mode_mean_tokens": True})
+    config = llama_config(architectures=["MPNetForMaskedLM"], num_key_value_heads=None, vocab_size=1000)
+    write_json(str(tmp_path / "config.json"), config)
+
+    assert some(estimate(str(tmp_path)).overhead).bytes == 16384 * (6 * 256 + 4 * 256) * 2
+
+
+def test_sentence_transformers_decoders_get_the_encoder_overhead(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "generation_config.json"), {})
+    config = llama_config(architectures=["Qwen3ForCausalLM"], hidden_act="silu", rms_norm_eps=1e-6)
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path))
+
+    assert result.kv_cache is None and not result.warnings
+    assert some(result.overhead).bytes == 16384 * (8 * 256 + 4 * 4 * 256) * 2
+
+
 def test_unindexed_files_are_separate_components(tmp_path: Path) -> None:
     write_safetensors(str(tmp_path / "flux-dev.safetensors"), {"w": ("BF16", [64, 64])})
     write_safetensors(str(tmp_path / "flux-schnell-00001-of-00002.safetensors"), {"a": ("BF16", [32])})

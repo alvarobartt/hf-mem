@@ -56,6 +56,51 @@ def test_encoder_patches() -> None:
     assert _overhead.encoder({}, {}) == 0
 
 
+BERT = {
+    "architectures": ["BertModel"],
+    "hidden_size": 768,
+    "num_attention_heads": 12,
+    "intermediate_size": 3072,
+    "vocab_size": 30522,
+    "hidden_act": "gelu",
+}
+
+
+def test_tei_warmup_keeps_six_hidden_states_in_post_norm_encoders() -> None:
+    # FlashBert keeps the embeddings, the layer input and output, the attention output and both outputs of the
+    # fused add + LayerNorm, plus the MLP output with the GELU fused into the cuBLASLt matmul, all in F16
+    assert _overhead.tei(BERT, {}, 16384) == _overhead.Overhead(16384 * (6 * 768 + 3072) * 2, 0, 0, 0, 0)
+    classifier = {**BERT, "architectures": ["BertForSequenceClassification"], "num_labels": 2}
+    assert _overhead.tei(classifier, {}, 16384) == _overhead.tei(BERT, {}, 16384)
+    # MoE experts only run over the tokens routed to them, so the dense layers set the peak
+    assert _overhead.tei({**BERT, "moe_top_k": 2}, {}, 16384) == _overhead.tei(BERT, {}, 16384)
+
+
+def test_tei_warmup_splade_head_keeps_the_logits_and_their_log() -> None:
+    masked = {**BERT, "architectures": ["BertForMaskedLM"]}
+    assert _overhead.tei(masked, {}, 512).activations == 512 * (6 * 768 + 2 * 30522) * 2
+    assert _overhead.tei(masked, {"1_Pooling/config.json": 1}, 512) == _overhead.tei(BERT, {}, 512)
+
+
+def test_tei_warmup_follows_gated_mlps_and_pre_norm_decoders() -> None:
+    qwen3 = {
+        "hidden_size": 1024,
+        "num_attention_heads": 16,
+        "num_key_value_heads": 8,
+        "head_dim": 128,
+        "intermediate_size": 3072,
+        "hidden_act": "silu",
+        "rms_norm_eps": 1e-6,
+    }
+    assert _overhead.tei(qwen3, {}, 1000).activations == 1000 * (8 * 1024 + 4 * 3072) * 2
+    narrow = {**qwen3, "intermediate_size": 512}
+    assert _overhead.tei(narrow, {}, 1000).activations == 1000 * (8 * 1024 + (16 + 2 * 8) * 128) * 2
+    modernbert = {**BERT, "model_type": "modernbert", "intermediate_size": 1152}
+    assert _overhead.tei(modernbert, {}, 1000).activations == 1000 * (6 * 768 + 4 * 1152) * 2
+    jina = {**BERT, "feed_forward_type": "geglu"}
+    assert _overhead.tei(jina, {}, 1000).activations == 1000 * (6 * 768 + 4 * 3072) * 2
+
+
 def test_batched_tokens_follow_the_gpu_size() -> None:
     assert _overhead.batched_tokens(None) == _overhead.batched_tokens("8x80") == 8192
     assert _overhead.batched_tokens("24") == 2048

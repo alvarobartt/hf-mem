@@ -135,6 +135,30 @@ def test_is_generative() -> None:
 
 
 @pytest.mark.parametrize(
+    "architectures, files, expected",
+    [
+        (["BertForMaskedLM"], {}, True),
+        (["XLMRobertaForSequenceClassification"], {}, True),
+        (["BertForTokenClassification"], {}, True),
+        (["BertModel"], {}, True),
+        (["Qwen3ForCausalLM"], {"config_sentence_transformers.json": 1, "generation_config.json": 1}, True),
+        (["LlamaForSequenceClassification"], {"generation_config.json": 1}, True),
+        (["LlamaModel"], {"generation_config.json": 1}, False),
+        (["LlamaForCausalLM"], {}, False),
+        (["Dinov2Model"], {"preprocessor_config.json": 1}, False),
+        (["Wav2Vec2ForSequenceClassification"], {"preprocessor_config.json": 1}, False),
+    ],
+)
+def test_is_text_encoder(architectures: list[str], files: dict[str, int], expected: bool) -> None:
+    assert _config.is_text_encoder(llama_config(architectures=architectures), files) is expected
+
+
+def test_is_text_encoder_needs_a_top_level_text_config() -> None:
+    clip = {"architectures": ["CLIPModel"], "text_config": llama_config()}
+    assert not _config.is_text_encoder(clip, {"config_sentence_transformers.json": 1})
+
+
+@pytest.mark.parametrize(
     "config, requested, expected",
     [
         ({"torch_dtype": "bfloat16"}, "auto", "BF16"),

@@ -4,7 +4,7 @@
 
 `hf-mem` estimates the memory required to run any model from the Hugging Face Hub, or from a local path, without downloading the weights. It reads the [Safetensors](https://github.com/huggingface/safetensors), [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) and [ONNX](https://onnx.ai) metadata via [HTTP Range requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Range_requests), and only depends on [`httpx2`](https://github.com/pydantic/httpx2).
 
-The estimate covers the model weights, the KV cache for generative models, and the runtime overhead of the inference engine (activations, encoder, graphs and runtime), for [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers), [Sentence Transformers](https://github.com/huggingface/sentence-transformers), GGUF and ONNX models (without the ONNX Runtime overhead).
+The estimate covers the model weights, the KV cache for generative models, and the runtime overhead of the inference engine (activations, encoder, graphs and runtime, or the warmup activations of [Text Embeddings Inference](https://github.com/huggingface/text-embeddings-inference) for encoder models), for [Transformers](https://github.com/huggingface/transformers), [Diffusers](https://github.com/huggingface/diffusers), [Sentence Transformers](https://github.com/huggingface/sentence-transformers), GGUF and ONNX models (without the ONNX Runtime overhead).
 
 ## Usage
 
@@ -39,6 +39,12 @@ uvx hf-mem google/embeddinggemma-2
 ```
 
 <img src="https://huggingface.co/datasets/alvarobartt/hf-mem/resolve/6079c94fcfeb6a8feb79a0c84883cc99fd08d915/sentence-transformers.png" />
+
+For encoder models, i.e. Sentence Transformers and Transformers models with a masked LM, sequence classification, token classification or question answering head (e.g. SPLADE, rerankers or NER models), the overhead is the peak of the warmup forward pass of [Text Embeddings Inference (TEI)](https://github.com/huggingface/text-embeddings-inference) over a batch of `--max-num-batched-tokens`, which defaults to 16384 tokens as TEI's `--max-batch-tokens`. The logits over the vocabulary are only included for masked LMs without a `1_Pooling` config, as TEI only computes them for SPLADE pooling.
+
+```bash
+uvx hf-mem BAAI/bge-reranker-v2-m3 --max-num-batched-tokens 32768
+```
 
 ### GGUF
 
@@ -117,7 +123,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 }
 ```
 
-- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
+- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` is `null` for non-generative models, and `overhead` for models that are neither generative nor text encoders (e.g. Diffusers pipelines or vision backbones).
 - `file`, `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
 - `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
 - `format` is `safetensors`, `gguf` or `onnx`.
@@ -152,8 +158,8 @@ hf extensions add alvarobartt/hf-mem
 
 - **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory.
 - **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus two batches of tokens in flight, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
-- **Overhead** is the memory an inference engine needs on top of the weights and the KV cache, per GPU, modeled on vLLM's memory profiling for Safetensors models and on llama.cpp's compute buffer and device context for GGUF models:
-  - `activations`: the peak of the dummy forward pass over the batched tokens and of the sampler over the vocabulary.
+- **Overhead** is the memory an inference engine needs on top of the weights and the KV cache, per GPU, modeled on vLLM's memory profiling for Safetensors models, on TEI's warmup for Safetensors encoder models, and on llama.cpp's compute buffer and device context for GGUF models:
+  - `activations`: the peak of the dummy forward pass over the batched tokens and of the sampler over the vocabulary. For encoder models, the hidden states kept by each layer (6 in post-norm encoders, 8 in pre-norm decoders) plus the largest of the QKV projection, the MLP and (for SPLADE) the logits over the vocabulary, for every batched token in F16, as in TEI's flash attention models.
   - `encoder`: the vision or audio encoder activations for the largest image or audio clip, from `config.json` and the processor configs, or from the `mmproj` metadata for GGUF, as llama.cpp grows it up to the largest image (4096 tokens for dynamic resolution encoders, `image_size` otherwise) and 30 seconds of audio.
   - `graphs`: the CUDA (or HIP) graphs captured for decoding, as estimated by vLLM before sizing the KV cache.
   - `runtime`: the device context, which vLLM keeps outside `--gpu-memory-utilization`, plus the attention, BLAS and collective communication workspaces.
@@ -166,6 +172,7 @@ The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4
 - The overhead has a median error of 10% against vLLM and lies between vLLM's reservation and SGLang's actual usage for most models (SGLang reserves a fixed share of the GPU instead), e.g. the longest context for Llama 3.1 8B on an L4 is 29,878 tokens against 30,048 in vLLM.
 - vLLM profiles the vision encoder with the largest video when it has more tokens than an image (e.g. Qwen2.5-VL reserves 3 to 7 GiB more at 32K to 64K tokens), and hf-mem warns about it.
 - The `mmproj` encoder buffer matches llama.cpp with the largest image within 5% for Gemma 3, Qwen2.5-VL, LFM3-VL, LFM2.5-VL, SmolVLM2, InternVL3, Pixtral and Ultravox, which can be up to 2x what llama.cpp reserves at startup.
+- The encoder overhead follows the tensors alive in TEI's flash attention models for its warmup batch, but it has not been fitted on TEI memory profiles yet and leaves out the CUDA context and the cuBLAS workspaces. TEI loads the weights in F16 too, so F32 checkpoints take half the weights shown, while models without flash attention in TEI (e.g. Gemma 3, DeBERTa-v2 or MPNet) or run with `--dtype float32` are padded and warm up with a single input instead.
 - Inference engines can repack or offload weights, e.g. vLLM pads the gpt-oss MXFP4 experts and keeps the per-layer embeddings of Qwen3.8-Flash-Next on the CPU, and SGLang loads the gpt-oss experts in BF16 on Hopper GPUs.
 
 ## References
