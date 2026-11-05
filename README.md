@@ -74,7 +74,7 @@ Safetensors weights are estimated first, then GGUF, and finally ONNX, while PyTo
 
 ### Does it fit?
 
-`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and adds to the summary the memory required on the given GPUs out of the usable memory, whether the model fits or how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account. Weights that the inference engine keeps in CPU memory (e.g. the DeepSeek-V4.1 Engram tables) are shown apart as `CPU MEMORY`, as they need that much free system memory instead.
+`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and adds to the summary the memory required on the given GPUs out of the usable memory, whether the model fits or how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account. Weights that the inference engine keeps in CPU memory (e.g. the DeepSeek-V4.1 Engram tables) are shown apart as `CPU MEMORY`, as they need that much free system memory instead. vLLM batches fewer tokens on A100s than on other GPUs with 80 GiB, so use `--max-num-batched-tokens 2048` there.
 
 ```bash
 uvx hf-mem meta-llama/Llama-3.1-8B-Instruct --max-model-len 32768 --gpu-memory 24
@@ -139,7 +139,7 @@ print(result.to_dict())
 
 ### Agents
 
-Coding agents can use `uvx hf-mem <model> -o json` to answer questions such as how much memory a model needs or whether it fits on a given GPU (adding `--gpu-memory`), choosing a single `--file` for GGUF and ONNX repositories since only one file is loaded for inference.
+Coding agents can use `uvx hf-mem <model> -o json` to answer questions such as how much memory a model needs or whether it fits on a given GPU (adding `--gpu-memory`), as described in the [`hf-mem` skill](skills/hf-mem/SKILL.md).
 
 ### Extensions
 
@@ -151,23 +151,21 @@ hf extensions add alvarobartt/hf-mem
 
 ## How it works
 
-- **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory, including the sub-models loaded next to the main model (e.g. the `audio_tokenizer` of speech models). Weights the engine keeps in CPU memory are shown apart and not in the GPU total: the Engram tables of DeepSeek-V4.1 and the n-gram embeddings of Qwen3.8-Flash-Next, which vLLM keeps in pinned host memory, and the token embeddings, which llama.cpp keeps on the CPU (with a GPU copy when tied to the output). With `--gpu-memory`, the MXFP4 experts are padded per GPU to vLLM's kernel tiles (e.g. +33% for DeepSeek-V4.1 on 8 GPUs).
-- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus two batches of tokens in flight, Multi-head Latent Attention (MLA) caches the compressed latent (plus the FP8 indexer keys of DeepSeek-V3.2 and GLM-5 on the layers with their own indexer), DeepSeek-V4.1 caches its compressed and sliding window records as vLLM does, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
-- **Overhead** is the memory an inference engine needs on top of the weights and the KV cache, per GPU, modeled on vLLM's memory profiling for Safetensors models and on llama.cpp's compute buffer and device context for GGUF models:
-  - `activations`: the peak of the dummy forward pass over the batched tokens and of the sampler over the vocabulary.
-  - `encoder`: the vision or audio encoder activations for the largest image or audio clip, from `config.json` and the processor configs, or from the `mmproj` metadata for GGUF, as llama.cpp grows it up to the largest image (4096 tokens for dynamic resolution encoders, `image_size` otherwise) and 30 seconds of audio.
-  - `graphs`: the CUDA (or HIP) graphs captured for decoding, as estimated by vLLM before sizing the KV cache.
-  - `runtime`: the device context, which vLLM keeps outside `--gpu-memory-utilization`, plus the attention, BLAS and collective communication workspaces.
+`hf-mem` only reads the metadata of the weight files (the Safetensors headers, the GGUF metadata or the ONNX graph) with HTTP Range requests, and adds up the memory an inference engine needs on the GPU:
 
-  vLLM picks its batching by GPU memory, not architecture: 16384 batched tokens on GPUs with 160 GiB or more (e.g. B200, MI300X), 8192 tokens on GPUs with 70 GiB or more (e.g. H100, H200), and 2048 tokens with 256 sequences on smaller GPUs and on A100s, which are excluded by name. hf-mem follows `--gpu-memory`, or `--max-num-batched-tokens` (e.g. 2048 on A100). With the same batching, only the graphs differ between architectures (up to 0.5 GiB more on Hopper than on Ampere).
+- **Weights**: the exact size of every tensor, per dtype and component. Weights that the engine keeps in CPU memory are reported apart, as vLLM does with the DeepSeek-V4.1 Engram tables and llama.cpp with the token embeddings.
+- **KV cache**: what the engine allocates for `--max-model-len` tokens and `--batch-size` sequences, following the model's attention: full attention caches every token, sliding window layers only the window, latent and compressed attention (e.g. DeepSeek, GLM) a smaller record per token, and linear attention or Mamba layers a fixed state per sequence.
+- **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, the CUDA graphs, and the runtime (the CUDA context and library workspaces).
 
-The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4, A10G, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs), with llama.cpp, and with Diffusers and Sentence Transformers, on 40+ LLMs, MoEs, hybrid, vision, audio and omni models. AMD GPUs go through the same memory profiling, batching and graph capture in vLLM on ROCm, so the same estimate applies, but it has not been validated there and the device context and workspaces may differ.
+The KV cache and the overhead follow vLLM for Safetensors models and llama.cpp for GGUF models, as validated on NVIDIA T4 to H200 GPUs with vLLM 0.33, SGLang 0.5 and llama.cpp on 50+ models: the KV cache matches vLLM exactly for most architectures (within 3% for DeepSeek-V4.1, Kimi Linear and Qwen3.8-Flash-Next), the overhead is within 10% of vLLM's on median, and the vision and audio encoders of GGUF models are within 5% of llama.cpp's.
 
-- The KV cache per request matches vLLM exactly for Llama 3, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), GLM-5.3 (MLA with sparse indexers), Gemma 3 and Gemma 4 (sliding window), gpt-oss, Qwen3.5 (linear attention) and Nemotron-H (Mamba), and within 3% for DeepSeek-V4.1 (compressed attention), Kimi Linear (KDA) and Qwen3.8-Flash-Next, from 32K to 512K tokens on 8 x H200, and the KV cache per token matches SGLang.
-- The overhead has a median error of 10% against vLLM and lies between vLLM's reservation and SGLang's actual usage for most models (SGLang reserves a fixed share of the GPU instead), e.g. the longest context for Llama 3.1 8B on an L4 is 29,878 tokens against 30,048 in vLLM.
-- vLLM profiles the vision encoder with the largest video when it has more tokens than an image (e.g. Qwen2.5-VL reserves 3 to 7 GiB more at 32K to 64K tokens), and hf-mem warns about it.
-- The `mmproj` encoder buffer matches llama.cpp with the largest image within 5% for Gemma 3, Qwen2.5-VL, LFM3-VL, LFM2.5-VL, SmolVLM2, InternVL3, Pixtral and Ultravox, which can be up to 2x what llama.cpp reserves at startup.
-- The weights per GPU match vLLM within 5% for DeepSeek-V4.1 (with 189 GiB of Engram tables in host memory), GLM-5.3, Qwen3.8-Flash-Next, Kimi Linear and gpt-oss, and the token embeddings in CPU memory match llama.cpp exactly. SGLang loads the gpt-oss experts in BF16 on Hopper GPUs instead.
+## Limitations
+
+- The estimates follow vLLM and llama.cpp with their default settings, so other engines (e.g. SGLang, which reserves a fixed share of the GPU instead) and non-default settings use different amounts of memory.
+- ONNX models have no overhead estimate, and GGUF and ONNX listings estimate each file from its size, so a single file (`:<quantization>` or `--file`) gives the most accurate numbers.
+- vLLM profiles the vision encoder of some models (e.g. Qwen2.5-VL) with a video when it has more tokens than an image, which can reserve a few GiB more (`hf-mem` warns about it).
+- PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, and encoder-decoder models (e.g. Whisper) have no KV cache estimate.
+- AMD and NVIDIA Blackwell GPUs go through the same accounting in vLLM, but have not been validated.
 
 ## References
 
