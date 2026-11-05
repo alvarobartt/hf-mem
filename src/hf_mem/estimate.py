@@ -376,9 +376,7 @@ async def _estimate_safetensors(
         )
     if config and _config.is_text_encoder(config, files):
         estimate.overhead = _overhead.tei(
-            _config.normalize(config),
-            max_num_batched_tokens or _overhead.TEI_BATCHED_TOKENS,
-            _config.activation_bytes(config, weights),
+            _config.normalize(config), files, max_num_batched_tokens or _overhead.TEI_BATCHED_TOKENS
         )
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate

@@ -47,6 +47,7 @@ _PROFILES = {
     },
 }
 _GATED = ("silu", "swiglu", "swish")
+_GLU = ("modernbert", "new", "gte", "gemma3_text")
 
 
 @dataclass
@@ -151,25 +152,34 @@ def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_b
     return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]) + context, context)
 
 
-def tei(config: dict[str, Any], tokens: int, dtype_bytes: int) -> Overhead:
-    # Peak of TEI's warmup forward pass for encoder models: the residual stream plus the largest transient, i.e.
-    # the QKV projection, the MLP, or the logits over the vocabulary for every token of masked LMs (e.g. SPLADE).
-    # Pooled heads (embeddings, sequence classifiers) and per-token labels are far smaller than the attention.
+def tei(config: dict[str, Any], files: Any, tokens: int) -> Overhead:
+    # Peak of TEI's warmup on GPUs, which only runs the flash attention models in F16: the hidden states alive in a
+    # layer (6 in post-norm encoders, which keep the embeddings, 8 in pre-norm decoders with a fused add + RMSNorm)
+    # plus the largest transient, i.e. the QKV projection, the MLP (the GLU output, activation and product when
+    # gated, the GELU is fused into the matmul otherwise) or the SPLADE logits and their log. Pooled heads are far
+    # smaller, and MoE experts only run over their routed tokens.
     hidden = config.get("hidden_size") or 0
     heads = config.get("num_attention_heads") or 1
     kv_heads = config.get("num_key_value_heads") or heads
     head_dim = config.get("head_dim") or hidden // heads
     inter = config.get("intermediate_size") or config.get("n_inner") or 4 * hidden
-    if experts := config.get("num_experts_per_tok") or config.get("moe_top_k"):
-        inter = (config.get("moe_intermediate_size") or inter) * experts
-    gated = any(a in str(config.get("hidden_act") or config.get("activation_function") or "") for a in _GATED)
-    masked = any(str(a).endswith("ForMaskedLM") for a in config.get("architectures") or [])
+    act = str(config.get("hidden_act") or config.get("activation_function") or "")
+    gated = (
+        any(a in act for a in _GATED)
+        or config.get("model_type") in _GLU
+        or "glu" in str(config.get("feed_forward_type") or "")
+    )
+    # SPLADE pooling needs a masked LM, while Sentence Transformers pooling skips the vocabulary
+    splade = "1_Pooling/config.json" not in files and any(
+        str(a).endswith("ForMaskedLM") for a in config.get("architectures") or []
+    )
     transient = max(
         (heads + 2 * kv_heads) * head_dim,
-        (3 if gated else 2) * inter,
-        (config.get("vocab_size") or 0) if masked else 0,
+        (4 if gated else 1) * inter,
+        2 * (config.get("vocab_size") or 0) if splade else 0,
     )
-    return Overhead(tokens * (hidden + transient) * dtype_bytes, 0, 0, 0, 0)
+    states = 8 if config.get("rms_norm_eps") else 6
+    return Overhead(tokens * (states * hidden + transient) * 2, 0, 0, 0, 0)
 
 
 def _clip_bytes(positions: int, hidden: int, ffn: int | None, gated: bool) -> int:

@@ -158,16 +158,6 @@ def test_is_text_encoder_needs_a_top_level_text_config() -> None:
     assert not _config.is_text_encoder(clip, {"config_sentence_transformers.json": 1})
 
 
-def test_activation_bytes_use_the_model_dtype() -> None:
-    weights, quantized = Weights(), Weights()
-    weights.add("F32", 10, 40)
-    quantized.add("BF16", 10, 20)
-    quantized.add("F8_E4M3", 100, 100)
-    assert _config.activation_bytes({"torch_dtype": "float16"}, weights) == 2
-    assert _config.activation_bytes({}, weights) == 4
-    assert _config.activation_bytes({"torch_dtype": "float8_e4m3fn"}, quantized) == 2
-
-
 @pytest.mark.parametrize(
     "config, requested, expected",
     [

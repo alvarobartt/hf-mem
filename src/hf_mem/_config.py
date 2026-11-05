@@ -7,7 +7,6 @@ MAX_NUM_BATCHED_TOKENS = 8192
 BLOCK_SIZE = 16
 
 _BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I8": 1}
-_FLOATS = ("BF16", "F16", "F32")
 _TORCH = {
     "float32": "F32",
     "float": "F32",
@@ -176,23 +175,13 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
     if isinstance(dtype, str):
         return _TORCH.get(dtype.removeprefix("torch."), "F16")
 
-    dtype = _dominant_dtype(weights)
+    counts = {d: w.params for d, w in weights.dtypes.items() if d in {"BF16", "F16", "F32"}}
+    dtype = max(counts, key=counts.__getitem__) if counts else "BF16"
     warnings.append(
         f"The KV cache dtype could not be inferred from `config.json`, so it defaults to {dtype}, set "
         "`--kv-cache-dtype` to override it."
     )
     return dtype
-
-
-def _dominant_dtype(weights: Weights) -> str:
-    counts = {d: w.params for d, w in weights.dtypes.items() if d in _FLOATS}
-    return max(counts, key=counts.__getitem__) if counts else "BF16"
-
-
-def activation_bytes(config: dict[str, Any], weights: Weights) -> int:
-    # The model dtype, as the weights are reported, else the dominant 16/32-bit dtype of the (quantized) weights.
-    dtype = _TORCH.get(str(config.get("torch_dtype") or config.get("dtype") or "").removeprefix("torch."))
-    return _BYTES[dtype if dtype in _FLOATS else _dominant_dtype(weights)]
 
 
 def layer_kinds(config: dict[str, Any]) -> list[str]:
