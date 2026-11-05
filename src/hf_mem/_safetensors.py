@@ -14,6 +14,12 @@ PROBE_SIZE = 100_000
 MAX_HEADER_SIZE = 100_000_000
 SHARD = re.compile(r"-\d+-of-\d+(?=\.safetensors$)")
 _MODEL_SHARD = re.compile(r"model-\d+-of-(\d+)\.safetensors")
+# Embedding tables vLLM keeps in pinned host memory (`EngramConfig.cpu_offload`, on by default): the DeepSeek-V4.1
+# Engram tables and the Qwen3.8 / Qwen4Exp per-layer n-gram embeddings
+OFFLOADED = re.compile(
+    r"(?:\.engram\.embed\.(?:weight|scale)|engram_tables\.\d+\.(?:weight|weight_scale_inv)"
+    r"|\.ngram_embedding\.shard_\d+\.weight)$"
+)
 _EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
 POOL_MIN_FILES: int | None = None
 # Sub-models loaded next to the main model, e.g. the audio tokenizer that decodes the generated speech
@@ -50,22 +56,26 @@ async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
     return head[8 : size + 8]
 
 
-def summarize(raw: bytes) -> tuple[dict[str, list[int]], dict[tuple[int, str], list[int]]]:
+Summary = tuple[dict[str, list[int]], dict[tuple[int, str], list[int]], dict[str, list[int]]]
+
+
+def summarize(raw: bytes) -> Summary:
     dtypes: dict[str, list[int]] = {}
     experts: dict[tuple[int, str], list[int]] = {}
+    offloaded: dict[str, list[int]] = {}
     for tensor, info in json.loads(raw).items():
         if tensor == "__metadata__":
             continue
         start, end = info["data_offsets"]
         params, dtype = math.prod(info["shape"]), info["dtype"]
-        entry = dtypes.setdefault(dtype, [0, 0])
+        entry = (offloaded if OFFLOADED.search(tensor) else dtypes).setdefault(dtype, [0, 0])
         entry[0] += params
         entry[1] += end - start
         if "expert" in tensor and (match := _EXPERT.search(tensor)):
             entry = experts.setdefault((int(match.group(1)), dtype), [0, 0])
             entry[0] += params
             entry[1] += end - start
-    return dtypes, experts
+    return dtypes, experts, offloaded
 
 
 def _groups(paths: list[str]) -> dict[str, list[str]]:
@@ -155,10 +165,10 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
 
 async def read_components(
     source: Any, components: dict[str, list[str]], warnings: list[str] | None = None
-) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]]]:
+) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]], Weights]:
     paths = sorted({p for ps in components.values() for p in ps})
     semaphore, probe = asyncio.Semaphore(32), [PROBE_SIZE]
-    summaries: dict[str, tuple[dict[str, list[int]], dict[tuple[int, str], list[int]]]] = {}
+    summaries: dict[str, Summary] = {}
     pool = _pool() if POOL_MIN_FILES and len(paths) >= POOL_MIN_FILES else None
     loop = asyncio.get_running_loop()
 
@@ -187,16 +197,19 @@ async def read_components(
             warnings.append(f"Skipping {len(broken)} invalid `*.safetensors` files, e.g. {error}")
     weights: dict[str, Weights] = {}
     experts: dict[str, dict[int, Weights]] = {}
+    offloaded = Weights()
     for name, component_paths in components.items():
         component, merged = Weights(), dict[int, Weights]()
         for path in component_paths:
-            dtypes, by_expert = summaries[path]
+            dtypes, by_expert, cpu = summaries[path]
             for dtype, (params, nbytes) in dtypes.items():
                 component.add(dtype, params, nbytes)
             for (expert, dtype), (params, nbytes) in by_expert.items():
                 merged.setdefault(expert, Weights()).add(dtype, params, nbytes)
+            for dtype, (params, nbytes) in cpu.items():
+                offloaded.add(dtype, params, nbytes)
         weights[name], experts[name] = component, merged
-    return weights, experts
+    return weights, experts, offloaded
 
 
 def _pool() -> Any:

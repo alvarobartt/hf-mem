@@ -53,6 +53,7 @@ def test_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str
         "format",
         "total",
         "weights",
+        "offloaded",
         "components",
         "kv_cache",
         "overhead",

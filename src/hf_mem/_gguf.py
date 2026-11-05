@@ -3,7 +3,7 @@ import math
 import os
 import re
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from hf_mem._weights import Weights, choices
@@ -118,6 +118,7 @@ class Header:
     metadata: dict[str, Any]
     weights: Weights
     data_start: int
+    offloaded: Weights = field(default_factory=Weights)
 
 
 def _metadata(buf: bytes, prefix: bool = False, partial: bool = False) -> tuple[dict[str, Any], int, int, bool]:
@@ -143,28 +144,35 @@ def _metadata(buf: bytes, prefix: bool = False, partial: bool = False) -> tuple[
 
 def parse_header(buf: bytes, file_size: int) -> Header:
     metadata, offset, tensor_count, _ = _metadata(buf)
-    tensors = []
+    tensors, names = [], set()
     for _ in range(tensor_count):
-        _, offset = _value(buf, offset, 8, False)
+        tensor, offset = _value(buf, offset, 8, True)
+        names.add(tensor)
         (dims,) = _unpack("<I", buf, offset)
         shape = _unpack(f"<{dims}Q", buf, offset + 4)
         offset += 4 + 8 * dims
         kind, data_offset = _unpack("<IQ", buf, offset)
         offset += 12
-        tensors.append((data_offset, kind, math.prod(shape)))
+        tensors.append((data_offset, kind, math.prod(shape), tensor))
 
     alignment = metadata.get("general.alignment", 32)
     data_start = -(-offset // alignment) * alignment
     tensors.sort()
     ends = [t[0] for t in tensors[1:]] + [file_size - data_start]
-    weights = Weights()
-    for (start, kind, params), end in zip(tensors, ends):
-        if kind in TYPES:
-            name, block, size = TYPES[kind]
-            weights.add(name, params, -(-params // block) * size)
-        else:
-            weights.add(f"TYPE_{kind}", params, end - start)
-    return Header(metadata, weights, data_start)
+    weights, offloaded = Weights(), Weights()
+    for (start, kind, params, tensor), end in zip(tensors, ends):
+        name, nbytes = (
+            (TYPES[kind][0], -(-params // TYPES[kind][1]) * TYPES[kind][2])
+            if kind in TYPES
+            else (f"TYPE_{kind}", end - start)
+        )
+        # llama.cpp keeps the token embeddings in host memory, and a copy on the GPU when tied to the output
+        if tensor == "token_embd.weight":
+            offloaded.add(name, params, nbytes)
+            if "output.weight" in names:
+                continue
+        weights.add(name, params, nbytes)
+    return Header(metadata, weights, data_start, offloaded)
 
 
 async def read_header(source: Any, path: str) -> Header:
@@ -334,7 +342,8 @@ def kv_cache(
 
 async def read_group(source: Any, paths: list[str]) -> Header:
     headers = await asyncio.gather(*(read_header(source, p) for p in paths))
-    weights = Weights()
+    weights, offloaded = Weights(), Weights()
     for header in headers:
         weights.merge(header.weights)
-    return Header(headers[0].metadata, weights, headers[0].data_start)
+        offloaded.merge(header.offloaded)
+    return Header(headers[0].metadata, weights, headers[0].data_start, offloaded)

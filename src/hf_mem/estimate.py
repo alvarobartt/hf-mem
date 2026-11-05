@@ -1,5 +1,6 @@
 import asyncio
 import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -37,6 +38,7 @@ class Estimate:
     format: str
     weights: Weights
     components: dict[str, Weights] = field(default_factory=dict)
+    offloaded: Weights | None = None
     kv_cache: KVCache | None = None
     moe: _safetensors.MoE | None = None
     overhead: _overhead.Overhead | None = None
@@ -59,6 +61,7 @@ class Estimate:
         out["format"] = self.format
         out["total"] = self.total
         out["weights"] = self.weights.to_dict()
+        out["offloaded"] = self.offloaded.to_dict() if self.offloaded else None
         out["components"] = (
             {name: w.to_dict() for name, w in self.components.items()} if len(self.components) > 1 else None
         )
@@ -127,6 +130,7 @@ def _fit(
     gpu_memory: str | None,
     utilization: float,
     kv_heads: int | None = None,
+    padding: Callable[[int], int] | None = None,
 ) -> None:
     if gpu_memory is None:
         return
@@ -142,7 +146,21 @@ def _fit(
         utilization=utilization,
         kv_heads=kv_heads,
         context=estimate.overhead.context if estimate.overhead else 0,
+        padding=padding,
     )
+
+
+def _mxfp4_padding(
+    config: dict[str, Any], text: dict[str, Any], weights: Weights
+) -> Callable[[int], int] | None:
+    quantization = config.get("quantization_config") or text.get("quantization_config") or {}
+    if quantization.get("quant_method") != "mxfp4" and quantization.get("expert_dtype") != "fp4":
+        return None
+    experts = sum(weights.dtypes[d].bytes for d in ("U8", "I8", "F8_E8M0") if d in weights.dtypes)
+    intermediate = text.get("moe_intermediate_size") or text.get("intermediate_size") or 0
+    if not experts or not intermediate or not text.get("hidden_size"):
+        return None
+    return _overhead.mxfp4_padding(experts, intermediate, text["hidden_size"])
 
 
 async def _estimate_gguf(
@@ -175,6 +193,7 @@ async def _estimate_gguf(
             file=name,
             weights=Weights().merge(header.weights).merge(extra[0].weights) if extra else header.weights,
             components=components,
+            offloaded=header.offloaded if header.offloaded.bytes else None,
             kv_cache=kv[0] if kv else None,
             overhead=_overhead.llama_cpp(extra[0].metadata if extra else None) if kv else None,
             warnings=warnings,
@@ -338,7 +357,7 @@ async def _estimate_safetensors(
         selected = await _safetensors.discover(source, file, warnings)
         if not selected:
             return None
-        components, experts = await _safetensors.read_components(source, selected, warnings)
+        components, experts, offloaded = await _safetensors.read_components(source, selected, warnings)
         try:
             config = await config_task if config_task else {}
         except (RuntimeError, ValueError) as e:
@@ -365,9 +384,15 @@ async def _estimate_safetensors(
         format="safetensors",
         weights=weights,
         components=components,
+        offloaded=offloaded if offloaded.bytes else None,
         file=file,
         warnings=warnings,
     )
+    if offloaded.bytes:
+        warnings.append(
+            f"vLLM keeps the {offloaded.bytes / _overhead.GIB:.2f} GiB of embedding tables (Engram or n-gram embeddings) "
+            "in pinned host memory, so they are not in the GPU total but need that much free CPU memory."
+        )
 
     if not config and "params.json" in files:
         warnings.append(
@@ -438,6 +463,7 @@ async def _estimate_safetensors(
         gpu_memory,
         utilization,
         _config.kv_heads(text),
+        _mxfp4_padding(config, text, weights),
     )
     return estimate
 

@@ -108,6 +108,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
   "format": "safetensors",
   "total": 27343113879,
   "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
+  "offloaded": null,
   "components": null,
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
   "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628},
@@ -118,7 +119,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 ```
 
 - `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
-- `file`, `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
+- `file`, `offloaded` (weights in CPU memory, not in `total`), `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
 - `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
 - `format` is `safetensors`, `gguf` or `onnx`.
 - GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
@@ -150,8 +151,8 @@ hf extensions add alvarobartt/hf-mem
 
 ## How it works
 
-- **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory.
-- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus two batches of tokens in flight, Multi-head Latent Attention (MLA) caches the compressed latent, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
+- **Weights** are the tensor sizes from the Safetensors headers (or the GGUF tensor infos), per dtype and per component, so they match what is loaded in memory. Weights the engine keeps in CPU memory are shown apart and not in the GPU total: the Engram tables of DeepSeek-V4.1 and the n-gram embeddings of Qwen3.8-Flash-Next, which vLLM keeps in pinned host memory, and the token embeddings, which llama.cpp keeps on the CPU (with a GPU copy when tied to the output). With `--gpu-memory`, the MXFP4 experts are padded per GPU to vLLM's kernel tiles (e.g. +33% for DeepSeek-V4.1 on 8 GPUs).
+- **KV cache** follows vLLM's allocation for Safetensors models: full attention layers hold `max_model_len` tokens, sliding window layers `sliding_window` plus two batches of tokens in flight, Multi-head Latent Attention (MLA) caches the compressed latent (plus the FP8 indexer keys of DeepSeek-V3.2 and GLM-5 on the layers with their own indexer), DeepSeek-V4.1 caches its compressed and sliding window records as vLLM does, and the state of Mamba, linear attention and convolution layers is a constant per sequence. GGUF follows llama.cpp, i.e. sliding window layers hold `sliding_window + 512` tokens and the recurrent state is stored in FP32.
 - **Overhead** is the memory an inference engine needs on top of the weights and the KV cache, per GPU, modeled on vLLM's memory profiling for Safetensors models and on llama.cpp's compute buffer and device context for GGUF models:
   - `activations`: the peak of the dummy forward pass over the batched tokens and of the sampler over the vocabulary.
   - `encoder`: the vision or audio encoder activations for the largest image or audio clip, from `config.json` and the processor configs, or from the `mmproj` metadata for GGUF, as llama.cpp grows it up to the largest image (4096 tokens for dynamic resolution encoders, `image_size` otherwise) and 30 seconds of audio.
@@ -162,11 +163,11 @@ hf extensions add alvarobartt/hf-mem
 
 The estimates have been validated with vLLM 0.33 and SGLang 0.5 on NVIDIA T4, L4, A10G, A100, RTX PRO 6000 and H200 GPUs (up to 8 GPUs), with llama.cpp, and with Diffusers and Sentence Transformers, on 40+ LLMs, MoEs, hybrid, vision, audio and omni models. AMD GPUs go through the same memory profiling, batching and graph capture in vLLM on ROCm, so the same estimate applies, but it has not been validated there and the device context and workspaces may differ.
 
-- The KV cache per request matches vLLM exactly for Llama 3, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), Gemma 3 and Gemma 4 (sliding window), gpt-oss, Qwen3.5 (linear attention) and Nemotron-H (Mamba), and the KV cache per token matches SGLang.
+- The KV cache per request matches vLLM exactly for Llama 3, Qwen3, Qwen3 MoE, DeepSeek-V2 (MLA), GLM-5.3 (MLA with sparse indexers), Gemma 3 and Gemma 4 (sliding window), gpt-oss, Qwen3.5 (linear attention) and Nemotron-H (Mamba), and within 3% for DeepSeek-V4.1 (compressed attention), Kimi Linear (KDA) and Qwen3.8-Flash-Next, from 32K to 512K tokens on 8 x H200, and the KV cache per token matches SGLang.
 - The overhead has a median error of 10% against vLLM and lies between vLLM's reservation and SGLang's actual usage for most models (SGLang reserves a fixed share of the GPU instead), e.g. the longest context for Llama 3.1 8B on an L4 is 29,878 tokens against 30,048 in vLLM.
 - vLLM profiles the vision encoder with the largest video when it has more tokens than an image (e.g. Qwen2.5-VL reserves 3 to 7 GiB more at 32K to 64K tokens), and hf-mem warns about it.
 - The `mmproj` encoder buffer matches llama.cpp with the largest image within 5% for Gemma 3, Qwen2.5-VL, LFM3-VL, LFM2.5-VL, SmolVLM2, InternVL3, Pixtral and Ultravox, which can be up to 2x what llama.cpp reserves at startup.
-- Inference engines can repack or offload weights, e.g. vLLM pads the gpt-oss MXFP4 experts and keeps the per-layer embeddings of Qwen3.8-Flash-Next on the CPU, and SGLang loads the gpt-oss experts in BF16 on Hopper GPUs.
+- The weights per GPU match vLLM within 5% for DeepSeek-V4.1 (with 189 GiB of Engram tables in host memory), GLM-5.3, Qwen3.8-Flash-Next, Kimi Linear and gpt-oss, and the token embeddings in CPU memory match llama.cpp exactly. SGLang loads the gpt-oss experts in BF16 on Hopper GPUs instead.
 
 ## References
 
