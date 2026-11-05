@@ -7,6 +7,7 @@ MAX_NUM_BATCHED_TOKENS = 8192
 BLOCK_SIZE = 16
 
 _BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I8": 1}
+_FLOATS = ("BF16", "F16", "F32")
 _TORCH = {
     "float32": "F32",
     "float": "F32",
@@ -63,6 +64,13 @@ _ENCODER_ARCHS = (
     "Embedding",
 )
 _GENERATIVE_ARCHS = ("ForCausalLM", "ForConditionalGeneration", "LMHeadModel")
+_TEXT_HEADS = (
+    "ForMaskedLM",
+    "ForSequenceClassification",
+    "ForTokenClassification",
+    "ForQuestionAnswering",
+    "ForMultipleChoice",
+)
 _STATE = ("linear", "conv", "mamba", "ssm", "recurrent", "delta", "rwkv", "lightning")
 _NO_CACHE = ("mlp", "moe")
 _SLIDING = ("sliding", "local", "chunked", "swa")
@@ -107,6 +115,19 @@ def _nested(config: dict[str, Any], path: str = "") -> list[tuple[str, dict[str,
 def is_generative(config: dict[str, Any], files: dict[str, int]) -> bool:
     architectures = config.get("architectures") or []
     return "generation_config.json" in files or any(a.endswith(_GENERATIVE_ARCHS) for a in architectures)
+
+
+def is_text_encoder(config: dict[str, Any], files: dict[str, int]) -> bool:
+    # Sentence Transformers, MLM, classification and QA heads, and bare `...Model` encoders, served with a
+    # single forward pass (e.g. by TEI), excluding vision and audio models (which ship a preprocessor).
+    if "preprocessor_config.json" in files or not _is_text(config):
+        return False
+    architectures = [str(a) for a in config.get("architectures") or []]
+    return (
+        "config_sentence_transformers.json" in files
+        or any(a.endswith(_TEXT_HEADS) for a in architectures)
+        or (not is_generative(config, files) and any(a.endswith("Model") for a in architectures))
+    )
 
 
 def text_config(config: dict[str, Any]) -> dict[str, Any] | None:
@@ -155,13 +176,23 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
     if isinstance(dtype, str):
         return _TORCH.get(dtype.removeprefix("torch."), "F16")
 
-    counts = {d: w.params for d, w in weights.dtypes.items() if d in {"BF16", "F16", "F32"}}
-    dtype = max(counts, key=counts.__getitem__) if counts else "BF16"
+    dtype = _dominant_dtype(weights)
     warnings.append(
         f"The KV cache dtype could not be inferred from `config.json`, so it defaults to {dtype}, set "
         "`--kv-cache-dtype` to override it."
     )
     return dtype
+
+
+def _dominant_dtype(weights: Weights) -> str:
+    counts = {d: w.params for d, w in weights.dtypes.items() if d in _FLOATS}
+    return max(counts, key=counts.__getitem__) if counts else "BF16"
+
+
+def activation_bytes(config: dict[str, Any], weights: Weights) -> int:
+    # The model dtype, as the weights are reported, else the dominant 16/32-bit dtype of the (quantized) weights.
+    dtype = _TORCH.get(str(config.get("torch_dtype") or config.get("dtype") or "").removeprefix("torch."))
+    return _BYTES[dtype if dtype in _FLOATS else _dominant_dtype(weights)]
 
 
 def layer_kinds(config: dict[str, Any]) -> list[str]:

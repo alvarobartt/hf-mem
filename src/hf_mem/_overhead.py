@@ -12,6 +12,8 @@ LARGEST_GPU = 160 * GIB
 CLIP_MAX_TOKENS = {"pixtral": 1024, "lfm2": 256}
 CLIP_DYNAMIC_TOKENS = 4096
 CLIP_AUDIO_POSITIONS = 1500
+# TEI warms up GPUs with a single batch of `--max-batch-tokens` (16384 by default), split into max length inputs.
+TEI_BATCHED_TOKENS = 16384
 
 # Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
 _PROFILES = {
@@ -147,6 +149,27 @@ def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_b
     )
     context = int(p["context"])
     return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]) + context, context)
+
+
+def tei(config: dict[str, Any], tokens: int, dtype_bytes: int) -> Overhead:
+    # Peak of TEI's warmup forward pass for encoder models: the residual stream plus the largest transient, i.e.
+    # the QKV projection, the MLP, or the logits over the vocabulary for every token of masked LMs (e.g. SPLADE).
+    # Pooled heads (embeddings, sequence classifiers) and per-token labels are far smaller than the attention.
+    hidden = config.get("hidden_size") or 0
+    heads = config.get("num_attention_heads") or 1
+    kv_heads = config.get("num_key_value_heads") or heads
+    head_dim = config.get("head_dim") or hidden // heads
+    inter = config.get("intermediate_size") or config.get("n_inner") or 4 * hidden
+    if experts := config.get("num_experts_per_tok") or config.get("moe_top_k"):
+        inter = (config.get("moe_intermediate_size") or inter) * experts
+    gated = any(a in str(config.get("hidden_act") or config.get("activation_function") or "") for a in _GATED)
+    masked = any(str(a).endswith("ForMaskedLM") for a in config.get("architectures") or [])
+    transient = max(
+        (heads + 2 * kv_heads) * head_dim,
+        (3 if gated else 2) * inter,
+        (config.get("vocab_size") or 0) if masked else 0,
+    )
+    return Overhead(tokens * (hidden + transient) * dtype_bytes, 0, 0, 0, 0)
 
 
 def _clip_bytes(positions: int, hidden: int, ffn: int | None, gated: bool) -> int:

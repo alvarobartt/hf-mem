@@ -56,6 +56,39 @@ def test_encoder_patches() -> None:
     assert _overhead.encoder({}, {}) == 0
 
 
+BERT = {
+    "architectures": ["BertModel"],
+    "hidden_size": 768,
+    "num_attention_heads": 12,
+    "intermediate_size": 3072,
+    "vocab_size": 30522,
+    "hidden_act": "gelu",
+}
+
+
+def test_tei_warmup_is_the_residual_stream_plus_the_largest_transient() -> None:
+    assert _overhead.tei(BERT, 16384, 4) == _overhead.Overhead(16384 * (768 + 2 * 3072) * 4, 0, 0, 0, 0)
+    masked = {**BERT, "architectures": ["BertForMaskedLM"]}
+    assert _overhead.tei(masked, 512, 2).activations == 512 * (768 + 30522) * 2
+    classifier = {**BERT, "architectures": ["BertForSequenceClassification"], "num_labels": 2}
+    assert _overhead.tei(classifier, 16384, 4) == _overhead.tei(BERT, 16384, 4)
+
+
+def test_tei_warmup_follows_gqa_gated_and_moe_layers() -> None:
+    qwen3 = {
+        "hidden_size": 1024,
+        "num_attention_heads": 16,
+        "num_key_value_heads": 8,
+        "head_dim": 128,
+        "intermediate_size": 3072,
+        "hidden_act": "silu",
+    }
+    assert _overhead.tei(qwen3, 1000, 2).activations == 1000 * (1024 + 3 * 3072) * 2
+    narrow = {**qwen3, "intermediate_size": 512}
+    assert _overhead.tei(narrow, 1000, 2).activations == 1000 * (1024 + (16 + 2 * 8) * 128) * 2
+    assert _overhead.tei({**BERT, "moe_top_k": 2}, 1000, 2).activations == 1000 * (768 + 2 * 2 * 3072) * 2
+
+
 def test_batched_tokens_follow_the_gpu_size() -> None:
     assert _overhead.batched_tokens(None) == _overhead.batched_tokens("8x80") == 8192
     assert _overhead.batched_tokens("24") == 2048

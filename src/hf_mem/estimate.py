@@ -374,6 +374,14 @@ async def _estimate_safetensors(
             "KV cache estimation skipped, as Mistral `params.json` configs are not supported, estimate a version of "
             "the model with a Transformers `config.json` for the KV cache."
         )
+    if config and _config.is_text_encoder(config, files):
+        estimate.overhead = _overhead.tei(
+            _config.normalize(config),
+            max_num_batched_tokens or _overhead.TEI_BATCHED_TOKENS,
+            _config.activation_bytes(config, weights),
+        )
+        _fit(estimate, 0, 0.0, gpu_memory, utilization)
+        return estimate
     if not config or "config_sentence_transformers.json" in files or not _config.is_generative(config, files):
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
