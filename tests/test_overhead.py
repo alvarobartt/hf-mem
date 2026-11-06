@@ -197,3 +197,28 @@ def test_mxfp4_experts_are_padded_to_the_vllm_tiles() -> None:
         weights=60 * GIB, gpu_memory="64", utilization=1.0, padding=lambda n: 8 * GIB, **args
     )
     assert plain.fits and not padded.fits and padded.required == 68 * GIB
+
+
+def test_fit_searches_non_linear_cache_and_replicates_fixed_windows() -> None:
+    # A sliding cache saturates at 100 pages. Both its fixed and growing parts replicate when KV heads < TP.
+    def cache(length: int) -> int:
+        return min(-(-length // 16), 100) * 1024
+
+    args: dict[str, Any] = dict(
+        weights=0,
+        kv_fixed=100 * 1024,
+        kv_per_token=0,
+        max_model_len=10000,
+        context_length=10000,
+        overhead=0,
+        kv_heads=1,
+        kv_bytes=cache,
+        utilization=1.0,
+    )
+    fit = _overhead.fit(gpu_memory=str(80 * 1024 / GIB), **args)
+    assert not fit.fits and fit.max_model_len == 80 * 16
+    replicated = _overhead.fit(gpu_memory=f"4x{80 * 1024 / GIB}", **args)
+    assert replicated.required == 4 * 100 * 1024
+    assert replicated.max_model_len == fit.max_model_len
+    roomy = _overhead.fit(gpu_memory=str(100 * 1024 / GIB), **args)
+    assert roomy.fits and roomy.max_model_len == 10000
