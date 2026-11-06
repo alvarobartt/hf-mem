@@ -353,3 +353,31 @@ def test_engram_and_ngram_tables_are_offloaded_to_cpu(tmp_path: Path) -> None:
     )
     assert any("pinned host memory" in w for w in result.warnings)
     assert result.to_dict()["offloaded"]["bytes"] == offloaded.bytes
+
+
+def test_suggested_context_fits_the_actual_cache_pages(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config(max_position_embeddings=1000000))
+    result = estimate(str(tmp_path), gpu_memory="2")
+    length = some(result.fit).max_model_len
+    assert 0 < length < 1000000
+    suggested = estimate(str(tmp_path), gpu_memory="2", max_model_len=length)
+    assert some(suggested.fit).fits
+    assert some(suggested.fit).required <= some(suggested.fit).usable
+    longer = estimate(str(tmp_path), gpu_memory="2", max_model_len=length + 1)
+    assert some(longer.fit).required > some(longer.fit).usable
+
+
+def test_suggested_context_for_saturated_sliding_cache(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            max_position_embeddings=100000,
+            layer_types=["sliding_attention"] * 4,
+            sliding_window=128,
+        ),
+    )
+    result = estimate(str(tmp_path), gpu_memory="2")
+    assert some(result.fit).fits
+    assert some(result.fit).max_model_len == 100000
