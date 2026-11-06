@@ -540,6 +540,10 @@ async def arun(
     progress: Progress | None = None,
     format: str | None = None,
 ) -> Estimate | Listing:
+    if batch_size < 1 or any(v is not None and v < 1 for v in (max_model_len, max_num_batched_tokens)):
+        raise RuntimeError("`--batch-size`, `--max-model-len` and `--max-num-batched-tokens` must be positive.")
+    if not 0 < gpu_memory_utilization <= 1:
+        raise RuntimeError("`--gpu-memory-utilization` must be in (0, 1].")
     if gpu_memory is not None:
         _overhead.parse_gpu_memory(gpu_memory)
     if format not in (None, *FORMATS):
