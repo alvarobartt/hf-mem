@@ -229,3 +229,9 @@ def test_indexer_cache_only_on_indexer_layers() -> None:
         {**base, "index_head_dim": 128, "indexer_types": ["full", "shared", "shared", "full"]}, "BF16", 1024, 1
     )[0]
     assert every - plain == 4 * 1024 * 132 and some_layers - plain == 2 * 1024 * 132
+    dsa = _config.kv_cache(
+        {**base, "dsa_config": {"dsa_layers": [2, 4], "index_head_dim": 128}}, "BF16", 1024, 1
+    )[0]
+    assert dsa - plain == 2 * 1024 * 132
+    assert _config.kv_dtype({**base, "dsa_config": {}}, "auto", Weights(), []) == "FP8_DS_MLA"
+    assert _config.kv_cache(base, "FP8_DS_MLA", 1024, 1)[0] == 4 * 1024 * 656
