@@ -198,7 +198,7 @@ class Fit:
 
     @property
     def fits(self) -> bool:
-        return self.needed is not None and self.needed <= (self.gpus or 1)
+        return self.required <= (self.gpus or 1) * self.usable
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -246,7 +246,7 @@ def fit(
     kv_heads: int | None = None,
     context: int = 0,
     padding: Callable[[int], int] | None = None,
-    kv_bytes: Callable[[int], int] | None = None,
+    kv_bytes: Callable[[int, int], int] | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
     usable = min(size * utilization, size - context) - (overhead - context)
@@ -255,14 +255,18 @@ def fit(
     def cache(length: int, n: int) -> float:
         replication = max(1.0, n / kv_heads) if kv_heads else 1.0
         if kv_bytes is not None:
-            return kv_bytes(length) * replication
+            return kv_bytes(length, n)
         return kv_fixed + kv_per_token * length * replication
 
     def padded(n: int) -> int:
         return base + (padding(n) if padding else 0)
 
     needed = next(
-        (n for n in (1, 2, 4, 8, 16, 32, 64) if padded(n) + cache(max_model_len, n) <= n * usable),
+        (
+            n
+            for n in sorted({1, 2, 4, 8, 16, 32, 64, gpus or 1})
+            if padded(n) + cache(max_model_len, n) <= n * usable
+        ),
         None,
     )
     n = gpus or 1

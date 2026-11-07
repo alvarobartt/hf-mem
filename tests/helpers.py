@@ -87,6 +87,30 @@ def llama_config(**overrides: Any) -> dict[str, Any]:
     return config
 
 
+def kimi_config(full: int = 3, state: int = 9, sparse: bool = True) -> dict[str, Any]:
+    config = llama_config(
+        model_type="kimi_linear",
+        architectures=["KimiLinearForCausalLM"],
+        hidden_size=7168,
+        num_hidden_layers=full + state,
+        num_attention_heads=96,
+        num_key_value_heads=96,
+        kv_lora_rank=512,
+        qk_rope_head_dim=64,
+        max_position_embeddings=1048576,
+        linear_attn_config={
+            "full_attn_layers": list(range(1, full + 1)),
+            "kda_layers": list(range(full + 1, full + state + 1)),
+            "num_heads": 96,
+            "head_dim": 128,
+            "short_conv_kernel_size": 4,
+        },
+    )
+    if sparse:
+        config["dsa_config"] = {"dsa_layers": list(range(1, full + 1)), "index_head_dim": 128}
+    return config
+
+
 def llama_tensors(layers: int = 4) -> dict[str, tuple[str, list[int]]]:
     tensors = {"model.embed_tokens.weight": ("BF16", [1000, 256])}
     for i in range(layers):

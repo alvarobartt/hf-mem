@@ -1,3 +1,4 @@
+from math import lcm
 from typing import Any
 
 from hf_mem._weights import Weights
@@ -237,7 +238,9 @@ def _state(config: dict[str, Any], dtype_bytes: float) -> tuple[int, int]:
         key_heads = config.get("linear_num_key_heads") or heads
         key_dim, value_dim = config.get("linear_key_head_dim") or 0, config.get("linear_value_head_dim") or 0
         conv = (2 * key_heads * key_dim + heads * value_dim) * ((config.get("linear_conv_kernel_dim") or 4) - 1)
-        return int(conv * dtype_bytes + heads * key_dim * value_dim * ssm_bytes), 2
+        return int(conv * dtype_bytes + heads * key_dim * value_dim * ssm_bytes), (
+            3 if config.get("linear_attn_config") else 2
+        )
     if state := config.get("mamba_d_state") or config.get("ssm_state_size") or config.get("state_size"):
         heads = config.get("mamba_num_heads") or config.get("mamba_n_heads") or 0
         head_dim = config.get("mamba_head_dim") or config.get("mamba_d_head") or 0
@@ -271,28 +274,83 @@ def _compressed(config: dict[str, Any], max_model_len: int, batched_tokens: int)
     return int(size), {"compressed": len(sources), "sliding": len(ratios), "full": 0, "state": 0, "none": 0}
 
 
+def _packed_mla(
+    config: dict[str, Any], dtype: str, length: int, batch_size: int, tensor_parallel_size: int
+) -> tuple[int, dict[str, int]] | None:
+    if not (config.get("dsa_config") and config.get("linear_attn_config") and config.get("kv_lora_rank")):
+        return None
+    kinds = layer_kinds(config)
+    full, state = kinds.count("full"), kinds.count("state")
+    if (
+        not full
+        or not state
+        or kinds.count("sliding")
+        or (config.get("indexer_types") or []).count("full") != full
+    ):
+        return None
+    # vLLM's Kimi K3.1 cache: a block row holds every MLA and indexer page. State groups share the same
+    # pool, so every checkpoint reserves an entire row, including its padding. MLA is replicated across
+    # tensor-parallel ranks; KDA states shard, changing the block size on each rank.
+    rank, rope = config["kv_lora_rank"], config.get("qk_rope_head_dim") or 0
+    token = (
+        (rank + _cdiv(rank, 128) * 4 + 2 * rope)
+        if dtype == "FP8_DS_MLA"
+        else (rank + rope) * _BYTES.get(dtype, 2)
+    )
+    row_token = full * (token + config["index_head_dim"] + DSV4_INDEX_SCALE)
+    state_bytes, pages = _state(config, 2)
+    state_bytes = _cdiv(state_bytes, tensor_parallel_size)
+    groups = _cdiv(state, full)
+    states_per_row = _cdiv(state, groups)
+    # Sparse MLA and indexer kernels use 64-token blocks; vLLM rounds the manager block to a power of two.
+    units = max(1, _cdiv(states_per_row * state_bytes, 64 * row_token))
+    block = 64 * (1 << (units - 1).bit_length())
+    row = block * row_token
+    if block > 64:
+        # Both cache views must split into whole 64-token kernel pages within the shared row.
+        alignment = lcm(64 * token, 64 * (config["index_head_dim"] + DSV4_INDEX_SCALE))
+        row = _cdiv(row, alignment) * alignment
+    size = row * (_cdiv(length, block) + groups * pages)
+    layers = {"full": full, "sliding": 0, "state": state, "none": len(kinds) - full - state}
+    return size * tensor_parallel_size * batch_size, layers
+
+
 def kv_cache(
     config: dict[str, Any],
     dtype: str,
     max_model_len: int,
     batch_size: int,
     batched_tokens: int = MAX_NUM_BATCHED_TOKENS,
+    tensor_parallel_size: int = 1,
 ) -> tuple[int, dict[str, int]]:
     config = normalize(config)
+    if packed := _packed_mla(config, dtype, max_model_len, batch_size, tensor_parallel_size):
+        return packed
+    if tensor_parallel_size > 1:
+        if config.get("linear_attn_config"):
+            sharded = {
+                **config,
+                "linear_num_value_heads": _cdiv(config["linear_num_value_heads"], tensor_parallel_size),
+                "linear_num_key_heads": _cdiv(config["linear_num_key_heads"], tensor_parallel_size),
+            }
+            size, layers = kv_cache(sharded, dtype, max_model_len, batch_size, batched_tokens)
+            return size * tensor_parallel_size, layers
+        size, layers = kv_cache(config, dtype, max_model_len, batch_size, batched_tokens)
+        return int(size * max(1.0, tensor_parallel_size / kv_heads(config))), layers
     if config.get("compress_ratios") and config.get("kv_source_layer_ids") is not None:
         size, counts = _compressed(config, max_model_len, batched_tokens)
         return size * batch_size, counts
     heads: int = config["num_attention_heads"]
-    kv_heads: int = config["num_key_value_heads"] or heads
+    cache_heads: int = config["num_key_value_heads"] or heads
     head_dim: int = config.get("head_dim") or (config["hidden_size"] or 0) // heads
     if rank := config.get("kv_lora_rank"):
         rope = config.get("qk_rope_head_dim") or 0
-        width = full_width = rank + rank // 32 + 2 * rope if dtype == "FP8_DS_MLA" else rank + rope
+        width = full_width = rank + _cdiv(rank, 128) * 4 + 2 * rope if dtype == "FP8_DS_MLA" else rank + rope
     else:
-        width = 2 * kv_heads * head_dim
+        width = 2 * cache_heads * head_dim
         full_width = (
             2
-            * (config.get("num_global_key_value_heads") or kv_heads)
+            * (config.get("num_global_key_value_heads") or cache_heads)
             * (config.get("global_head_dim") or head_dim)
         )
 
@@ -315,10 +373,11 @@ def kv_cache(
         size = full * _cdiv(max_model_len, BLOCK_SIZE) * full_token + sliding * sliding_pages * token
         return size * BLOCK_SIZE * batch_size + indexer, layers
 
-    state_bytes, state_pages = _state(config, 2 if dtype == "FP8_DS_MLA" else dtype_bytes)
+    state_bytes, state_pages = _state(config, 2 if config.get("linear_attn_config") else dtype_bytes)
     if not full + sliding:
         return state * state_pages * state_bytes * batch_size + indexer, layers
-    block = max(BLOCK_SIZE, _cdiv(_cdiv(state_bytes, token), BLOCK_SIZE) * BLOCK_SIZE)
+    alignment = 128 if config.get("linear_attn_config") else BLOCK_SIZE
+    block = max(alignment, _cdiv(_cdiv(state_bytes, token), alignment) * alignment)
     group = min(n for n in (full, sliding, state) if n)
     size = _cdiv(full, group) * _cdiv(max_model_len, block) * full_token
     size += _cdiv(sliding, group) * (_cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len)) * token
