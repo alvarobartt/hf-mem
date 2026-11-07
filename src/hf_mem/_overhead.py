@@ -246,30 +246,42 @@ def fit(
     kv_heads: int | None = None,
     context: int = 0,
     padding: Callable[[int], int] | None = None,
+    kv_bytes: Callable[[int], int] | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
     usable = min(size * utilization, size - context) - (overhead - context)
     base = weights
 
-    def per_token(n: int) -> float:
-        return kv_per_token * (max(1.0, n / kv_heads) if kv_heads else 1.0)
+    def cache(length: int, n: int) -> float:
+        replication = max(1.0, n / kv_heads) if kv_heads else 1.0
+        if kv_bytes is not None:
+            return kv_bytes(length) * replication
+        return kv_fixed + kv_per_token * length * replication
 
     def padded(n: int) -> int:
         return base + (padding(n) if padding else 0)
 
     needed = next(
-        (
-            n
-            for n in (1, 2, 4, 8, 16, 32, 64)
-            if padded(n) + kv_fixed + per_token(n) * max_model_len <= n * usable
-        ),
+        (n for n in (1, 2, 4, 8, 16, 32, 64) if padded(n) + cache(max_model_len, n) <= n * usable),
         None,
     )
     n = gpus or 1
     weights = padded(n)
-    budget = n * usable - weights - kv_fixed
-    longest = math.floor(budget / per_token(n)) if kv_per_token > 0 and budget > 0 else 0
-    required = weights + kv_fixed + per_token(n) * max_model_len + n * overhead
+    if kv_bytes is not None:
+        # Search the actual allocation: cache pages, sliding windows and recurrent state make it non-linear.
+        low, high = 0, context_length
+        while low < high:
+            middle = (low + high + 1) // 2
+            if weights + cache(middle, n) <= n * usable:
+                low = middle
+            else:
+                high = middle - 1
+        longest = low
+    else:
+        budget = n * usable - weights - kv_fixed
+        per_token = kv_per_token * (max(1.0, n / kv_heads) if kv_heads else 1.0)
+        longest = math.floor(budget / per_token) if per_token > 0 and budget > 0 else 0
+    required = weights + cache(max_model_len, n) + n * overhead
     return Fit(
         size,
         int(min(size * utilization, size - context) + context),

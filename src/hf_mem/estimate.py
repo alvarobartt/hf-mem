@@ -131,6 +131,7 @@ def _fit(
     utilization: float,
     kv_heads: int | None = None,
     padding: Callable[[int], int] | None = None,
+    kv_bytes: Callable[[int], int] | None = None,
 ) -> None:
     if gpu_memory is None:
         return
@@ -147,6 +148,7 @@ def _fit(
         kv_heads=kv_heads,
         context=estimate.overhead.context if estimate.overhead else 0,
         padding=padding,
+        kv_bytes=kv_bytes,
     )
 
 
@@ -198,7 +200,21 @@ async def _estimate_gguf(
             overhead=_overhead.llama_cpp(extra[0].metadata if extra else None) if kv else None,
             warnings=warnings,
         )
-        _fit(estimate, kv[1] if kv else 0, kv[2] if kv else 0.0, gpu_memory, utilization)
+
+        def cache_bytes(length: int) -> int:
+            assert kv is not None
+            result = _gguf.kv_cache(header.metadata, length, batch_size, kv[0].dtype)
+            assert result is not None
+            return result[0]
+
+        _fit(
+            estimate,
+            kv[1] if kv else 0,
+            kv[2] if kv else 0.0,
+            gpu_memory,
+            utilization,
+            kv_bytes=cache_bytes if kv else None,
+        )
         return estimate
 
     names = list(groups)
@@ -316,7 +332,20 @@ async def _estimate_onnx(
             kv_cache=KVCache(kv[0], kv[1], length, batch_size, {}) if kv and length else None,
         )
         if len(labels) == 1:
-            _fit(estimate, context or 0, kv[2] if kv else 0.0, gpu_memory, utilization)
+
+            def cache_bytes(length: int) -> int:
+                cache = _onnx.kv_cache(result, length, batch_size, encoder_length)
+                assert cache is not None
+                return cache[0]
+
+            _fit(
+                estimate,
+                context or 0,
+                kv[2] if kv else 0.0,
+                gpu_memory,
+                utilization,
+                kv_bytes=cache_bytes if kv else None,
+            )
         files.append(estimate)
     if not files:
         raise RuntimeError(f"No valid ONNX files found for {source.name}.")
@@ -464,6 +493,7 @@ async def _estimate_safetensors(
         utilization,
         _config.kv_heads(text),
         _mxfp4_padding(config, text, weights),
+        lambda length: _config.kv_cache(text, dtype, length, batch_size, tokens)[0],
     )
     return estimate
 
@@ -510,6 +540,10 @@ async def arun(
     progress: Progress | None = None,
     format: str | None = None,
 ) -> Estimate | Listing:
+    if batch_size < 1 or any(v is not None and v < 1 for v in (max_model_len, max_num_batched_tokens)):
+        raise RuntimeError("`--batch-size`, `--max-model-len` and `--max-num-batched-tokens` must be positive.")
+    if not 0 < gpu_memory_utilization <= 1:
+        raise RuntimeError("`--gpu-memory-utilization` must be in (0, 1].")
     if gpu_memory is not None:
         _overhead.parse_gpu_memory(gpu_memory)
     if format not in (None, *FORMATS):
