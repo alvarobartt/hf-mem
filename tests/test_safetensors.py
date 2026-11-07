@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 
 import pytest
-from helpers import estimate, llama_config, llama_tensors, some, write_json, write_safetensors
+from helpers import estimate, kimi_config, llama_config, llama_tensors, some, write_json, write_safetensors
 
-from hf_mem import Estimate, _safetensors
-from hf_mem._render import table
+from hf_mem import Estimate, _config, _safetensors
+from hf_mem._render import markdown, table
 from hf_mem._source import LocalSource
 
 
@@ -381,3 +381,26 @@ def test_suggested_context_for_saturated_sliding_cache(tmp_path: Path) -> None:
     result = estimate(str(tmp_path), gpu_memory="2")
     assert some(result.fit).fits
     assert some(result.fit).max_model_len == 100000
+
+
+@pytest.mark.parametrize("gpu_memory", ["4", "2x4", "8x4"])
+def test_kimi_fit_uses_the_cache_rows_for_each_tensor_parallel_rank(tmp_path: Path, gpu_memory: str) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    config = kimi_config()
+    write_json(str(tmp_path / "config.json"), config)
+    result = estimate(str(tmp_path), gpu_memory=gpu_memory)
+    cache = some(result.kv_cache)
+    fit = some(result.fit)
+    ranks = fit.gpus or 1
+    expected = _config.kv_cache(config, cache.dtype, cache.max_model_len, 1, tensor_parallel_size=ranks)[0]
+    assert fit.required == result.weights.bytes + expected + ranks * some(result.overhead).bytes
+    assert cache.dtype == "FP8_DS_MLA"
+    assert 0 < fit.max_model_len < cache.max_model_len
+    suggested = estimate(str(tmp_path), gpu_memory=gpu_memory, max_model_len=fit.max_model_len)
+    assert some(suggested.fit).fits
+    longer = estimate(str(tmp_path), gpu_memory=gpu_memory, max_model_len=fit.max_model_len + 1)
+    assert not some(longer.fit).fits
+    if ranks == 8:
+        assert some(longer.fit).needed == 4
+        assert "DOES NOT FIT" in table(longer)
+        assert "fits on 4 GPUs" in markdown(longer)

@@ -1,7 +1,7 @@
 from typing import Any
 
 import pytest
-from helpers import llama_config, some
+from helpers import kimi_config, llama_config, some
 
 from hf_mem import _config
 from hf_mem._weights import Weights
@@ -229,3 +229,54 @@ def test_indexer_cache_only_on_indexer_layers() -> None:
         {**base, "index_head_dim": 128, "indexer_types": ["full", "shared", "shared", "full"]}, "BF16", 1024, 1
     )[0]
     assert every - plain == 4 * 1024 * 132 and some_layers - plain == 2 * 1024 * 132
+    dsa = _config.kv_cache(
+        {**base, "dsa_config": {"dsa_layers": [2, 4], "index_head_dim": 128}}, "BF16", 1024, 1
+    )[0]
+    assert dsa - plain == 2 * 1024 * 132
+    assert _config.kv_dtype({**base, "dsa_config": {}}, "auto", Weights(), []) == "FP8_DS_MLA"
+    assert _config.kv_cache(base, "FP8_DS_MLA", 1024, 1)[0] == 4 * 1024 * 656
+
+
+# vLLM kimi-k31 (266e88c05): packed cache planner, with one KDA prefill checkpoint.
+@pytest.mark.parametrize(
+    "full, state, tp, dtype, length, expected",
+    [
+        (3, 3, 1, "FP8_DS_MLA", 131072, 426725376),
+        (3, 3, 1, "FP8_DS_MLA", 1048576, 2599145472),
+        (3, 3, 8, "FP8_DS_MLA", 131072, 2970451968),
+        (3, 3, 8, "FP8_DS_MLA", 1048576, 22832578560),
+        (3, 9, 1, "FP8_DS_MLA", 16383, 387932160),
+        (3, 9, 1, "FP8_DS_MLA", 16384, 387932160),
+        (3, 9, 1, "FP8_DS_MLA", 16385, 426725376),
+        (3, 9, 1, "FP8_DS_MLA", 131072, 659484672),
+        (3, 9, 1, "FP8_DS_MLA", 1048576, 2831904768),
+        (3, 9, 1, "BF16", 131072, 790732800),
+        (3, 9, 1, "F8_E4M3", 131072, 592846848),
+        (3, 9, 8, "FP8_DS_MLA", 131072, 3236462592),
+        (3, 9, 8, "FP8_DS_MLA", 1048576, 23098589184),
+        (3, 9, 8, "BF16", 131072, 4444323840),
+        (3, 9, 8, "F8_E4M3", 131072, 2604957696),
+        (3, 15, 1, "FP8_DS_MLA", 131072, 892243968),
+        (3, 15, 1, "FP8_DS_MLA", 1048576, 3064664064),
+        (3, 15, 8, "FP8_DS_MLA", 131072, 3502473216),
+        (3, 15, 8, "FP8_DS_MLA", 1048576, 23364599808),
+        (24, 69, 1, "FP8_DS_MLA", 131072, 3879321600),
+        (24, 69, 1, "FP8_DS_MLA", 1048576, 21258682368),
+        (24, 69, 8, "FP8_DS_MLA", 131072, 21258682368),
+        (24, 69, 8, "FP8_DS_MLA", 1048576, 160293568512),
+    ],
+)
+def test_kimi_sparse_cache_matches_vllm_rows(
+    full: int, state: int, tp: int, dtype: str, length: int, expected: int
+) -> None:
+    config = kimi_config(full, state)
+    size, layers = _config.kv_cache(config, dtype, length, 1, tensor_parallel_size=tp)
+    assert size == expected
+    assert (layers["full"], layers["state"]) == (full, state)
+    assert _config.kv_cache(config, dtype, length, 2, tensor_parallel_size=tp)[0] == 2 * expected
+
+
+def test_kimi_dense_cache_keeps_the_prefill_checkpoint() -> None:
+    config = kimi_config(sparse=False)
+    assert _config.kv_cache(config, "BF16", 131072, 1)[0] == 637009920
+    assert _config.kv_cache(config, "BF16", 1048576, 1)[0] == 3822059520

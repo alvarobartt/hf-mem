@@ -131,7 +131,7 @@ def _fit(
     utilization: float,
     kv_heads: int | None = None,
     padding: Callable[[int], int] | None = None,
-    kv_bytes: Callable[[int], int] | None = None,
+    kv_bytes: Callable[[int, int], int] | None = None,
 ) -> None:
     if gpu_memory is None:
         return
@@ -201,7 +201,7 @@ async def _estimate_gguf(
             warnings=warnings,
         )
 
-        def cache_bytes(length: int) -> int:
+        def cache_bytes(length: int, n: int) -> int:
             assert kv is not None
             result = _gguf.kv_cache(header.metadata, length, batch_size, kv[0].dtype)
             assert result is not None
@@ -333,7 +333,7 @@ async def _estimate_onnx(
         )
         if len(labels) == 1:
 
-            def cache_bytes(length: int) -> int:
+            def cache_bytes(length: int, n: int) -> int:
                 cache = _onnx.kv_cache(result, length, batch_size, encoder_length)
                 assert cache is not None
                 return cache[0]
@@ -493,7 +493,7 @@ async def _estimate_safetensors(
         utilization,
         _config.kv_heads(text),
         _mxfp4_padding(config, text, weights),
-        lambda length: _config.kv_cache(text, dtype, length, batch_size, tokens)[0],
+        lambda length, n: _config.kv_cache(text, dtype, length, batch_size, tokens, n)[0],
     )
     return estimate
 

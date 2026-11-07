@@ -190,7 +190,13 @@ def table(estimate: Estimate | Listing) -> str:
         if fit.fits and fit.needed and fit.needed < gpus:
             verdict = f"FITS ON {fit.needed} GPU" + ("S" if fit.needed > 1 else "")
         else:
-            verdict = "FITS" if fit.fits else f"⚠ NEEDS {fit.needed} GPUS" if fit.needed else "⚠ DOES NOT FIT"
+            verdict = (
+                "FITS"
+                if fit.fits
+                else f"⚠ NEEDS {fit.needed} GPUS"
+                if fit.needed and fit.needed > gpus
+                else "⚠ DOES NOT FIT"
+            )
         sections[0][1].append(("GPU MEMORY", text, verdict, fit.required / capacity))
     return _color(_draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH))
 
@@ -253,7 +259,8 @@ def markdown(estimate: Estimate | Listing) -> str:
         gpus = f"{fit.gpus or 1} x {gib(fit.gpu_memory)} GiB"
         verdict = f"Fits on {gpus}" if fit.fits else f"Does not fit on {gpus}"
         if fit.needed and fit.needed != (fit.gpus or 1):
-            verdict += f", needs {fit.needed} GPU{'s' if fit.needed > 1 else ''}"
+            action = "fits on" if not fit.fits and fit.needed < (fit.gpus or 1) else "needs"
+            verdict += f", {action} {fit.needed} GPU{'s' if fit.needed > 1 else ''}"
         if estimate.kv_cache and fit.max_model_len:
             verdict += f", up to {fit.max_model_len} tokens"
         lines += ["", verdict + "."]

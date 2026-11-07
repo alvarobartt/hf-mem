@@ -418,6 +418,7 @@ The KV cache and the overhead follow vLLM for Safetensors models and llama.cpp f
 - ONNX models have no overhead estimate, and GGUF and ONNX listings estimate each file from its size, so a single file (`:<quantization>` or `--file`) gives the most accurate numbers.
 - vLLM profiles the vision encoder of some models (e.g. Qwen2.5-VL) with a video when it has more tokens than an image, which can reserve a few GiB more (`hf-mem` warns about it).
 - PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, and encoder-decoder models (e.g. Whisper) have no KV cache estimate.
+- Kimi K3.1 defaults to vLLM's `fp8_ds_mla` cache layout on Hopper. Use `--kv-cache-dtype fp8` for the per-tensor FP8 layout used by FlashInfer on Blackwell.
 - AMD and NVIDIA Blackwell GPUs go through the same accounting in vLLM, but have not been validated.
 
 ## References
