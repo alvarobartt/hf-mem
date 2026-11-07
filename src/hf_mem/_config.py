@@ -11,7 +11,7 @@ DSV4_INDEX_RECORD = 148
 # FP8 indexer key scale of the DeepSeek-V3.2 and GLM-5 sparse attention indexers
 DSV4_INDEX_SCALE = 4
 
-_BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I8": 1}
+_BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "FP8_DS_MLA": 1, "I8": 1}
 _TORCH = {
     "float32": "F32",
     "float": "F32",
@@ -100,6 +100,12 @@ def normalize(config: dict[str, Any]) -> dict[str, Any]:
             ("mamba_ssm_dtype", "float32"),
         ):
             config.setdefault(key, value)
+    if isinstance(dsa := config.get("dsa_config"), dict) and config.get("index_head_dim") is None:
+        indexed = set(dsa.get("dsa_layers") or [])
+        config["index_head_dim"] = dsa.get("index_head_dim")
+        config["indexer_types"] = [
+            "full" if i + 1 in indexed else "none" for i in range(config["num_hidden_layers"] or 0)
+        ]
     if config["num_hidden_layers"] is None:
         layers = (
             config.get("layer_types")
@@ -162,7 +168,10 @@ def text_config(config: dict[str, Any]) -> dict[str, Any] | None:
 def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings: list[str]) -> str:
     if requested in {"fp8_e5m2", "fp8_e4m3"}:
         return requested.upper().replace("FP8", "F8")
-    if requested in {"fp8", "fp8_ds_mla", "fp8_inc"}:
+    if requested == "fp8_ds_mla" or (requested == "auto" and isinstance(config.get("dsa_config"), dict)):
+        # vLLM's sparse MLA cache outside Blackwell: FP8 latent with a 4 B scale per 128 values and a BF16 RoPE key
+        return "FP8_DS_MLA" if config.get("kv_lora_rank") else "F8_E4M3"
+    if requested in {"fp8", "fp8_inc"}:
         return "F8_E4M3"
     if requested in {"bfloat16", "float16"}:
         return _TORCH[requested]
@@ -277,7 +286,8 @@ def kv_cache(
     kv_heads: int = config["num_key_value_heads"] or heads
     head_dim: int = config.get("head_dim") or (config["hidden_size"] or 0) // heads
     if rank := config.get("kv_lora_rank"):
-        width = full_width = rank + (config.get("qk_rope_head_dim") or 0)
+        rope = config.get("qk_rope_head_dim") or 0
+        width = full_width = rank + rank // 32 + 2 * rope if dtype == "FP8_DS_MLA" else rank + rope
     else:
         width = 2 * kv_heads * head_dim
         full_width = (
@@ -305,7 +315,7 @@ def kv_cache(
         size = full * _cdiv(max_model_len, BLOCK_SIZE) * full_token + sliding * sliding_pages * token
         return size * BLOCK_SIZE * batch_size + indexer, layers
 
-    state_bytes, state_pages = _state(config, dtype_bytes)
+    state_bytes, state_pages = _state(config, 2 if dtype == "FP8_DS_MLA" else dtype_bytes)
     if not full + sliding:
         return state * state_pages * state_bytes * batch_size + indexer, layers
     block = max(BLOCK_SIZE, _cdiv(_cdiv(state_bytes, token), BLOCK_SIZE) * BLOCK_SIZE)
