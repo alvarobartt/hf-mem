@@ -152,7 +152,7 @@ Text encoders, rerankers and Sentence Transformers include a warmup estimate ove
 uvx hf-mem BAAI/bge-base-en-v1.5 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
 ```
 
-By default, weights keep their stored dtypes, including mixed precision and quantization buffers. Activations use the configured dtype or the dominant floating-point weight dtype. For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` explicitly casts floating-point parameters and activations; integer tensors remain unchanged. Other model types reject this option. Warmup assumes memory-efficient attention, with explicit attention scores for MPNet, DeBERTa and configurations selecting eager attention. Fit checks assume one replica per GPU.
+By default, weights keep their stored dtypes, including mixed precision and quantization buffers. Activations use the configured dtype or the dominant floating-point weight dtype. For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` explicitly casts floating-point parameters and activations; integer tensors remain unchanged. Other model types reject this option. Warmup assumes memory-efficient attention in half precision, and eager attention for MPNet, DeBERTa, configurations selecting it, and F32 activations, as memory-efficient attention kernels need half precision. Fit checks assume one replica per GPU.
 
 To estimate a Text Embeddings Inference deployment, use its configured `--dtype` (`float16` or `float32`) and the actual number of warmup tokens, which may be smaller than its batch limit:
 
@@ -160,7 +160,7 @@ To estimate a Text Embeddings Inference deployment, use its configured `--dtype`
 uvx hf-mem BAAI/bge-base-en-v1.5 --dtype float16 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
 ```
 
-Changing `--dtype` changes weight and activation precision; it does not select a kernel or change the token budget or sequence length. Engine casts, padding and attention workspaces can still change observed memory use.
+Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Casting while loading holds the largest tensor both as stored and as cast, so F32 checkpoints with large vocabularies loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
 
 ### GGUF
 
@@ -335,7 +335,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
   "offloaded": null,
   "components": null,
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628},
+  "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628, "buffers": 0, "loading": 0},
   "moe": null,
   "fit": null,
   "warnings": []
@@ -385,8 +385,11 @@ Decoder KV cache and overhead follow vLLM for Safetensors models and llama.cpp f
 
 Encoder warmup uses model dimensions, activation precision and the token budget, with a 0.32 GiB allowance for the device context and library workspaces. It includes masked-language-model logits unless the model supplies embedding pooling, and includes SPLADE logits and transformations. MoE, recurrent and latent-attention encoders have no warmup estimate. Text Embeddings Inference is a validation reference; its loading policies and warmup scheduling are not assumed.
 
+With eager attention, each sequence keeps tensors of attention scores (heads x length x length) at once, counted from the architecture: the scores and the probabilities; a bias per position term (MPNet's relative positions, ALiBi, or DeBERTa's two disentangled terms), which also carries the padding; and the masks: one per attention pattern when the layers alternate between full and sliding window attention (ModernBERT, Gemma 3), a causal mask, or else a padding mask once several sequences share a batch. Eager ALiBi attention also keeps the biases of every pair of positions for the model's lifetime (`buffers` in the overhead), and `--dtype` casts that change the stored dtype add the loading peak of the largest tensor, assumed to be the token embeddings, which load first (`loading`, only what exceeds the warmup). Against the startup peak of Text Embeddings Inference 1.9 with `--dtype float32` on an L4, this is within 6% for a single input of 2048 tokens with ModernBERT, NomicBERT, JinaBERT, Gemma 3 and Qwen3. At 4096 tokens it is 14% and 16% below for ModernBERT and NomicBERT, which keep the tensors their architecture needs while CUDA's memory pool fragments and reserves about one more attention tensor, and 9% below for Qwen3, whose causal mask takes one more tensor while it is built in Text Embeddings Inference 1.9.4 (fixed on its main branch).
+
 ## Limitations
 
+- CPU memory is not estimated for text encoders: CPU backends can differ for F32 and F16, and loading peaks on CPUs differ from steady memory.
 - Decoder estimates follow vLLM and llama.cpp with their default settings, so other engines (e.g. SGLang, which reserves a fixed share of the GPU instead) and non-default settings use different amounts of memory.
 - ONNX models have no overhead estimate, and GGUF and ONNX listings estimate each file from its size, so a single file (`:<quantization>` or `--file`) gives the most accurate numbers.
 - vLLM profiles the vision encoder of some models (e.g. Qwen2.5-VL) with a video when it has more tokens than an image, which can reserve a few GiB more (`hf-mem` warns about it).
