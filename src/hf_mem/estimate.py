@@ -386,12 +386,19 @@ async def _estimate_safetensors(
         selected = await _safetensors.discover(source, file, warnings)
         if not selected:
             return None
-        components, experts, offloaded = await _safetensors.read_components(source, selected, warnings)
         try:
             config = await config_task if config_task else {}
         except (RuntimeError, ValueError) as e:
             warnings.append(f"KV cache estimation skipped, as `config.json` could not be read ({e}).")
             config = {}
+        quantization = (
+            config.get("quantization_config")
+            or (config.get("text_config") or {}).get("quantization_config")
+            or {}
+        )
+        components, experts, offloaded = await _safetensors.read_components(
+            source, selected, warnings, quantization.get("format")
+        )
         processor: dict[str, Any] = {}
         for result in await asyncio.gather(*processor_tasks, return_exceptions=True):
             if isinstance(result, dict):

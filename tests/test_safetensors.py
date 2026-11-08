@@ -174,6 +174,56 @@ def test_moe_breakdown_skipped_for_non_uniform_experts(tmp_path: Path) -> None:
     assert any("not uniform" in w for w in result.warnings)
 
 
+@pytest.mark.parametrize("nested", [False, True])
+@pytest.mark.parametrize("pooled", [False, True])
+def test_mxfp4_parameters_include_both_packed_values(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nested: bool, pooled: bool
+) -> None:
+    quantization = {"quant_method": "compressed-tensors", "format": "mxfp4-pack-quantized"}
+    config = llama_config(num_local_experts=2, num_experts_per_tok=1, quantization_config=quantization)
+    write_json(
+        str(tmp_path / "config.json"),
+        {"architectures": ["KimiK31ForConditionalGeneration"], "text_config": config} if nested else config,
+    )
+    first = write_safetensors(
+        str(tmp_path / "model-00001-of-00002.safetensors"),
+        {"model.embed_tokens.weight": ("BF16", [100, 64]), "model.buffer": ("U8", [8])}
+        | {f"model.layers.0.mlp.experts.{e}.w1.weight_packed": ("U8", [32, 16]) for e in range(2)},
+    )
+    second = write_safetensors(
+        str(tmp_path / "model-00002-of-00002.safetensors"),
+        {f"model.layers.0.mlp.experts.{e}.w1.weight_scale": ("U8", [32, 1]) for e in range(2)},
+    )
+    if pooled:
+        monkeypatch.setattr(_safetensors, "POOL_MIN_FILES", 1)
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == first + second == 13896
+    assert result.weights.params == 8456
+    assert result.weights.dtypes["MXFP4"].params == 2048
+    assert result.weights.dtypes["MXFP4"].bytes == 1088
+    assert result.weights.dtypes["U8"].params == result.weights.dtypes["U8"].bytes == 8
+    assert some(result.moe).expert.params == 1024
+    assert some(result.moe).expert.bytes == 544
+    assert some(result.moe).base.params == 6408
+    assert "MXFP4" in table(result)
+
+
+@pytest.mark.parametrize("quantization", [{}, {"format": "pack-quantized"}])
+def test_u8_tensors_are_not_assumed_to_be_mxfp4(tmp_path: Path, quantization: dict[str, str]) -> None:
+    write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {"layer.weight_packed": ("U8", [32, 16]), "layer.weight_scale": ("U8", [32, 1])},
+    )
+    write_json(str(tmp_path / "config.json"), llama_config(quantization_config=quantization))
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.params == result.weights.bytes == 544
+    assert set(result.weights.dtypes) == {"U8"}
+
+
 def test_pickle_weights_are_not_estimated(tmp_path: Path) -> None:
     for name, size in {"pytorch_model.bin": 1000, "optimizer.pt": 99, "README.md": 5}.items():
         with open(tmp_path / name, "wb") as f:
