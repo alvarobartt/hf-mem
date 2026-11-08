@@ -77,6 +77,7 @@ def main() -> None:
         help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
+    parser.add_argument("--color", action="store_true", help="Enable color in terminal tables.")
     parser.add_argument(
         "-o",
         "--output",
@@ -125,4 +126,4 @@ def main() -> None:
         return
     for warning in result.warnings:
         print(f"hf-mem: warning: {warning}", file=sys.stderr)
-    print(markdown(result) if args.output == "markdown" else table(result))
+    print(markdown(result) if args.output == "markdown" else table(result, color=args.color))

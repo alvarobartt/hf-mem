@@ -113,9 +113,9 @@ def _dtype_items(weights: Weights, total: int) -> list[Item]:
     ]
 
 
-def table(estimate: Estimate | Listing) -> str:
+def table(estimate: Estimate | Listing, color: bool = False) -> str:
     if isinstance(estimate, Listing):
-        return _listing(estimate)
+        return _listing(estimate, color)
     total, kv, weights = estimate.total or 1, estimate.kv_cache, estimate.weights
     offloaded = estimate.offloaded
     all_params = weights.params + (offloaded.params if offloaded else 0)
@@ -198,10 +198,12 @@ def table(estimate: Estimate | Listing) -> str:
                 else "⚠ DOES NOT FIT"
             )
         sections[0][1].append(("GPU MEMORY", text, verdict, fit.required / capacity))
-    return _color(_draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH))
+    return _color(
+        _draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH), color
+    )
 
 
-def _listing(listing: Listing) -> str:
+def _listing(listing: Listing, color: bool = False) -> str:
     kv = next((f.kv_cache for f in listing.files if f.kv_cache), None)
     largest = max(f.total for f in listing.files) or 1
     name_width = min(max(len(f.file or "") for f in listing.files), MAX_FILE_WIDTH)
@@ -214,11 +216,11 @@ def _listing(listing: Listing) -> str:
             text += f" ({' + '.join(parts)})"
         items.append(("", text, f.file or "", f.total / largest))
     titles = _titles(listing.url, listing.revision, None, kv)
-    return _color(_draw(titles, [("FILES", items)], name_width))
+    return _color(_draw(titles, [("FILES", items)], name_width), color)
 
 
-def _color(lines: list[str]) -> str:
-    if sys.stdout.isatty() and not os.getenv("NO_COLOR"):
+def _color(lines: list[str], enabled: bool = False) -> str:
+    if enabled and sys.stdout.isatty() and not os.getenv("NO_COLOR"):
         return "\n".join(f"\x1b[38;2;244;183;63m{line}\x1b[0m" for line in lines)
     return "\n".join(lines)
 
