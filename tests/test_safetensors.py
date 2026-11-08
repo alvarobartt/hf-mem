@@ -547,13 +547,19 @@ def test_encoder_warmup_keeps_weights_and_scales_with_tokens(tmp_path: Path, dty
     assert small.weights.bytes == large.weights.bytes == stored
     assert set(small.weights.dtypes) == {dtype, "F32", "I64"}
     assert small.kv_cache is large.kv_cache is None
-    assert some(large.overhead).activations == 4 * some(small.overhead).activations
-    assert some(small.overhead).activations // size == 512 * (7 * 256 + 2 * 1024)
+    per_token = 7 * 256 + 2 * 1024
+    if size == 2:
+        assert some(large.overhead).activations == 4 * some(small.overhead).activations
+        assert some(small.overhead).activations // size == 512 * per_token
+    else:
+        # F32 runs eager: a single sequence keeps the scores and the probabilities, a batch also a padding mask
+        assert some(small.overhead).activations // size == 512 * per_token + 2 * 8 * 512**2
+        assert some(large.overhead).activations // size == 2048 * per_token + 3 * 8 * 2 * 1024**2
     assert small.total == small.weights.bytes + some(small.overhead).bytes
     assert any("Weights are estimated as stored" in w for w in small.warnings)
 
 
-def test_encoder_precision_does_not_change_attention_or_batch_shape(tmp_path: Path) -> None:
+def test_encoder_f32_activations_add_the_attention_tensors(tmp_path: Path) -> None:
     write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
     config = llama_config(architectures=["BertModel"], model_type="bert", torch_dtype="float32")
     write_json(str(tmp_path / "config.json"), config)
@@ -561,7 +567,89 @@ def test_encoder_precision_does_not_change_attention_or_batch_shape(tmp_path: Pa
     write_json(str(tmp_path / "config.json"), {**config, "torch_dtype": "float16"})
     half = estimate(str(tmp_path), max_num_batched_tokens=512)
     assert half.weights.to_dict() == single.weights.to_dict()
-    assert some(single.overhead).activations == 2 * some(half.overhead).activations
+    per_token = 7 * 256 + 2 * 1024
+    assert some(half.overhead).activations == 512 * per_token * 2
+    assert some(single.overhead).activations == (512 * per_token + 2 * 8 * 512**2) * 4
+    assert any("eager attention" in w and "half precision" in w for w in single.warnings)
+    assert any("memory-efficient attention" in w for w in half.warnings)
+
+
+def test_f32_modernbert_keeps_both_attention_masks_and_does_not_fit(tmp_path: Path) -> None:
+    # nomic-ai/modernbert-embed-base with `--dtype float32` peaks at 4.70 GiB with a 4096 token input on an L4
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [149_014_272])})
+    config = {
+        "architectures": ["ModernBertModel"],
+        "model_type": "modernbert",
+        "hidden_size": 768,
+        "intermediate_size": 1152,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 22,
+        "local_attention": 128,
+        "global_attn_every_n_layers": 3,
+        "max_position_embeddings": 8192,
+        "torch_dtype": "float32",
+    }
+    write_json(str(tmp_path / "config.json"), config)
+    options = {"max_num_batched_tokens": 4096, "max_model_len": 4096, "gpu_memory": "4"}
+    full = estimate(str(tmp_path), dtype="float32", **options)
+    half = estimate(str(tmp_path), dtype="float16", **options)
+    assert some(full.overhead).activations == (4096 * (7 * 768 + 5 * 1152) + 4 * 12 * 4096**2) * 4
+    assert not some(full.fit).fits and some(half.fit).fits
+    assert any("eager attention" in w for w in full.warnings)
+
+
+def test_f16_override_counts_the_loading_peak_of_the_largest_tensor(tmp_path: Path) -> None:
+    # intfloat/multilingual-e5-base with `--dtype float16` peaks at 1326 MiB while loading and 820 MiB once ready
+    embeddings = 250002 * 768
+    write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {"embeddings.word_embeddings.weight": ("F32", [250002, 768]), "encoder.w": ("F32", [86_000_000])},
+    )
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            architectures=["XLMRobertaModel"],
+            model_type="xlm-roberta",
+            hidden_size=768,
+            intermediate_size=3072,
+            num_attention_heads=12,
+            max_position_embeddings=514,
+            pad_token_id=1,
+            torch_dtype="float32",
+        ),
+    )
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    cast = estimate(str(tmp_path), dtype="float16", max_num_batched_tokens=128)
+    stored = estimate(str(tmp_path), max_num_batched_tokens=128)
+    overhead = some(cast.overhead)
+    # The embeddings load first, uploaded in F32 and cast to F16 on the device
+    assert overhead.loading > 0
+    assert cast.total == overhead.runtime + embeddings * (4 + 2)
+    assert some(stored.overhead).loading == 0
+    assert "LOADING" in table(cast)
+    assert any("while loading" in w for w in cast.warnings)
+
+
+def test_f32_alibi_keeps_the_bias_table(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            architectures=["JinaBertForMaskedLM"],
+            model_type="bert",
+            position_embedding_type="alibi",
+            max_position_embeddings=8192,
+            torch_dtype="float32",
+        ),
+    )
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    full = estimate(str(tmp_path), max_num_batched_tokens=128)
+    half = estimate(str(tmp_path), max_num_batched_tokens=128, dtype="float16")
+    assert some(full.overhead).buffers == 8 * 8192**2 * 4
+    assert some(half.overhead).buffers == 0
+    assert full.total == full.weights.bytes + some(full.overhead).bytes
+    assert "BUFFERS" in table(full)
+    assert any("ALiBi" in w for w in full.warnings)
 
 
 def test_encoder_eager_warmup_uses_all_tokens_and_sequence_override(tmp_path: Path) -> None:
@@ -679,7 +767,10 @@ def test_encoder_precision_override_keeps_components_and_buffer_storage(
         "0_Transformer": (64000 + 64) * size + 512 * 8,
         "2_Dense": 2048 * size,
     }
-    assert some(result.overhead).activations * 4 == some(before.overhead).activations * size
+    # Two sequences of 384 tokens, which only keep the attention tensors in F32
+    per_token, attention = 7 * 256 + 2 * 1024, 3 * 8 * 2 * 384**2
+    assert some(before.overhead).activations == (768 * per_token + attention) * 4
+    assert some(result.overhead).activations == (768 * per_token + (attention if size == 4 else 0)) * size
     assert result.total == result.weights.bytes + some(result.overhead).bytes
     assert (
         estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384).weights.to_dict()
@@ -696,9 +787,14 @@ def test_encoder_dtype_override_keeps_attention_and_warmup_shape(tmp_path: Path,
     )
     half = estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384, dtype="float16")
     full = estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384, dtype="float32")
-    assert some(full.overhead).activations == 2 * some(half.overhead).activations
+    # MPNet always runs eager, while BERT only materializes the attention scores in F32
+    if model_type == "mpnet":
+        assert some(full.overhead).activations == 2 * some(half.overhead).activations
+    else:
+        assert some(full.overhead).activations > 2 * some(half.overhead).activations
     assert some(full.overhead).runtime == some(half.overhead).runtime
-    assert ("eager attention" in " ".join(full.warnings)) == (model_type == "mpnet")
+    assert ("eager attention" in " ".join(half.warnings)) == (model_type == "mpnet")
+    assert "eager attention" in " ".join(full.warnings)
 
 
 @pytest.mark.parametrize(

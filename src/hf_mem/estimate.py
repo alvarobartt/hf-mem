@@ -7,7 +7,7 @@ from typing import Any
 from hf_mem import _config, _gguf, _onnx, _overhead, _safetensors
 from hf_mem._source import HubError, Progress, open_source
 from hf_mem._version import __version__
-from hf_mem._weights import DTYPES, Weights
+from hf_mem._weights import DTYPES, FLOAT_BYTES, Weights
 
 FORMATS = ("safetensors", "gguf", "onnx")
 
@@ -398,6 +398,21 @@ async def _encoder_length(source: Any, config: dict[str, Any], override: int | N
     return length if length > 0 else None
 
 
+def _loading_transient(components: dict[str, Weights], dtype: str) -> int:
+    # Engines that cast while loading upload each tensor as stored and cast it on the device, so loading peaks
+    # with the largest tensor held both ways, the token embeddings of encoders, which load first
+    target, size = DTYPES[dtype]
+    return max(
+        (
+            entry.largest * (FLOAT_BYTES[name] + size)
+            for component in components.values()
+            for name, entry in component.dtypes.items()
+            if name in FLOAT_BYTES and name != target
+        ),
+        default=0,
+    )
+
+
 def _encoder_size(config: dict[str, Any], weights: Weights) -> int:
     dtype = config.get("dtype") or config.get("torch_dtype")
     sizes = {"float64": 8, "float32": 4, "float16": 2, "bfloat16": 2}
@@ -521,16 +536,19 @@ async def _estimate_safetensors(
                 "Encoder warmup estimation skipped, as the sequence length is unknown, set `--max-model-len`."
             )
         else:
-            estimate.overhead = _overhead.encoder_warmup(
-                encoder_config,
-                files,
-                tokens,
-                length,
-                DTYPES[dtype][1] if dtype else _encoder_size(encoder_config, weights),
-            )
-            attention = (
-                "eager attention" if _overhead.encoder_eager(encoder_config) else "memory-efficient attention"
-            )
+            size = DTYPES[dtype][1] if dtype else _encoder_size(encoder_config, weights)
+            estimate.overhead = overhead = _overhead.encoder_warmup(encoder_config, files, tokens, length, size)
+            if dtype:
+                transient = _loading_transient(components, dtype)
+                overhead.loading = max(0, transient - weights.bytes - overhead.activations - overhead.buffers)
+            full, remaining = divmod(tokens, min(tokens, length))
+            if _overhead.encoder_eager(encoder_config, size):
+                tensors = _overhead.encoder_attention_tensors(encoder_config, full + bool(remaining))
+                attention = f"eager attention, keeping {tensors} tensors of attention scores per sequence" + (
+                    ", as memory-efficient attention kernels need half precision" if size >= 4 else ""
+                )
+            else:
+                attention = "memory-efficient attention"
             warnings.append(
                 f"Encoder warmup assumes {tokens} tokens in sequences of up to {length} tokens with {attention}. "
                 + (
@@ -540,6 +558,18 @@ async def _estimate_safetensors(
                 )
                 + "Engine kernels, padding and workspaces can change memory use."
             )
+            if overhead.buffers:
+                positions = encoder_config.get("max_position_embeddings")
+                warnings.append(
+                    f"Eager ALiBi attention keeps the biases of {positions} x {positions} positions per head, "
+                    f"{overhead.buffers / _overhead.GIB:.2f} GiB for the model's lifetime."
+                )
+            if overhead.loading:
+                warnings.append(
+                    f"Casting to {dtype} while loading holds the largest tensor both as stored and as cast, "
+                    f"peaking at {(overhead.bytes + weights.bytes) / _overhead.GIB:.2f} GiB while loading, "
+                    "assuming tensors are cast on the device and the token embeddings load first."
+                )
         if gpu_memory and (_overhead.parse_gpu_memory(gpu_memory)[0] or 1) > 1:
             warnings.append("Encoder fit assumes one replica per GPU, without tensor parallelism.")
         _fit(estimate, 0, 0.0, gpu_memory, utilization, max_gpus=1)

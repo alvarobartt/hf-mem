@@ -178,6 +178,8 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
                 ("ENCODER", overhead.encoder),
                 ("GRAPHS", overhead.graphs),
                 ("RUNTIME", overhead.runtime),
+                ("BUFFERS", overhead.buffers),
+                ("LOADING", overhead.loading),
             )
             if value
         ]

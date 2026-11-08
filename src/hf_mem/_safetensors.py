@@ -56,13 +56,14 @@ async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
     return head[8 : size + 8]
 
 
-Summary = tuple[dict[str, list[int]], dict[tuple[int, str], list[int]], dict[str, list[int]]]
+Summary = tuple[dict[str, list[int]], dict[tuple[int, str], list[int]], dict[str, list[int]], dict[str, int]]
 
 
 def summarize(raw: bytes, quantization: dict[str, Any] | None = None) -> Summary:
     dtypes: dict[str, list[int]] = {}
     experts: dict[tuple[int, str], list[int]] = {}
     offloaded: dict[str, list[int]] = {}
+    largest: dict[str, int] = {}
     quantization = quantization or {}
     packed, scales = None, None
     if quantization.get("format") == "mxfp4-pack-quantized":
@@ -95,11 +96,13 @@ def summarize(raw: bytes, quantization: dict[str, Any] | None = None) -> Summary
         entry = (offloaded if OFFLOADED.search(tensor) else dtypes).setdefault(dtype, [0, 0])
         entry[0] += params
         entry[1] += end - start
+        if not OFFLOADED.search(tensor):
+            largest[dtype] = max(largest.get(dtype, 0), params)
         if expert:
             entry = experts.setdefault((int(expert.group(1)), dtype), [0, 0])
             entry[0] += params
             entry[1] += end - start
-    return dtypes, experts, offloaded
+    return dtypes, experts, offloaded, largest
 
 
 def _groups(paths: list[str]) -> dict[str, list[str]]:
@@ -232,9 +235,9 @@ async def read_components(
     for name, component_paths in components.items():
         component, merged = Weights(), dict[int, Weights]()
         for path in component_paths:
-            dtypes, by_expert, cpu = summaries[path]
+            dtypes, by_expert, cpu, largest = summaries[path]
             for dtype, (params, nbytes) in dtypes.items():
-                component.add(dtype, params, nbytes)
+                component.add(dtype, params, nbytes, largest.get(dtype, 0))
             for (expert, dtype), (params, nbytes) in by_expert.items():
                 merged.setdefault(expert, Weights()).add(dtype, params, nbytes)
             for dtype, (params, nbytes) in cpu.items():
