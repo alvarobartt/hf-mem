@@ -7,6 +7,7 @@ import time
 from hf_mem import _safetensors
 from hf_mem._config import KV_CACHE_DTYPES
 from hf_mem._gguf import CACHE_TYPES
+from hf_mem._overhead import TEXT_EMBEDDINGS_INFERENCE_DTYPES
 from hf_mem._render import markdown, table
 from hf_mem._source import HubError, Progress
 from hf_mem._version import __version__
@@ -74,7 +75,15 @@ def main() -> None:
     parser.add_argument(
         "--max-num-batched-tokens",
         type=int,
-        help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
+        help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100. "
+        "For encoder models, as `--max-batch-tokens` in Text Embeddings Inference, defaults to 16384.",
+    )
+    parser.add_argument(
+        "--dtype",
+        choices=TEXT_EMBEDDINGS_INFERENCE_DTYPES,
+        help="For encoder models, the dtype the weights are loaded in and the activations run in, as `--dtype` "
+        "in Text Embeddings Inference. The weights default to the checkpoint dtype, and the activations to F16 "
+        "(F32 for Gemma 3) as Text Embeddings Inference on GPUs.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--color", action="store_true", help="Enable color in terminal tables.")
@@ -109,6 +118,7 @@ def main() -> None:
                 gpu_memory=args.gpu_memory,
                 gpu_memory_utilization=args.gpu_memory_utilization,
                 max_num_batched_tokens=args.max_num_batched_tokens,
+                dtype=args.dtype,
                 progress=Progress(status),
                 format=args.format,
             )

@@ -41,6 +41,33 @@ def test_table(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[st
     assert len({len(line) for line in out.splitlines()}) == 1
 
 
+def test_encoder_table(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"]))
+
+    code, out, err = cli(monkeypatch, capsys, str(tmp_path))
+
+    # The F32 weights are shown as stored, with a hint to estimate them as Text Embeddings Inference loads them
+    assert code == 0 and "`--dtype float16`" in err
+    assert "PARAMS + OVERHEAD)" in out and "MODEL (" in out and "ACTIVATIONS" in out
+    assert "KV CACHE" not in out
+    assert len({len(line) for line in out.splitlines()}) == 1
+
+
+def test_dtype(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"]))
+
+    code, out, _ = cli(monkeypatch, capsys, str(tmp_path), "--dtype", "float16", "-o", "json")
+    assert code == 0 and set(json.loads(out)["weights"]["dtypes"]) == {"F16"}
+    code, _, err = cli(monkeypatch, capsys, str(tmp_path), "--dtype", "bfloat16")
+    assert code == 2 and "invalid choice" in err
+
+
 @pytest.mark.parametrize(
     "tty,color,no_color,expected",
     [
