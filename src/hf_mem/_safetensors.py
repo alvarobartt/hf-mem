@@ -85,6 +85,13 @@ def summarize(raw: bytes, quantization: dict[str, Any] | None = None) -> Summary
                 params, dtype = params * 2, "MXFP4"
             elif dtype == "F8_E8M0" and tensor.endswith(".scale"):
                 params, dtype = 0, "MXFP4"
+        if quantization.get("quant_method") == "fp8" and (
+            dtype == "F8_E8M0"
+            and tensor.endswith(".scale")
+            or dtype == "F32"
+            and tensor.endswith(".weight_scale_inv")
+        ):
+            params = 0
         entry = (offloaded if OFFLOADED.search(tensor) else dtypes).setdefault(dtype, [0, 0])
         entry[0] += params
         entry[1] += end - start
