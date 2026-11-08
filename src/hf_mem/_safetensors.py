@@ -59,7 +59,7 @@ async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
 Summary = tuple[dict[str, list[int]], dict[tuple[int, str], list[int]], dict[str, list[int]]]
 
 
-def summarize(raw: bytes) -> Summary:
+def summarize(raw: bytes, quantization: str | None = None) -> Summary:
     dtypes: dict[str, list[int]] = {}
     experts: dict[tuple[int, str], list[int]] = {}
     offloaded: dict[str, list[int]] = {}
@@ -68,6 +68,11 @@ def summarize(raw: bytes) -> Summary:
             continue
         start, end = info["data_offsets"]
         params, dtype = math.prod(info["shape"]), info["dtype"]
+        if quantization == "mxfp4-pack-quantized" and dtype == "U8":
+            if tensor.rsplit(".", 1)[-1] == "weight_packed":
+                params, dtype = params * 2, "MXFP4"
+            elif tensor.rsplit(".", 1)[-1] == "weight_scale":
+                params, dtype = 0, "MXFP4"
         entry = (offloaded if OFFLOADED.search(tensor) else dtypes).setdefault(dtype, [0, 0])
         entry[0] += params
         entry[1] += end - start
@@ -164,7 +169,10 @@ async def discover(source: Any, file: str | None, warnings: list[str]) -> dict[s
 
 
 async def read_components(
-    source: Any, components: dict[str, list[str]], warnings: list[str] | None = None
+    source: Any,
+    components: dict[str, list[str]],
+    warnings: list[str] | None = None,
+    quantization: str | None = None,
 ) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]], Weights]:
     paths = sorted({p for ps in components.values() for p in ps})
     semaphore, probe = asyncio.Semaphore(32), [PROBE_SIZE]
@@ -176,7 +184,11 @@ async def read_components(
         async with semaphore:
             raw = await read_header(source, path, probe[0])
         try:
-            summaries[path] = await loop.run_in_executor(pool, summarize, raw) if pool else summarize(raw)
+            summaries[path] = (
+                await loop.run_in_executor(pool, summarize, raw, quantization)
+                if pool
+                else summarize(raw, quantization)
+            )
         except (ValueError, KeyError, TypeError, AttributeError) as e:
             raise RuntimeError(f"`{path}` is not a valid Safetensors file.") from e
         probe[0] = max(probe[0], len(raw) + 8)
