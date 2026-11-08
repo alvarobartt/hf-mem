@@ -41,6 +41,36 @@ def test_table(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[st
     assert len({len(line) for line in out.splitlines()}) == 1
 
 
+@pytest.mark.parametrize(
+    "tty,color,no_color,expected",
+    [
+        (True, False, False, False),
+        (True, True, False, True),
+        (True, True, True, False),
+        (False, True, False, False),
+    ],
+)
+def test_terminal_color_is_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    model: str,
+    tty: bool,
+    color: bool,
+    no_color: bool,
+    expected: bool,
+) -> None:
+    monkeypatch.setattr(sys.stdout, "isatty", lambda: tty)
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    if no_color:
+        monkeypatch.setenv("NO_COLOR", "1")
+
+    code, out, _ = cli(monkeypatch, capsys, model, *(["--color"] if color else []))
+
+    assert code == 0
+    assert ("\x1b[" in out) is expected
+    assert "TOTAL MEMORY" in out
+
+
 def test_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
     code, out, _ = cli(monkeypatch, capsys, model, "-o", "json", "--max-model-len", "10", "--batch-size", "2")
     data = json.loads(out)

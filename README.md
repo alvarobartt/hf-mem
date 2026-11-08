@@ -8,6 +8,8 @@ The estimate covers the model weights, the KV cache for generative models, and t
 
 Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, where `<model>` is a Hub model ID (optionally with `@revision`, and with `:<quantization>` for GGUF), a Hub URL, or a local path.
 
+Tables are monochrome by default. Use `--color` to enable terminal colors; `NO_COLOR` takes precedence.
+
 ### Transformers
 
 ```console
