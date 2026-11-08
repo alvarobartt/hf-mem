@@ -247,7 +247,7 @@ def test_gpt_oss_mxfp4_blocks_count_both_values(tmp_path: Path) -> None:
     assert result.weights.dtypes["U8"].params == 5
 
 
-@pytest.mark.parametrize("expert_dtype,params", [("fp4", 1024), ("fp8", 544)])
+@pytest.mark.parametrize("expert_dtype,params", [("fp4", 1024), ("fp8", 512)])
 def test_deepseek_fp4_experts_keep_the_fp8_weights(tmp_path: Path, expert_dtype: str, params: int) -> None:
     write_safetensors(
         str(tmp_path / "model.safetensors"),
@@ -264,11 +264,34 @@ def test_deepseek_fp4_experts_keep_the_fp8_weights(tmp_path: Path, expert_dtype:
     result = estimate(str(tmp_path))
 
     assert result.weights.bytes == 1057
-    assert result.weights.params == params + 513
+    assert result.weights.params == params + 512
     assert some(result.moe).expert.params == params
     assert some(result.moe).expert.bytes == 544
-    assert some(result.moe).base.params == 513
+    assert some(result.moe).base.params == 512
     assert some(result.moe).base.bytes == 513
+
+
+def test_fp8_scales_are_storage_not_parameters(tmp_path: Path) -> None:
+    write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {
+            "model.layers.0.attn.weight": ("F8_E4M3", [32, 64]),
+            "model.layers.0.attn.weight_scale_inv": ("F32", [1, 2]),
+            "model.layers.0.norm.scale": ("F32", [32]),
+            "model.layers.1.engram.embed.weight": ("F8_E4M3", [8, 8]),
+            "model.layers.1.engram.embed.scale": ("F8_E8M0", [1, 1]),
+        },
+    )
+    write_json(str(tmp_path / "config.json"), llama_config(quantization_config={"quant_method": "fp8"}))
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.params == 2080
+    assert result.weights.bytes == 2184
+    assert result.weights.dtypes["F32"].params == 32
+    assert result.weights.dtypes["F32"].bytes == 136
+    assert some(result.offloaded).params == 64
+    assert some(result.offloaded).bytes == 65
 
 
 def test_pickle_weights_are_not_estimated(tmp_path: Path) -> None:
