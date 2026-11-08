@@ -148,10 +148,16 @@ def is_generative(config: dict[str, Any], files: dict[str, int]) -> bool:
 
 
 def is_text_encoder(config: dict[str, Any], files: dict[str, int]) -> bool:
-    # Sentence Transformers, MLM, classification and QA heads, and bare `...Model` encoders, served with a
-    # single forward pass (e.g. by Text Embeddings Inference), excluding vision and audio models (which ship
-    # a preprocessor).
-    if "preprocessor_config.json" in files or not _is_text(config):
+    if (
+        config.get("is_encoder_decoder")
+        or any(
+            hint in str(config.get("model_type") or "").lower()
+            for hint in ("vision", "audio", "wav2vec", "dinov", "vit", "clip")
+        )
+        or "preprocessor_config.json" in files
+        or any(isinstance(config.get(k), dict) for k in ("vision_config", "audio_config", *_TEXT_KEYS))
+        or not _is_text(config)
+    ):
         return False
     architectures = [str(a) for a in config.get("architectures") or []]
     return (
