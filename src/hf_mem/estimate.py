@@ -158,7 +158,7 @@ def _mxfp4_padding(
     quantization = config.get("quantization_config") or text.get("quantization_config") or {}
     if quantization.get("quant_method") != "mxfp4" and quantization.get("expert_dtype") != "fp4":
         return None
-    experts = sum(weights.dtypes[d].bytes for d in ("U8", "I8", "F8_E8M0") if d in weights.dtypes)
+    experts = sum(weights.dtypes[d].bytes for d in ("U8", "I8", "F8_E8M0", "MXFP4") if d in weights.dtypes)
     intermediate = text.get("moe_intermediate_size") or text.get("intermediate_size") or 0
     if not experts or not intermediate or not text.get("hidden_size"):
         return None
@@ -397,7 +397,7 @@ async def _estimate_safetensors(
             or {}
         )
         components, experts, offloaded = await _safetensors.read_components(
-            source, selected, warnings, quantization.get("format")
+            source, selected, warnings, quantization
         )
         processor: dict[str, Any] = {}
         for result in await asyncio.gather(*processor_tasks, return_exceptions=True):

@@ -224,6 +224,53 @@ def test_u8_tensors_are_not_assumed_to_be_mxfp4(tmp_path: Path, quantization: di
     assert set(result.weights.dtypes) == {"U8"}
 
 
+def test_gpt_oss_mxfp4_blocks_count_both_values(tmp_path: Path) -> None:
+    write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {
+            "model.embed_tokens.weight": ("BF16", [16, 32]),
+            "model.layers.0.mlp.experts.gate_up_proj_blocks": ("U8", [2, 32, 1, 16]),
+            "model.layers.0.mlp.experts.gate_up_proj_scales": ("U8", [2, 32, 1]),
+            "model.layers.0.mlp.experts.gate_up_proj_bias": ("BF16", [2, 32]),
+            "model.buffer": ("U8", [5]),
+        },
+    )
+    write_json(str(tmp_path / "config.json"), llama_config(quantization_config={"quant_method": "mxfp4"}))
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.params == 2629
+    assert result.weights.bytes == 2245
+    assert result.weights.dtypes["MXFP4"].params == 2048
+    assert result.weights.dtypes["MXFP4"].bytes == 1088
+    assert result.weights.dtypes["BF16"].params == 576
+    assert result.weights.dtypes["U8"].params == 5
+
+
+@pytest.mark.parametrize("expert_dtype,params", [("fp4", 1024), ("fp8", 544)])
+def test_deepseek_fp4_experts_keep_the_fp8_weights(tmp_path: Path, expert_dtype: str, params: int) -> None:
+    write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {
+            "layers.0.ffn.experts.0.w1.weight": ("I8", [32, 16]),
+            "layers.0.ffn.experts.0.w1.scale": ("F8_E8M0", [32, 1]),
+            "layers.0.attn.wq.weight": ("I8", [16, 32]),
+            "layers.0.attn.wq.scale": ("F8_E8M0", [1, 1]),
+        },
+    )
+    quantization = {"quant_method": "fp8", "expert_dtype": expert_dtype}
+    write_json(str(tmp_path / "config.json"), llama_config(quantization_config=quantization))
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == 1057
+    assert result.weights.params == params + 513
+    assert some(result.moe).expert.params == params
+    assert some(result.moe).expert.bytes == 544
+    assert some(result.moe).base.params == 513
+    assert some(result.moe).base.bytes == 513
+
+
 def test_pickle_weights_are_not_estimated(tmp_path: Path) -> None:
     for name, size in {"pytorch_model.bin": 1000, "optimizer.pt": 99, "README.md": 5}.items():
         with open(tmp_path / name, "wb") as f:

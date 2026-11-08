@@ -7,7 +7,18 @@ from typing import Any, TypeVar
 from hf_mem import Estimate, Listing, run
 from hf_mem._gguf import TYPES
 
-_BITS = {"F64": 64, "F32": 32, "F16": 16, "BF16": 16, "I64": 64, "I32": 32, "F8_E4M3": 8, "U8": 8, "I8": 8}
+_BITS = {
+    "F64": 64,
+    "F32": 32,
+    "F16": 16,
+    "BF16": 16,
+    "I64": 64,
+    "I32": 32,
+    "F8_E4M3": 8,
+    "F8_E8M0": 8,
+    "U8": 8,
+    "I8": 8,
+}
 
 
 def write_safetensors(path: str, tensors: dict[str, tuple[str, list[int]]]) -> int:
