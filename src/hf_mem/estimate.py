@@ -133,6 +133,7 @@ def _fit(
     kv_heads: int | None = None,
     padding: Callable[[int], int] | None = None,
     kv_bytes: Callable[[int, int], int] | None = None,
+    max_gpus: int | None = None,
 ) -> None:
     if gpu_memory is None:
         return
@@ -150,6 +151,7 @@ def _fit(
         context=estimate.overhead.context if estimate.overhead else 0,
         padding=padding,
         kv_bytes=kv_bytes,
+        max_gpus=max_gpus,
     )
 
 
@@ -365,6 +367,42 @@ async def _estimate_onnx(
     return Listing(source.name, source.revision, source.url, files, warnings)
 
 
+_IGNORED_DTYPE = (
+    "`--dtype` only applies to encoder models served with Text Embeddings Inference, so the weights are "
+    "estimated as stored."
+)
+# As Text Embeddings Inference reads the maximum input length, in order of priority
+_SENTENCE_TRANSFORMERS_CONFIGS = (
+    "sentence_bert_config.json",
+    "sentence_roberta_config.json",
+    "sentence_distilbert_config.json",
+    "sentence_camembert_config.json",
+    "sentence_albert_config.json",
+    "sentence_xlm-roberta_config.json",
+    "sentence_xlnet_config.json",
+)
+
+
+async def _max_input_length(source: Any, config: dict[str, Any], dtype: str | None) -> int | None:
+    # Only the padded models need it, as they warm up with a single input of the maximum input length: the
+    # Sentence Transformers `max_seq_length`, or else the positions minus the RoBERTa padding offset
+    if not _overhead.text_embeddings_inference_padded(config, dtype):
+        return None
+    for name in _SENTENCE_TRANSFORMERS_CONFIGS:
+        if name in source.files:
+            try:
+                if isinstance(length := (await source.json(name)).get("max_seq_length"), int):
+                    return length
+            except (RuntimeError, ValueError):
+                pass
+            break
+    positions = config.get("max_position_embeddings")
+    if not isinstance(positions, int):
+        return None
+    roberta = config.get("model_type") in ("roberta", "xlm-roberta", "camembert")
+    return positions - ((config.get("pad_token_id") or 0) + 1 if roberta else 0)
+
+
 async def _estimate_safetensors(
     source: Any,
     file: str | None,
@@ -376,6 +414,7 @@ async def _estimate_safetensors(
     gpu_memory: str | None,
     utilization: float,
     max_num_batched_tokens: int | None,
+    dtype: str | None = None,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -437,6 +476,43 @@ async def _estimate_safetensors(
             "KV cache estimation skipped, as Mistral `params.json` configs are not supported, estimate a version of "
             "the model with a Transformers `config.json` for the KV cache."
         )
+    if config and _config.is_text_encoder(config, files):
+        default, size = _overhead.text_embeddings_inference_dtype(config)
+        loaded = sum(component.cast(default, size).bytes for component in components.values())
+        if dtype is None and abs(loaded - weights.bytes) > 0.01 * weights.bytes:
+            warnings.append(
+                f"Text Embeddings Inference loads the weights in {default} on GPUs by default, i.e. "
+                f"{loaded / _overhead.GIB:.2f} GiB instead of {weights.bytes / _overhead.GIB:.2f} GiB, so set "
+                f"`--dtype {'float32' if default == 'F32' else 'float16'}` to estimate them as loaded."
+            )
+        if dtype is not None:
+            # As Text Embeddings Inference casts the floating point weights to `--dtype`
+            served = _overhead.text_embeddings_inference_dtype(config, dtype)
+            estimate.components = {name: component.cast(*served) for name, component in components.items()}
+            estimate.weights = Weights()
+            for component in estimate.components.values():
+                estimate.weights.merge(component)
+        if dtype == "float16" and _overhead.text_embeddings_inference_dtype(config)[0] == "F32":
+            warnings.append(
+                "Text Embeddings Inference only supports Gemma 3 in F32 and fails to start with "
+                "`--dtype float16`, so use `--dtype float32` or leave it unset."
+            )
+        estimate.overhead = _overhead.text_embeddings_inference(
+            _config.normalize(config),
+            files,
+            max_num_batched_tokens or _overhead.TEXT_EMBEDDINGS_INFERENCE_BATCHED_TOKENS,
+            await _max_input_length(source, config, dtype),
+            dtype,
+        )
+        if gpu_memory and (_overhead.parse_gpu_memory(gpu_memory)[0] or 1) > 1:
+            warnings.append(
+                "Text Embeddings Inference runs each model on a single GPU, without tensor parallelism, so the "
+                "fit is for one of the given GPUs, serving one replica per GPU."
+            )
+        _fit(estimate, 0, 0.0, gpu_memory, utilization, max_gpus=1)
+        return estimate
+    if dtype is not None:
+        warnings.append(_IGNORED_DTYPE)
     if not config or "config_sentence_transformers.json" in files or not _config.is_generative(config, files):
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
@@ -548,6 +624,7 @@ async def arun(
     max_num_batched_tokens: int | None = None,
     progress: Progress | None = None,
     format: str | None = None,
+    dtype: str | None = None,
 ) -> Estimate | Listing:
     if batch_size < 1 or any(v is not None and v < 1 for v in (max_model_len, max_num_batched_tokens)):
         raise RuntimeError("`--batch-size`, `--max-model-len` and `--max-num-batched-tokens` must be positive.")
@@ -557,6 +634,9 @@ async def arun(
         _overhead.parse_gpu_memory(gpu_memory)
     if format not in (None, *FORMATS):
         raise RuntimeError(f"`--format={format}` is not valid, use one of {', '.join(FORMATS)}.")
+    if dtype not in (None, *_overhead.TEXT_EMBEDDINGS_INFERENCE_DTYPES):
+        choices = ", ".join(_overhead.TEXT_EMBEDDINGS_INFERENCE_DTYPES)
+        raise RuntimeError(f"`--dtype={dtype}` is not valid, use one of {choices}.")
     source, url_file = await open_source(model_id, revision, hf_token, progress)
     file = file or url_file
     warnings: list[str] = []
@@ -579,6 +659,8 @@ async def arun(
             for p in source.files
         )
         only_onnx = onnx and not any(p.endswith(".safetensors") for p in source.files) and not gguf
+        if dtype is not None and (format in ("gguf", "onnx") or (format is None and not has_safetensors)):
+            warnings.append(_IGNORED_DTYPE)
         if format == "onnx" or (format is None and ((wants_onnx and not wants_gguf) or only_onnx)):
             return await _estimate_onnx(
                 source,
@@ -612,6 +694,7 @@ async def arun(
             gpu_memory,
             gpu_memory_utilization,
             max_num_batched_tokens,
+            dtype,
         ):
             for other, found in (("GGUF", gguf), ("ONNX", onnx)):
                 if found and format is None and file is None:
@@ -648,6 +731,7 @@ def run(
     gpu_memory_utilization: float = 0.92,
     max_num_batched_tokens: int | None = None,
     format: str | None = None,
+    dtype: str | None = None,
 ) -> Estimate | Listing:
     try:
         asyncio.get_running_loop()
@@ -665,6 +749,7 @@ def run(
                 gpu_memory_utilization,
                 max_num_batched_tokens,
                 format=format,
+                dtype=dtype,
             )
         )
     raise RuntimeError(

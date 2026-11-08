@@ -69,6 +69,13 @@ _ENCODER_ARCHS = (
     "Embedding",
 )
 _GENERATIVE_ARCHS = ("ForCausalLM", "ForConditionalGeneration", "LMHeadModel")
+_TEXT_HEADS = (
+    "ForMaskedLM",
+    "ForSequenceClassification",
+    "ForTokenClassification",
+    "ForQuestionAnswering",
+    "ForMultipleChoice",
+)
 _STATE = ("linear", "conv", "mamba", "ssm", "recurrent", "delta", "rwkv", "lightning")
 _NO_CACHE = ("mlp", "moe")
 _SLIDING = ("sliding", "local", "chunked", "swa")
@@ -138,6 +145,20 @@ def _nested(config: dict[str, Any], path: str = "") -> list[tuple[str, dict[str,
 def is_generative(config: dict[str, Any], files: dict[str, int]) -> bool:
     architectures = config.get("architectures") or []
     return "generation_config.json" in files or any(a.endswith(_GENERATIVE_ARCHS) for a in architectures)
+
+
+def is_text_encoder(config: dict[str, Any], files: dict[str, int]) -> bool:
+    # Sentence Transformers, MLM, classification and QA heads, and bare `...Model` encoders, served with a
+    # single forward pass (e.g. by Text Embeddings Inference), excluding vision and audio models (which ship
+    # a preprocessor).
+    if "preprocessor_config.json" in files or not _is_text(config):
+        return False
+    architectures = [str(a) for a in config.get("architectures") or []]
+    return (
+        "config_sentence_transformers.json" in files
+        or any(a.endswith(_TEXT_HEADS) for a in architectures)
+        or (not is_generative(config, files) and any(a.endswith("Model") for a in architectures))
+    )
 
 
 def text_config(config: dict[str, Any]) -> dict[str, Any] | None:

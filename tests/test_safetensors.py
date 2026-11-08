@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from helpers import estimate, kimi_config, llama_config, llama_tensors, some, write_json, write_safetensors
 
-from hf_mem import Estimate, _config, _safetensors
+from hf_mem import Estimate, _config, _overhead, _safetensors
 from hf_mem._render import markdown, table
 from hf_mem._source import LocalSource
 
@@ -124,6 +124,180 @@ def test_sentence_transformers_adds_dense_modules(tmp_path: Path) -> None:
 
     assert {n: c.bytes for n, c in result.components.items()} == {"0_Transformer": main, "2_Dense": dense}
     assert result.kv_cache is None
+
+
+def test_encoder_weights_keep_the_checkpoint_dtype_unless_a_dtype_is_passed(tmp_path: Path) -> None:
+    tensors = {"w": ("F32", [1000, 64]), "embeddings.position_ids": ("I64", [1, 512])}
+    write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    write_safetensors(str(tmp_path / "2_Dense/model.safetensors"), {"linear.weight": ("BF16", [64, 32])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "modules.json"), [{"path": ""}, {"path": "1_Pooling"}, {"path": "2_Dense"}])
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"], model_type="bert"))
+
+    stored = estimate(str(tmp_path))
+    assert set(stored.weights.dtypes) == {"F32", "BF16", "I64"}
+    assert stored.weights.bytes == 64000 * 4 + 2048 * 2 + 512 * 8
+    # Text Embeddings Inference loads the F32 weights in F16 by default
+    assert any("`--dtype float16`" in w for w in stored.warnings)
+
+    # As `--dtype float16` in Text Embeddings Inference, keeping the integer buffers as they are
+    result = estimate(str(tmp_path), dtype="float16")
+
+    assert result.weights.to_dict()["dtypes"] == {
+        "F16": {"bytes": (64000 + 2048) * 2, "params": 64000 + 2048},
+        "I64": {"bytes": 512 * 8, "params": 512},
+    }
+    assert {n: c.bytes for n, c in result.components.items()} == {
+        "0_Transformer": 64000 * 2 + 512 * 8,
+        "2_Dense": 2048 * 2,
+    }
+    assert result.total == result.weights.bytes + some(result.overhead).bytes and not result.warnings
+
+
+def test_gemma3_weights_keep_the_checkpoint_dtype_and_warn_about_float16(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("BF16", [1000, 64])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    config = llama_config(architectures=["Gemma3TextModel"], model_type="gemma3_text")
+    write_json(str(tmp_path / "config.json"), config)
+
+    stored = estimate(str(tmp_path))
+    assert set(stored.weights.dtypes) == {"BF16"}
+    # Text Embeddings Inference loads Gemma 3 in F32 by default
+    assert any("`--dtype float32`" in w for w in stored.warnings)
+    result = estimate(str(tmp_path), dtype="float32")
+    assert (set(result.weights.dtypes), result.weights.bytes) == ({"F32"}, 64000 * 4) and not result.warnings
+    # Text Embeddings Inference refuses to start Gemma 3 in F16
+    assert any("float32" in w for w in estimate(str(tmp_path), dtype="float16").warnings)
+
+
+def test_dtype_float32_pads_the_flash_models(tmp_path: Path) -> None:
+    # RoBERTa without a Sentence Transformers config warms up with `max_position_embeddings` minus the padding
+    # offset (`pad_token_id + 1`) as its maximum input length
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    config = llama_config(
+        architectures=["RobertaModel"],
+        model_type="roberta",
+        num_key_value_heads=None,
+        max_position_embeddings=514,
+        pad_token_id=1,
+    )
+    write_json(str(tmp_path / "config.json"), config)
+
+    single = 512 * (7 * 256 + 2 * 1024) * 4 + 5 * 8 * 512**2 * 4
+    assert some(estimate(str(tmp_path), dtype="float32").overhead).activations == single
+
+
+def test_dtype_is_ignored_for_generative_models(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    result = estimate(str(tmp_path), dtype="float16")
+
+    assert set(result.weights.dtypes) == {"BF16", "F32"}
+    assert any("`--dtype`" in w for w in result.warnings)
+    with pytest.raises(RuntimeError, match="--dtype"):
+        estimate(str(tmp_path), dtype="bfloat16")
+
+
+def test_encoder_overhead_follows_the_text_embeddings_inference_warmup(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    config = {
+        "architectures": ["BertForMaskedLM"],
+        "hidden_size": 64,
+        "num_hidden_layers": 2,
+        "num_attention_heads": 4,
+        "intermediate_size": 128,
+        "vocab_size": 1000,
+    }
+    write_json(str(tmp_path / "config.json"), config)
+    write_json(str(tmp_path / "1_SpladePooling/config.json"), {"pooling_strategy": "max"})
+
+    result = estimate(str(tmp_path))
+    overhead = some(result.overhead)
+
+    assert overhead.activations == 16384 * (7 * 64 + 2 * 128 + 2 * 1000) * 2
+    assert overhead.bytes == overhead.activations + overhead.runtime
+    assert result.kv_cache is None and result.total == result.weights.bytes + overhead.bytes
+    small = some(estimate(str(tmp_path), max_num_batched_tokens=512).overhead)
+    assert small.activations == 512 * (7 * 64 + 2 * 128 + 2 * 1000) * 2
+    fit = estimate(str(tmp_path), gpu_memory="24")
+    assert some(fit.overhead).bytes == overhead.bytes and some(fit.fit).required == result.total
+
+
+def test_text_embeddings_inference_fits_on_a_single_gpu(tmp_path: Path) -> None:
+    # Text Embeddings Inference has no tensor parallelism, so 4 GiB of weights do not fit on 2 GPUs of 3 GiB
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("BF16", [1024, 1024, 2048])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"], model_type="bert"))
+
+    fit = some(estimate(str(tmp_path), gpu_memory="2x3").fit)
+    assert (fit.gpus, fit.needed, fit.fits) == (1, None, False)
+    assert any("single GPU" in w for w in estimate(str(tmp_path), gpu_memory="2x3").warnings)
+    assert not estimate(str(tmp_path), gpu_memory="8").warnings
+
+
+def test_masked_lms_without_pooling_default_to_cls(tmp_path: Path) -> None:
+    # As `google-bert/bert-base-uncased`, which Text Embeddings Inference pools with CLS without `--pooling
+    # splade`
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    config = {
+        "architectures": ["BertForMaskedLM"],
+        "model_type": "bert",
+        "hidden_size": 64,
+        "num_hidden_layers": 2,
+        "num_attention_heads": 4,
+        "intermediate_size": 256,
+        "vocab_size": 30522,
+    }
+    write_json(str(tmp_path / "config.json"), config)
+
+    assert some(estimate(str(tmp_path)).overhead).activations == 16384 * (7 * 64 + 2 * 256) * 2
+
+
+def test_text_embeddings_inference_runtime_counts_towards_the_fit(tmp_path: Path) -> None:
+    # `sentence-transformers/all-MiniLM-L6-v2` peaks at 500 MiB on an L4 (564 MiB on an A10G), so 0.3 GiB is too
+    # little even though its weights and warmup activations take less
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [22_700_000])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"], model_type="bert"))
+
+    result = estimate(str(tmp_path), gpu_memory="0.3", max_num_batched_tokens=512)
+    overhead = some(result.overhead)
+
+    assert overhead.runtime == overhead.context == int(0.32 * _overhead.GIB)
+    assert not some(result.fit).fits
+
+
+def test_padded_models_warm_up_with_one_input_of_the_sentence_transformers_length(tmp_path: Path) -> None:
+    # As `sentence-transformers/all-mpnet-base-v2`, which MPNet runs padded with a single input of 384 tokens
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "sentence_bert_config.json"), {"max_seq_length": 384})
+    write_json(str(tmp_path / "1_Pooling/config.json"), {"pooling_mode_mean_tokens": True})
+    config = llama_config(
+        architectures=["MPNetForMaskedLM"], model_type="mpnet", num_key_value_heads=None, vocab_size=1000
+    )
+    write_json(str(tmp_path / "config.json"), config)
+
+    single = 384 * (7 * 256 + 2 * 1024) * 2 + 5 * 8 * 384**2 * 2
+    assert some(estimate(str(tmp_path)).overhead).activations == single
+    # Without a Sentence Transformers config, the maximum input length is `max_position_embeddings`
+    os.remove(tmp_path / "sentence_bert_config.json")
+    single = 1024 * (7 * 256 + 2 * 1024) * 2 + 5 * 8 * 1024**2 * 2
+    assert some(estimate(str(tmp_path)).overhead).activations == single
+
+
+def test_sentence_transformers_decoders_get_the_encoder_overhead(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "generation_config.json"), {})
+    config = llama_config(architectures=["Qwen3ForCausalLM"], hidden_act="silu", rms_norm_eps=1e-6)
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path))
+
+    assert result.kv_cache is None and not result.warnings
+    assert some(result.overhead).activations == 16384 * (10 * 256 + 5 * 4 * 256) * 2
 
 
 def test_unindexed_files_are_separate_components(tmp_path: Path) -> None:
