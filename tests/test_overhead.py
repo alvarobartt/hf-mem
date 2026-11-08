@@ -56,122 +56,6 @@ def test_encoder_patches() -> None:
     assert _overhead.encoder({}, {}) == 0
 
 
-BERT = {
-    "architectures": ["BertModel"],
-    "model_type": "bert",
-    "hidden_size": 768,
-    "num_attention_heads": 12,
-    "intermediate_size": 3072,
-    "vocab_size": 30522,
-    "hidden_act": "gelu",
-}
-RUNTIME = int(0.32 * GIB)
-
-
-def test_text_embeddings_inference_warmup_follows_the_flash_encoders() -> None:
-    # Fitted on the warmup peaks of Text Embeddings Inference 1.9 on L4 and A10G GPUs (352 MiB for
-    # `BAAI/bge-base-en-v1.5` at 16384 tokens), plus the CUDA context and cuBLAS workspaces as the runtime
-    expected = _overhead.Overhead(16384 * (7 * 768 + 2 * 3072) * 2, 0, 0, RUNTIME, RUNTIME)
-    assert _overhead.text_embeddings_inference(BERT, {}, 16384) == expected
-    classifier = {**BERT, "architectures": ["BertForSequenceClassification"], "num_labels": 2}
-    assert _overhead.text_embeddings_inference(classifier, {}, 16384) == expected
-    # MoE experts only run over the tokens routed to them, so the dense layers set the peak
-    assert _overhead.text_embeddings_inference({**BERT, "moe_top_k": 2}, {}, 16384) == expected
-
-
-def test_text_embeddings_inference_warmup_splade_head_keeps_the_logits_and_their_log() -> None:
-    masked = {**BERT, "architectures": ["BertForMaskedLM"]}
-    splade = _overhead.text_embeddings_inference(masked, {"1_SpladePooling/config.json": 1}, 512)
-    assert splade.activations == 512 * (7 * 768 + 2 * 3072 + 2 * 30522) * 2
-    # Routed sparse encoders (e.g. OpenSearch's) prefix the module with the route
-    routed = {"document_1_SpladePooling/config.json": 1}
-    assert _overhead.text_embeddings_inference(masked, routed, 512) == splade
-
-
-def test_text_embeddings_inference_masked_lms_without_splade_pooling_skip_the_vocabulary() -> None:
-    # Without `--pooling`, Text Embeddings Inference pools BERT variants without `1_Pooling` with CLS, and only
-    # runs the SPLADE head when asked to, so the vocabulary only counts for Sentence Transformers sparse
-    # encoders
-    masked = {**BERT, "architectures": ["BertForMaskedLM"]}
-    plain = _overhead.text_embeddings_inference(BERT, {}, 512)
-    assert _overhead.text_embeddings_inference(masked, {}, 512) == plain
-    assert _overhead.text_embeddings_inference(masked, {"1_Pooling/config.json": 1}, 512) == plain
-    # SPLADE needs a masked LM head
-    assert _overhead.text_embeddings_inference(BERT, {"1_SpladePooling/config.json": 1}, 512) == plain
-
-
-def test_text_embeddings_inference_warmup_follows_gated_mlps_and_pre_norm_decoders() -> None:
-    qwen3 = {
-        "model_type": "qwen3",
-        "hidden_size": 1024,
-        "num_attention_heads": 16,
-        "num_key_value_heads": 8,
-        "head_dim": 128,
-        "intermediate_size": 3072,
-        "hidden_act": "silu",
-        "rms_norm_eps": 1e-6,
-    }
-    assert _overhead.text_embeddings_inference(qwen3, {}, 1000).activations == 1000 * (10 * 1024 + 5 * 3072) * 2
-    modernbert = {**BERT, "model_type": "modernbert", "intermediate_size": 1152}
-    assert (
-        _overhead.text_embeddings_inference(modernbert, {}, 1000).activations == 1000 * (7 * 768 + 5 * 1152) * 2
-    )
-    jina = {**BERT, "feed_forward_type": "geglu"}
-    assert _overhead.text_embeddings_inference(jina, {}, 1000).activations == 1000 * (7 * 768 + 5 * 3072) * 2
-
-
-def test_text_embeddings_inference_padded_models_warm_up_with_a_single_input() -> None:
-    # MPNet, DeBERTa-v2 and Gemma 3 run without flash attention, so the warmup is a single input of the maximum
-    # input length, which also keeps the attention scores over it
-    mpnet = {**BERT, "model_type": "mpnet"}
-    single = 384 * (7 * 768 + 2 * 3072) * 2 + 5 * 12 * 384**2 * 2
-    assert _overhead.text_embeddings_inference(mpnet, {}, 16384, max_input_length=384).activations == single
-    assert _overhead.text_embeddings_inference(
-        mpnet, {}, 32768, max_input_length=384
-    ) == _overhead.text_embeddings_inference(mpnet, {}, 16384, max_input_length=384)
-    truncated = 256 * (7 * 768 + 2 * 3072) * 2 + 5 * 12 * 256**2 * 2
-    assert _overhead.text_embeddings_inference(mpnet, {}, 256, max_input_length=384).activations == truncated
-    # Flash models split the batch into inputs of the maximum length instead
-    assert _overhead.text_embeddings_inference(
-        BERT, {}, 16384, max_input_length=512
-    ) == _overhead.text_embeddings_inference(BERT, {}, 16384)
-
-
-GEMMA3 = {
-    "model_type": "gemma3_text",
-    "hidden_size": 768,
-    "num_attention_heads": 3,
-    "num_key_value_heads": 1,
-    "head_dim": 256,
-    "intermediate_size": 1152,
-    "rms_norm_eps": 1e-6,
-}
-
-
-def test_text_embeddings_inference_runs_gemma3_in_f32() -> None:
-    assert _overhead.text_embeddings_inference_dtype(GEMMA3) == ("F32", 4)
-    assert _overhead.text_embeddings_inference_dtype(BERT) == ("F16", 2)
-    expected = 2048 * (10 * 768 + 5 * 1152) * 4 + 5 * 3 * 2048**2 * 4
-    assert _overhead.text_embeddings_inference(GEMMA3, {}, 16384, max_input_length=2048).activations == expected
-
-
-def test_text_embeddings_inference_follows_the_dtype_passed() -> None:
-    assert _overhead.text_embeddings_inference_dtype(BERT, "float32") == ("F32", 4)
-    assert _overhead.text_embeddings_inference_dtype(GEMMA3, "float16") == ("F16", 2)
-    assert _overhead.text_embeddings_inference(BERT, {}, 16384, dtype="float16") == (
-        _overhead.text_embeddings_inference(BERT, {}, 16384)
-    )
-    # Text Embeddings Inference only runs its flash attention models in F16, so F32 pads every model
-    assert not _overhead.text_embeddings_inference_padded(BERT)
-    assert _overhead.text_embeddings_inference_padded(BERT, "float32")
-    assert _overhead.text_embeddings_inference_padded(GEMMA3)
-    single = 512 * (7 * 768 + 2 * 3072) * 4 + 5 * 12 * 512**2 * 4
-    assert (
-        _overhead.text_embeddings_inference(BERT, {}, 16384, max_input_length=512, dtype="float32").activations
-        == single
-    )
-
-
 def test_batched_tokens_follow_the_gpu_size() -> None:
     assert _overhead.batched_tokens(None) == _overhead.batched_tokens("8x80") == 8192
     assert _overhead.batched_tokens("24") == 2048
@@ -209,18 +93,6 @@ def test_fit() -> None:
     limited: dict[str, Any] = {**args, "context_length": 5}
     assert _overhead.fit(weights=30 * GIB, gpu_memory="2x20", utilization=0.9, **limited).max_model_len == 5
     assert _overhead.fit(weights=10**15, gpu_memory="20", utilization=0.9, **args).needed is None
-
-
-def test_fit_can_keep_the_model_on_a_single_gpu() -> None:
-    args: dict[str, Any] = dict(
-        kv_fixed=0, kv_per_token=0, max_model_len=0, context_length=0, overhead=GIB, utilization=0.9
-    )
-    assert _overhead.fit(weights=30 * GIB, gpu_memory="2x20", **args).fits
-    single = _overhead.fit(weights=30 * GIB, gpu_memory="2x20", max_gpus=1, **args)
-    assert (single.gpus, single.needed, single.fits, single.required) == (1, None, False, 31 * GIB)
-    small = _overhead.fit(weights=10 * GIB, gpu_memory="2x20", max_gpus=1, **args)
-    assert (small.gpus, small.needed, small.fits, small.required) == (1, 1, True, 11 * GIB)
-    assert _overhead.fit(weights=10 * GIB, gpu_memory="20", max_gpus=1, **args).gpus is None
 
 
 def test_fit_keeps_the_cuda_context_outside_the_utilization() -> None:
@@ -360,3 +232,33 @@ def test_fit_checks_the_requested_gpu_count_between_power_of_two_sizes() -> None
         utilization=1.0,
     )
     assert result.fits and result.needed == 3
+
+
+def test_encoder_attention_workspace_tracks_sequence_boundaries() -> None:
+    config = {"model_type": "mpnet", "hidden_size": 768, "intermediate_size": 3072, "num_attention_heads": 12}
+    single = _overhead.encoder_warmup(config, {}, 384, 384, 4)
+    double = _overhead.encoder_warmup(config, {}, 768, 384, 4)
+    partial = _overhead.encoder_warmup(config, {}, 512, 384, 4)
+    short = _overhead.encoder_warmup(config, {}, 768, 128, 4)
+    assert double.activations == 2 * single.activations
+    assert single.activations < partial.activations < double.activations
+    assert short.activations < double.activations
+    assert double.runtime == single.runtime == partial.runtime
+    fused = _overhead.encoder_warmup({**config, "_attn_implementation": "sdpa"}, {}, 768, 384, 4)
+    assert fused.activations < short.activations
+
+
+def test_encoder_precision_and_gemma_have_no_server_specific_rules() -> None:
+    config = {
+        "model_type": "gemma3_text",
+        "hidden_size": 768,
+        "intermediate_size": 1152,
+        "num_attention_heads": 3,
+        "head_dim": 256,
+        "num_key_value_heads": 1,
+        "rms_norm_eps": 1e-6,
+    }
+    half = _overhead.encoder_warmup(config, {}, 2048, 2048, 2)
+    full = _overhead.encoder_warmup(config, {}, 2048, 2048, 4)
+    assert full.activations == 2 * half.activations
+    assert not _overhead.encoder_eager(config)

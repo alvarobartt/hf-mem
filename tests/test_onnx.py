@@ -36,6 +36,8 @@ def test_single_file_reads_dtypes_and_the_kv_cache_from_the_graph(tmp_path: Path
     kv = some(result.kv_cache)
     assert (kv.dtype, kv.max_model_len, kv.bytes) == ("F16", 1024, PER_TOKEN * 1024 * 2)
     assert any("ONNX Runtime overhead" in w for w in result.warnings)
+    with pytest.raises(RuntimeError, match="only supports unquantized Safetensors text encoders"):
+        estimate(str(tmp_path), dtype="float16")
     with pytest.raises(RuntimeError, match="only `auto`"):
         estimate(str(tmp_path), kv_cache_dtype="fp8")
 

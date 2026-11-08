@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
-FLOATS = ("F64", "F32", "F16", "BF16")
+DTYPES = {"float16": ("F16", 2), "bfloat16": ("BF16", 2), "float32": ("F32", 4)}
+_FLOAT_BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2}
 
 
 @dataclass
@@ -25,18 +26,20 @@ class Weights:
             self.bytes += other.bytes
         return self
 
-    def cast(self, dtype: str, size: int) -> "Weights":
-        # The floating point weights as loaded by engines that cast them (e.g. Text Embeddings Inference), with
-        # `size` bytes per parameter, keeping the integer and quantized tensors as they are
-        cast = Weights()
+    def cast(self, dtype: str) -> "Weights":
+        target, size = DTYPES[dtype]
+        result = Weights()
         for name, entry in self.dtypes.items():
-            if name in FLOATS:
-                cast.add(dtype, entry.params, entry.params * size)
+            if name in _FLOAT_BYTES:
+                if entry.params:
+                    result.add(target, entry.params, entry.params * size)
+                if buffers := entry.bytes - entry.params * _FLOAT_BYTES[name]:
+                    result.add(name, 0, buffers)
             else:
-                cast.add(name, entry.params, entry.bytes)
+                result.add(name, entry.params, entry.bytes)
         if not self.dtypes:
-            cast.params, cast.bytes = self.params, self.bytes
-        return cast
+            result.params, result.bytes = self.params, self.bytes
+        return result
 
     def sorted_dtypes(self) -> list[tuple[str, "Weights"]]:
         return sorted(self.dtypes.items(), key=lambda item: item[1].bytes, reverse=True)

@@ -13,11 +13,6 @@ LARGEST_GPU = 160 * GIB
 CLIP_MAX_TOKENS = {"pixtral": 1024, "lfm2": 256}
 CLIP_DYNAMIC_TOKENS = 4096
 CLIP_AUDIO_POSITIONS = 1500
-# Text Embeddings Inference warms up GPUs with a single batch of `--max-batch-tokens` (16384 by default), split
-# into inputs of the maximum input length, or a single input of it for the models it runs padded.
-TEXT_EMBEDDINGS_INFERENCE_BATCHED_TOKENS = 16384
-# Models that Text Embeddings Inference runs without flash attention on GPUs, i.e. with padded batches.
-TEXT_EMBEDDINGS_INFERENCE_PADDED = ("mpnet", "gemma3_text", "deberta-v2")
 
 # Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
 _PROFILES = {
@@ -52,15 +47,7 @@ _PROFILES = {
 }
 _GATED = ("silu", "swiglu", "swish")
 _GLU = ("modernbert", "new", "gte", "gemma3_text")
-_F32_MODEL_TYPES = ("gemma3_text",)
-# `--dtype` in Text Embeddings Inference on GPUs
-_TEXT_EMBEDDINGS_INFERENCE_DTYPES = {"float16": ("F16", 2), "float32": ("F32", 4)}
-TEXT_EMBEDDINGS_INFERENCE_DTYPES = tuple(_TEXT_EMBEDDINGS_INFERENCE_DTYPES)
-# Fitted on Text Embeddings Inference 1.9 warmup peaks on L4 and A10G GPUs, see the README: the elements kept
-# per batched token, per hidden size (post-norm encoders and pre-norm decoders) and per MLP intermediate size,
-# which include the fragmentation of the CUDA memory pool, the attention scores kept by the padded models over
-# their single input, and the CUDA context with the cuBLAS workspaces (0.26 GiB on an L4, 0.32 GiB on an A10G).
-_TEXT_EMBEDDINGS_INFERENCE = {
+_ENCODER = {
     "encoder": 7,
     "decoder": 10,
     "mlp": 2,
@@ -172,32 +159,15 @@ def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_b
     return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]) + context, context)
 
 
-def text_embeddings_inference_dtype(config: dict[str, Any], dtype: str | None = None) -> tuple[str, int]:
-    # The dtype Text Embeddings Inference runs in: `--dtype`, or else F16 on GPUs, except for Gemma 3, which it
-    # only supports in F32 and selects when `--dtype` is not set
-    if dtype is not None:
-        return _TEXT_EMBEDDINGS_INFERENCE_DTYPES[dtype]
-    return ("F32", 4) if config.get("model_type") in _F32_MODEL_TYPES else ("F16", 2)
+def encoder_eager(config: dict[str, Any]) -> bool:
+    implementation = config.get("_attn_implementation") or config.get("attn_implementation")
+    if implementation is not None:
+        return implementation == "eager"
+    return config.get("model_type") in ("mpnet", "deberta", "deberta-v2")
 
 
-def text_embeddings_inference_padded(config: dict[str, Any], dtype: str | None = None) -> bool:
-    # The models without flash attention, and every model in F32, as the flash attention models only run in F16
-    return (
-        config.get("model_type") in TEXT_EMBEDDINGS_INFERENCE_PADDED
-        or text_embeddings_inference_dtype(config, dtype)[0] == "F32"
-    )
-
-
-def text_embeddings_inference(
-    config: dict[str, Any],
-    files: Any,
-    tokens: int,
-    max_input_length: int | None = None,
-    dtype: str | None = None,
-) -> Overhead:
-    # Peak of Text Embeddings Inference's warmup on GPUs over `tokens` batched tokens, in the dtype it runs in.
-    # Pooled and classification heads are far smaller, and MoE experts only run over their routed tokens.
-    p = _TEXT_EMBEDDINGS_INFERENCE
+def encoder_warmup(config: dict[str, Any], files: Any, tokens: int, length: int, size: int) -> Overhead:
+    p = _ENCODER
     hidden = config.get("hidden_size") or 0
     heads = config.get("num_attention_heads") or 1
     inter = config.get("intermediate_size") or config.get("n_inner") or 4 * hidden
@@ -207,23 +177,20 @@ def text_embeddings_inference(
         or config.get("model_type") in _GLU
         or "glu" in str(config.get("feed_forward_type") or "")
     )
-    # The logits over the vocabulary only run with `--pooling splade` on a masked LM, which is what Sentence
-    # Transformers sparse encoders ship a `SpladePooling` module for, while BERT variants without `1_Pooling`
-    # default to CLS pooling
-    splade = any(str(f).endswith("SpladePooling/config.json") for f in files) and any(
-        str(a).endswith("ForMaskedLM") for a in config.get("architectures") or []
-    )
+    masked = any(str(a).endswith("ForMaskedLM") for a in config.get("architectures") or [])
+    sparse = any(str(f).endswith("SpladePooling/config.json") for f in files)
+    pooled = "config_sentence_transformers.json" in files and not sparse
     per_token = (p["decoder"] if config.get("rms_norm_eps") else p["encoder"]) * hidden
     per_token += (p["gated_mlp"] if gated else p["mlp"]) * inter
-    # The SPLADE head keeps the logits and their log
-    per_token += 2 * (config.get("vocab_size") or 0) if splade else 0
-    attention = 0.0
-    if text_embeddings_inference_padded(config, dtype):
-        tokens = min(tokens, max_input_length or config.get("max_position_embeddings") or tokens)
-        attention = p["attention"] * heads * tokens**2
-    _, size = text_embeddings_inference_dtype(config, dtype)
+    head_dim = config.get("head_dim") or hidden // heads
+    kv_heads = config.get("num_key_value_heads") or heads
+    per_token += max(0, (heads + 2 * kv_heads) * head_dim - 3 * hidden)
+    per_token += (3 if sparse else 1) * (config.get("vocab_size") or 0) if masked and not pooled else 0
+    sequence = min(tokens, length)
+    full, remaining = divmod(tokens, sequence)
+    scores = heads * (full * sequence**2 + remaining**2) if encoder_eager(config) else 0
     runtime = int(p["runtime"])
-    return Overhead(int(tokens * per_token + attention) * size, 0, 0, runtime, runtime)
+    return Overhead(int(tokens * per_token + p["attention"] * scores) * size, 0, 0, runtime, runtime)
 
 
 def _clip_bytes(positions: int, hidden: int, ffn: int | None, gated: bool) -> int:
@@ -326,7 +293,6 @@ def fit(
     max_gpus: int | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
-    # Engines without tensor parallelism (e.g. Text Embeddings Inference) only use `max_gpus` of the given GPUs
     if max_gpus is not None and gpus is not None:
         gpus = min(gpus, max_gpus)
     usable = min(size * utilization, size - context) - (overhead - context)
