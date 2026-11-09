@@ -118,8 +118,9 @@ def _gguf_kv(
     result = _gguf.kv_cache(metadata, length, batch_size, dtype)
     if result is None:
         return None
-    half = _gguf.kv_cache(metadata, max(1, length // 2), batch_size, dtype)[0]  # type: ignore[index]
-    slope = (result[0] - half) / (length - max(1, length // 2)) if length > 1 else 0.0
+    half = _gguf.kv_cache(metadata, max(1, length // 2), batch_size, dtype)
+    assert half is not None
+    slope = (result[0] - half[0]) / (length - max(1, length // 2)) if length > 1 else 0.0
     return KVCache(result[0], dtype, length, batch_size, result[1]), context_length or length, slope
 
 
@@ -235,6 +236,7 @@ async def _estimate_gguf(
         if isinstance(result, Exception):
             warnings.append(f"Skipping `{name}`: {result}")
             continue
+        assert isinstance(result, tuple)
         metadata, tokenizer = result
         header_size = first.data_start if tokenizer and isinstance(first, _gguf.Header) else 0
         paths = groups[name]

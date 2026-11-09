@@ -22,15 +22,5 @@ jobs:
         with:
           version: "latest"
 
-      - name: Set up Python with uv
-        run: uv venv --python 3.11
-
-      - name: Install dependencies
-        run: |
-          source .venv/bin/activate
-          uv pip install -e . --group lint
-
       - name: Run pre-commit checks
-        run: |
-          source .venv/bin/activate
-          uv run pre-commit run --all-files
+        run: uv run --frozen --python 3.11 --group lint pre-commit run --all-files

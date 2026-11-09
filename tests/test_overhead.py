@@ -90,12 +90,8 @@ def test_fit() -> None:
     fit = _overhead.fit(weights=30 * GIB, gpu_memory="20", utilization=0.9, **args)
     assert (fit.needed, fit.fits, fit.max_model_len) == (2, False, 0)
     assert _overhead.fit(weights=30 * GIB, gpu_memory="2x20", utilization=0.9, **args).fits
-    assert (
-        _overhead.fit(
-            weights=30 * GIB, gpu_memory="2x20", utilization=0.9, **{**args, "context_length": 5}
-        ).max_model_len
-        == 5
-    )
+    limited: dict[str, Any] = {**args, "context_length": 5}
+    assert _overhead.fit(weights=30 * GIB, gpu_memory="2x20", utilization=0.9, **limited).max_model_len == 5
     assert _overhead.fit(weights=10**15, gpu_memory="20", utilization=0.9, **args).needed is None
 
 

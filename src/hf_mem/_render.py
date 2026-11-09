@@ -4,7 +4,7 @@ import sys
 
 from hf_mem._version import __version__
 from hf_mem._weights import Weights
-from hf_mem.estimate import Estimate, Listing
+from hf_mem.estimate import Estimate, KVCache, Listing
 
 NAME_WIDTH = 15
 MAX_FILE_WIDTH = 64
@@ -44,7 +44,7 @@ def _draw(titles: list[str], sections: list[Section], name_width: int) -> list[s
     )
     data = inner - name_width - 5
     badge = f" hf-mem v{__version__} "
-    lines = ["┌" + "┬" * (inner - len(badge)) + badge + "┐", "├" + "┴" * inner + "┤"]
+    lines: list[str] = ["┌" + "┬" * (inner - len(badge)) + badge + "┐", "├" + "┴" * inner + "┤"]
     lines += [f"│{t:^{inner}}│" for t in titles]
 
     def divider(left: str, mid: str, right: str) -> str:
@@ -91,12 +91,12 @@ def _where(url: str, revision: str | None) -> str:
     return _shorten(f"{url} @ {revision}" if revision else url)
 
 
-def _titles(url: str, revision: str | None, file: str | None, kv: object) -> list[str]:
+def _titles(url: str, revision: str | None, file: str | None, kv: KVCache | None) -> list[str]:
     titles = ["INFERENCE MEMORY ESTIMATE FOR", _where(url, revision)]
     if file:
         titles.append(_shorten(f"FOR `{file}`"))
     if kv is not None:
-        titles.append(f"w/ max-model-len={kv.max_model_len}, batch-size={kv.batch_size}")  # type: ignore[attr-defined]
+        titles.append(f"w/ max-model-len={kv.max_model_len}, batch-size={kv.batch_size}")
     return titles
 
 
