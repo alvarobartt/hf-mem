@@ -6,9 +6,7 @@ The estimate covers the model weights, the KV cache for generative models, and t
 
 ## Usage
 
-Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, where `<model>` is a Hub model ID (optionally with `@revision`, and with `:<quantization>` for GGUF), a Hub URL, or a local path.
-
-Tables are monochrome by default. Use `--color` to enable terminal colors; `NO_COLOR` takes precedence.
+Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, where `<model>` is a Hugging Face Hub model ID (optionally with `@revision`, and with `:<quantization>` for GGUF), an URL, or a local path.
 
 ### Transformers
 
@@ -289,51 +287,6 @@ $ uvx hf-mem onnx-community/Qwen3-0.6B-ONNX --file onnx/model_q4f16.onnx
 ```
 
 The weights are the initializers in the ONNX graph, and the KV cache comes from the `past_*` graph inputs, i.e. the dtype and the cached heads per token as exported, with the context length from `config.json`. ONNX files over 16 MiB with the weights inline are estimated from their file sizes, reading only the graph inputs at the end of the file, and the ONNX Runtime overhead is not estimated.
-
-### Picking a format
-
-Safetensors weights are estimated first, then GGUF, and finally ONNX, while PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, as they cannot be read without loading them. `--format safetensors`, `--format gguf` or `--format onnx` picks one, and a warning mentions the GGUF or ONNX files that were found next to the Safetensors weights.
-
-### Does it fit?
-
-`--gpu-memory` takes the memory per GPU in GiB (e.g. `80`, or `8x80` for 8 GPUs) and adds to the summary the memory required on the given GPUs out of the usable memory, whether the model fits or how many GPUs it needs, and the longest context that fits on the given GPUs, using 92% of the memory as vLLM does by default (`--gpu-memory-utilization`). With tensor parallelism, the KV heads (and the MLA latent) that are replicated across GPUs are taken into account. Weights that the inference engine keeps in CPU memory (e.g. the DeepSeek-V4.1 Engram tables) are shown apart as `CPU MEMORY`, as they need that much free system memory instead. vLLM batches fewer tokens on A100s than on other GPUs with 80 GiB, so use `--max-num-batched-tokens 2048` there.
-
-```console
-$ uvx hf-mem meta-llama/Llama-3.1-8B-Instruct --max-model-len 32768 --gpu-memory 24
-┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
-├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
-│                          INFERENCE MEMORY ESTIMATE FOR                           │
-│              https://hf.co/meta-llama/Llama-3.1-8B-Instruct @ main               │
-│                       w/ max-model-len=32768, batch-size=1                       │
-├─────────────────┬────────────────────────────────────────────────────────────────┤
-│ TOTAL MEMORY    │ 21.87 GiB (8.03B PARAMS + KV CACHE + OVERHEAD)                 │
-│ REQUIREMENTS    │ ██████████████████████████████████████████████████████████████ │
-├─────────────────┼────────────────────────────────────────────────────────────────┤
-│ GPU MEMORY      │ 21.87 / 22.91 GiB [95%] ON 1 x 24.00 GiB, UP TO 41258 TOKENS   │
-│ FITS            │ ███████████████████████████████████████████████████████████▎░░ │
-├─────────────────┴────────────────────────────────────────────────────────────────┤
-│                         MODEL (8.03B PARAMS, 14.96 GiB)                          │
-├─────────────────┬────────────────────────────────────────────────────────────────┤
-│ BF16            │ 14.96 / 21.87 GiB                                              │
-│ 8.03B PARAMS    │ ██████████████████████████████████████████▍░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴────────────────────────────────────────────────────────────────┤
-│                        KV CACHE (32768 TOKENS, 4.00 GiB)                         │
-├─────────────────┬────────────────────────────────────────────────────────────────┤
-│ BF16            │ 4.00 / 21.87 GiB                                               │
-│ 32768 TOKENS    │ ███████████▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴────────────────────────────────────────────────────────────────┤
-│                               OVERHEAD (2.92 GiB)                                │
-├─────────────────┬────────────────────────────────────────────────────────────────┤
-│ ACTIVATIONS     │ 1.38 / 21.87 GiB                                               │
-│                 │ ███▉░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼────────────────────────────────────────────────────────────────┤
-│ GRAPHS          │ 0.43 / 21.87 GiB                                               │
-│                 │ █▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼────────────────────────────────────────────────────────────────┤
-│ RUNTIME         │ 1.10 / 21.87 GiB                                               │
-│                 │ ███▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-└─────────────────┴────────────────────────────────────────────────────────────────┘
-```
 
 ### Local models and the cache
 
