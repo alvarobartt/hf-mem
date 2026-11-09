@@ -98,10 +98,10 @@ def _value(buf: bytes, offset: int, kind: int, keep: bool) -> tuple[Any, int]:
         offset += 12
         if item in _SCALAR:
             fmt = f"<{count}{_SCALAR[item]}"
-            values = _unpack(fmt, buf, offset) if keep else None
+            values = list(_unpack(fmt, buf, offset)) if keep else None
             if offset + struct.calcsize(fmt) > len(buf):
                 raise _Truncated
-            return (list(values) if keep else None), offset + struct.calcsize(fmt)  # type: ignore[arg-type]
+            return values, offset + struct.calcsize(fmt)
         if item == 8 and not keep:
             return None, _skip_strings(buf, offset, count)
         items: list[Any] = []

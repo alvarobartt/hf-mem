@@ -30,7 +30,7 @@ _ALIASES = {
     "hidden_size": ("hidden_size", "d_model", "n_embd", "dim"),
     "max_position_embeddings": ("max_position_embeddings", "n_positions", "max_seq_len", "seq_length"),
 }
-_DEFAULTS = {
+_DEFAULTS: dict[str, dict[str, Any]] = {
     "gemma2": {
         "head_dim": 256,
         "sliding_window": 4096,

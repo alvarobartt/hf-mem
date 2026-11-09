@@ -3,13 +3,13 @@ repos:
     rev: v0.17.3
     hooks:
       - id: ruff-check
-        args: [--fix, --select, "I"]
+        args: [--fix]
       - id: ruff-format
   - repo: local
     hooks:
-      - id: mypy
-        name: mypy
-        entry: mypy
+      - id: ty
+        name: ty
+        entry: ty check
         language: system
         types: [python]
         pass_filenames: false
