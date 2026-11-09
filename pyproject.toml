@@ -1,6 +1,6 @@
 [project]
 name = "hf-mem"
-version = "0.6.0"
+version = "1.0.0"
 description = "A CLI to estimate inference memory requirements for Hugging Face models, written in Python."
 readme = "README.md"
 authors = [
@@ -25,14 +25,37 @@ build-backend = "uv_build"
 [dependency-groups]
 lint = [
     "pre-commit>=4.5.1",
+    "pytest>=8",
     "ruff>=0.14.10",
+    "ty>=0.0.99",
 ]
+test = [
+    "pytest>=8",
+]
+
+[tool.uv.dependency-groups]
+lint = { requires-python = ">=3.11" }
+
+[tool.pytest.ini_options]
+pythonpath = ["tests"]
+testpaths = ["tests"]
+
+[tool.ty.environment]
+python-version = "3.10"
+extra-paths = ["tests"]
+
+[tool.ty.src]
+include = ["src", "tests"]
+
+[tool.ty.rules]
+unused-ignore-comment = "error"
 
 [tool.ruff]
 line-length = 112
 
 [tool.ruff.lint]
-select = ["I"]
+select = ["I", "ANN"]
+ignore = ["ANN401"]
 
 [tool.ruff.lint.isort]
 force-single-line = false
