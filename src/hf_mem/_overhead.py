@@ -3,6 +3,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from hf_mem import _config
+
 GIB = 1 << 30
 MIB = 1 << 20
 LARGE_GPU = 70 * GIB
@@ -46,6 +48,14 @@ _PROFILES = {
     },
 }
 _GATED = ("silu", "swiglu", "swish")
+_GLU = ("modernbert", "new", "gte", "gemma3_text")
+_ENCODER = {
+    "encoder": 7,
+    "decoder": 10,
+    "mlp": 2,
+    "gated_mlp": 5,
+    "runtime": 0.32 * GIB,
+}
 
 
 @dataclass
@@ -55,10 +65,14 @@ class Overhead:
     graphs: int
     runtime: int
     context: int
+    # Tensors other than the weights kept for the model's lifetime (e.g. the ALiBi biases of eager attention)
+    buffers: int = 0
+    # What loading needs on top of the rest, while it holds a tensor both as stored and as cast
+    loading: int = 0
 
     @property
     def bytes(self) -> int:
-        return self.activations + self.encoder + self.graphs + self.runtime
+        return self.activations + self.encoder + self.graphs + self.runtime + self.buffers + self.loading
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +81,8 @@ class Overhead:
             "encoder": self.encoder,
             "graphs": self.graphs,
             "runtime": self.runtime,
+            "buffers": self.buffers,
+            "loading": self.loading,
         }
 
 
@@ -148,6 +164,85 @@ def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_b
     )
     context = int(p["context"])
     return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]) + context, context)
+
+
+def encoder_eager(config: dict[str, Any], size: int) -> bool:
+    # Memory-efficient attention kernels only run in half precision, so F32 activations materialize the scores
+    if size >= 4:
+        return True
+    implementation = config.get("_attn_implementation") or config.get("attn_implementation")
+    if implementation is not None:
+        return implementation == "eager"
+    return config.get("model_type") in ("mpnet", "deberta", "deberta-v2")
+
+
+def encoder_attention_tensors(config: dict[str, Any], sequences: int) -> int:
+    # Tensors of every query and key pair per head that an eager layer keeps at once: the scores and the
+    # probabilities, a bias per position term (relative positions, ALiBi, or the disentangled terms of
+    # DeBERTa), which also carries the padding, and the masks: one per attention pattern when the layers
+    # alternate between full and sliding window attention, a causal mask, or else a padding mask once
+    # sequences of different lengths share a batch
+    terms = config.get("pos_att_type") or ()
+    biases = (
+        # MPNet always adds relative positions (`MPNetConfig` defaults to 32 buckets)
+        bool(config.get("relative_attention_num_buckets") or config.get("model_type") == "mpnet")
+        + (config.get("position_embedding_type") == "alibi")
+        + (
+            len(terms.split("|") if isinstance(terms, str) else terms)
+            if config.get("relative_attention")
+            else 0
+        )
+    )
+    kinds = set(_config.layer_kinds(config)) if config.get("num_hidden_layers") else set()
+    if (
+        config.get("local_attention")
+        and config.get("global_attn_every_n_layers")
+        or {"full", "sliding"} <= kinds
+    ):
+        masks = 2
+    elif config.get("rms_norm_eps") and not config.get("use_bidirectional_attention"):
+        masks = 1
+    else:
+        masks = int(sequences > 1 and not biases)
+    return 2 + biases + masks
+
+
+def encoder_buffers(config: dict[str, Any], size: int) -> int:
+    # Eager ALiBi attention keeps the bias of every pair of positions, while memory-efficient kernels only keep
+    # a slope per head
+    if config.get("position_embedding_type") != "alibi":
+        return 0
+    return (config.get("num_attention_heads") or 1) * (config.get("max_position_embeddings") or 0) ** 2 * size
+
+
+def encoder_warmup(config: dict[str, Any], files: Any, tokens: int, length: int, size: int) -> Overhead:
+    p = _ENCODER
+    hidden = config.get("hidden_size") or 0
+    heads = config.get("num_attention_heads") or 1
+    inter = config.get("intermediate_size") or config.get("n_inner") or 4 * hidden
+    act = str(config.get("hidden_act") or config.get("activation_function") or "")
+    gated = (
+        any(a in act for a in _GATED)
+        or config.get("model_type") in _GLU
+        or "glu" in str(config.get("feed_forward_type") or "")
+    )
+    masked = any(str(a).endswith("ForMaskedLM") for a in config.get("architectures") or [])
+    sparse = any(str(f).endswith("SpladePooling/config.json") for f in files)
+    pooled = "config_sentence_transformers.json" in files and not sparse
+    per_token = (p["decoder"] if config.get("rms_norm_eps") else p["encoder"]) * hidden
+    per_token += (p["gated_mlp"] if gated else p["mlp"]) * inter
+    head_dim = config.get("head_dim") or hidden // heads
+    kv_heads = config.get("num_key_value_heads") or heads
+    per_token += max(0, (heads + 2 * kv_heads) * head_dim - 3 * hidden)
+    per_token += (3 if sparse else 1) * (config.get("vocab_size") or 0) if masked and not pooled else 0
+    sequence = min(tokens, length)
+    full, remaining = divmod(tokens, sequence)
+    eager = encoder_eager(config, size)
+    scores = heads * (full * sequence**2 + remaining**2) if eager else 0
+    tensors = encoder_attention_tensors(config, full + bool(remaining))
+    runtime = int(p["runtime"])
+    buffers = encoder_buffers(config, size) if eager else 0
+    return Overhead(int(tokens * per_token + tensors * scores) * size, 0, 0, runtime, runtime, buffers)
 
 
 def _clip_bytes(positions: int, hidden: int, ffn: int | None, gated: bool) -> int:
@@ -247,8 +342,11 @@ def fit(
     context: int = 0,
     padding: Callable[[int], int] | None = None,
     kv_bytes: Callable[[int, int], int] | None = None,
+    max_gpus: int | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
+    if max_gpus is not None and gpus is not None:
+        gpus = min(gpus, max_gpus)
     usable = min(size * utilization, size - context) - (overhead - context)
     base = weights
 
@@ -265,7 +363,7 @@ def fit(
         (
             n
             for n in sorted({1, 2, 4, 8, 16, 32, 64, gpus or 1})
-            if padded(n) + cache(max_model_len, n) <= n * usable
+            if n <= (max_gpus or n) and padded(n) + cache(max_model_len, n) <= n * usable
         ),
         None,
     )

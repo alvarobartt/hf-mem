@@ -232,3 +232,109 @@ def test_fit_checks_the_requested_gpu_count_between_power_of_two_sizes() -> None
         utilization=1.0,
     )
     assert result.fits and result.needed == 3
+
+
+def test_encoder_attention_workspace_tracks_sequence_boundaries() -> None:
+    config = {"model_type": "mpnet", "hidden_size": 768, "intermediate_size": 3072, "num_attention_heads": 12}
+    single = _overhead.encoder_warmup(config, {}, 384, 384, 4)
+    double = _overhead.encoder_warmup(config, {}, 768, 384, 4)
+    partial = _overhead.encoder_warmup(config, {}, 512, 384, 4)
+    short = _overhead.encoder_warmup(config, {}, 768, 128, 4)
+    assert double.activations == 2 * single.activations
+    assert single.activations < partial.activations < double.activations
+    assert short.activations < double.activations
+    assert double.runtime == single.runtime == partial.runtime
+    fused = _overhead.encoder_warmup({**config, "_attn_implementation": "sdpa"}, {}, 768, 384, 2)
+    assert fused.activations < _overhead.encoder_warmup(config, {}, 768, 128, 2).activations
+
+
+def test_encoder_attention_runs_eager_in_f32() -> None:
+    # Memory-efficient attention kernels only run in half precision, so F32 materializes the scores
+    gemma = {
+        "model_type": "gemma3_text",
+        "hidden_size": 768,
+        "intermediate_size": 1152,
+        "num_attention_heads": 3,
+        "head_dim": 256,
+        "num_key_value_heads": 1,
+        "rms_norm_eps": 1e-6,
+    }
+    half = _overhead.encoder_warmup(gemma, {}, 2048, 2048, 2)
+    full = _overhead.encoder_warmup(gemma, {}, 2048, 2048, 4)
+    assert not _overhead.encoder_eager(gemma, 2) and _overhead.encoder_eager(gemma, 4)
+    assert full.activations > 2 * half.activations
+    assert _overhead.encoder_eager({"model_type": "bert", "_attn_implementation": "sdpa"}, 4)
+    assert not _overhead.encoder_eager({"model_type": "mpnet", "_attn_implementation": "sdpa"}, 2)
+
+
+MODERNBERT = {
+    "model_type": "modernbert",
+    "hidden_size": 768,
+    "intermediate_size": 1152,
+    "num_attention_heads": 12,
+    "num_hidden_layers": 22,
+    "local_attention": 128,
+    "global_attn_every_n_layers": 3,
+    "max_position_embeddings": 8192,
+}
+
+
+@pytest.mark.parametrize(
+    "config,single,batched",
+    [
+        # The scores and the probabilities, plus a padding mask once sequences of different lengths are batched
+        ({"model_type": "bert", "num_hidden_layers": 12}, 2, 3),
+        # A position bias that also carries the padding: relative positions, ALiBi or disentangled attention
+        ({"model_type": "mpnet", "relative_attention_num_buckets": 32}, 3, 3),
+        ({"model_type": "bert", "position_embedding_type": "alibi"}, 3, 3),
+        ({"model_type": "deberta-v2", "relative_attention": True, "pos_att_type": ["p2c", "c2p"]}, 4, 4),
+        ({"model_type": "deberta-v2", "relative_attention": True, "pos_att_type": "p2c|c2p"}, 4, 4),
+        # A causal mask, which also carries the padding
+        ({"model_type": "qwen3", "rms_norm_eps": 1e-6, "num_hidden_layers": 28}, 3, 3),
+        # A mask per attention pattern when the layers alternate between full and sliding window attention
+        (MODERNBERT, 4, 4),
+        (
+            {
+                "model_type": "gemma3_text",
+                "rms_norm_eps": 1e-6,
+                "use_bidirectional_attention": True,
+                "num_hidden_layers": 2,
+                "layer_types": ["sliding_attention", "full_attention"],
+            },
+            4,
+            4,
+        ),
+    ],
+)
+def test_encoder_attention_tensors_follow_the_architecture(
+    config: dict[str, Any], single: int, batched: int
+) -> None:
+    assert _overhead.encoder_attention_tensors(config, 1) == single
+    assert _overhead.encoder_attention_tensors(config, 4) == batched
+
+
+def test_encoder_eager_warmup_keeps_the_attention_tensors_of_each_sequence() -> None:
+    per_token = 7 * 768 + 5 * 1152
+    single = _overhead.encoder_warmup(MODERNBERT, {}, 4096, 4096, 4)
+    assert single.activations == (4096 * per_token + 4 * 12 * 4096**2) * 4
+    bert = {"model_type": "bert", "hidden_size": 768, "intermediate_size": 3072, "num_attention_heads": 12}
+    batched = _overhead.encoder_warmup(bert, {}, 1024, 512, 4)
+    assert batched.activations == (1024 * (7 * 768 + 2 * 3072) + 3 * 12 * 2 * 512**2) * 4
+
+
+def test_eager_alibi_keeps_the_bias_of_every_position_pair() -> None:
+    # Eager ALiBi keeps the bias for every pair of positions, while memory-efficient kernels keep a slope per head
+    jina = {
+        "model_type": "bert",
+        "position_embedding_type": "alibi",
+        "hidden_size": 512,
+        "intermediate_size": 2048,
+        "num_attention_heads": 8,
+        "max_position_embeddings": 8192,
+    }
+    full = _overhead.encoder_warmup(jina, {}, 128, 128, 4)
+    half = _overhead.encoder_warmup(jina, {}, 128, 128, 2)
+    assert full.buffers == 8 * 8192**2 * 4
+    assert half.buffers == 0
+    assert full.bytes == full.activations + full.buffers + full.runtime
+    assert full.to_dict()["buffers"] == full.buffers and full.to_dict()["loading"] == 0

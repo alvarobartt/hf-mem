@@ -198,3 +198,32 @@ def test_bars_show_small_fractions() -> None:
     assert _bar(0.3, 4) == "█▎░░"
     assert _bar(1.0, 4) == "████"
     assert all(len(_bar(f / 100, 7)) == 7 for f in range(101))
+
+
+def test_encoder_table(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"]))
+    code, out, err = cli(monkeypatch, capsys, str(tmp_path), "--max-num-batched-tokens", "512")
+    assert code == 0 and "Encoder warmup" in err
+    assert "MODEL (" in out and "ACTIVATIONS" in out and "KV CACHE" not in out
+
+
+@pytest.mark.parametrize(
+    "dtype,target,size", [("float16", "F16", 2), ("bfloat16", "BF16", 2), ("float32", "F32", 4)]
+)
+def test_encoder_dtype_option(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    dtype: str,
+    target: str,
+    size: int,
+) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"]))
+    code, out, err = cli(monkeypatch, capsys, str(tmp_path), "--dtype", dtype, "--output", "json")
+    result = json.loads(out)
+    assert code == 0 and err == ""
+    assert result["weights"]["dtypes"] == {target: {"bytes": 64000 * size, "params": 64000}}

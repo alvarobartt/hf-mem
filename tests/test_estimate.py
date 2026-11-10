@@ -21,6 +21,7 @@ from hf_mem import arun, run
         ({"gpu_memory_utilization": 1.1}, "must be in"),
         ({"gpu_memory_utilization": float("nan")}, "must be in"),
         ({"gpu_memory_utilization": float("inf")}, "must be in"),
+        ({"dtype": "float8"}, "--dtype"),
     ],
 )
 @pytest.mark.parametrize("asynchronous", [False, True])

@@ -7,6 +7,7 @@ from helpers import estimate, kimi_config, llama_config, llama_tensors, some, wr
 from hf_mem import Estimate, _config, _safetensors
 from hf_mem._render import markdown, table
 from hf_mem._source import LocalSource
+from hf_mem._weights import Weights
 
 
 def test_dense_model_with_kv_cache(tmp_path: Path) -> None:
@@ -524,3 +525,309 @@ def test_kimi_fit_uses_the_cache_rows_for_each_tensor_parallel_rank(tmp_path: Pa
         assert some(longer.fit).needed == 4
         assert "DOES NOT FIT" in table(longer)
         assert "fits on 4 GPUs" in markdown(longer)
+
+
+@pytest.mark.parametrize("dtype,size", [("F32", 4), ("BF16", 2), ("F16", 2)])
+def test_encoder_warmup_keeps_weights_and_scales_with_tokens(tmp_path: Path, dtype: str, size: int) -> None:
+    stored = write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {
+            "w": (dtype, [1000, 64]),
+            "norm.weight": ("F32", [64]),
+            "position_ids": ("I64", [512]),
+            "norm.weight": ("F32", [64]),
+        },
+    )
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(architectures=["BertModel"], model_type="bert", torch_dtype=None),
+    )
+    small = estimate(str(tmp_path), max_num_batched_tokens=512)
+    large = estimate(str(tmp_path), max_num_batched_tokens=2048)
+    assert small.weights.bytes == large.weights.bytes == stored
+    assert set(small.weights.dtypes) == {dtype, "F32", "I64"}
+    assert small.kv_cache is large.kv_cache is None
+    per_token = 7 * 256 + 2 * 1024
+    if size == 2:
+        assert some(large.overhead).activations == 4 * some(small.overhead).activations
+        assert some(small.overhead).activations // size == 512 * per_token
+    else:
+        # F32 runs eager: a single sequence keeps the scores and the probabilities, a batch also a padding mask
+        assert some(small.overhead).activations // size == 512 * per_token + 2 * 8 * 512**2
+        assert some(large.overhead).activations // size == 2048 * per_token + 3 * 8 * 2 * 1024**2
+    assert small.total == small.weights.bytes + some(small.overhead).bytes
+    assert any("Weights are estimated as stored" in w for w in small.warnings)
+
+
+def test_encoder_f32_activations_add_the_attention_tensors(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    config = llama_config(architectures=["BertModel"], model_type="bert", torch_dtype="float32")
+    write_json(str(tmp_path / "config.json"), config)
+    single = estimate(str(tmp_path), max_num_batched_tokens=512)
+    write_json(str(tmp_path / "config.json"), {**config, "torch_dtype": "float16"})
+    half = estimate(str(tmp_path), max_num_batched_tokens=512)
+    assert half.weights.to_dict() == single.weights.to_dict()
+    per_token = 7 * 256 + 2 * 1024
+    assert some(half.overhead).activations == 512 * per_token * 2
+    assert some(single.overhead).activations == (512 * per_token + 2 * 8 * 512**2) * 4
+    assert any("eager attention" in w and "half precision" in w for w in single.warnings)
+    assert any("memory-efficient attention" in w for w in half.warnings)
+
+
+def test_f32_modernbert_keeps_both_attention_masks_and_does_not_fit(tmp_path: Path) -> None:
+    # nomic-ai/modernbert-embed-base with `--dtype float32` peaks at 4.70 GiB with a 4096 token input on an L4
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [149_014_272])})
+    config = {
+        "architectures": ["ModernBertModel"],
+        "model_type": "modernbert",
+        "hidden_size": 768,
+        "intermediate_size": 1152,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 22,
+        "local_attention": 128,
+        "global_attn_every_n_layers": 3,
+        "max_position_embeddings": 8192,
+        "torch_dtype": "float32",
+    }
+    write_json(str(tmp_path / "config.json"), config)
+    options = {"max_num_batched_tokens": 4096, "max_model_len": 4096, "gpu_memory": "4"}
+    full = estimate(str(tmp_path), dtype="float32", **options)
+    half = estimate(str(tmp_path), dtype="float16", **options)
+    assert some(full.overhead).activations == (4096 * (7 * 768 + 5 * 1152) + 4 * 12 * 4096**2) * 4
+    assert not some(full.fit).fits and some(half.fit).fits
+    assert any("eager attention" in w for w in full.warnings)
+
+
+def test_f16_override_counts_the_loading_peak_of_the_largest_tensor(tmp_path: Path) -> None:
+    # intfloat/multilingual-e5-base with `--dtype float16` peaks at 1326 MiB while loading and 820 MiB once ready
+    embeddings = 250002 * 768
+    write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {"embeddings.word_embeddings.weight": ("F32", [250002, 768]), "encoder.w": ("F32", [86_000_000])},
+    )
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            architectures=["XLMRobertaModel"],
+            model_type="xlm-roberta",
+            hidden_size=768,
+            intermediate_size=3072,
+            num_attention_heads=12,
+            max_position_embeddings=514,
+            pad_token_id=1,
+            torch_dtype="float32",
+        ),
+    )
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    cast = estimate(str(tmp_path), dtype="float16", max_num_batched_tokens=128)
+    stored = estimate(str(tmp_path), max_num_batched_tokens=128)
+    overhead = some(cast.overhead)
+    # The embeddings load first, uploaded in F32 and cast to F16 on the device
+    assert overhead.loading > 0
+    assert cast.total == overhead.runtime + embeddings * (4 + 2)
+    assert some(stored.overhead).loading == 0
+    assert "LOADING" in table(cast)
+    assert any("while loading" in w for w in cast.warnings)
+
+
+def test_f32_alibi_keeps_the_bias_table(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            architectures=["JinaBertForMaskedLM"],
+            model_type="bert",
+            position_embedding_type="alibi",
+            max_position_embeddings=8192,
+            torch_dtype="float32",
+        ),
+    )
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    full = estimate(str(tmp_path), max_num_batched_tokens=128)
+    half = estimate(str(tmp_path), max_num_batched_tokens=128, dtype="float16")
+    assert some(full.overhead).buffers == 8 * 8192**2 * 4
+    assert some(half.overhead).buffers == 0
+    assert full.total == full.weights.bytes + some(full.overhead).bytes
+    assert "BUFFERS" in table(full)
+    assert any("ALiBi" in w for w in full.warnings)
+
+
+def test_encoder_eager_warmup_uses_all_tokens_and_sequence_override(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["MPNetModel"], model_type="mpnet"))
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "sentence_bert_config.json"), {"max_seq_length": 384})
+    original = estimate(str(tmp_path), max_num_batched_tokens=768)
+    shorter = estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=128)
+    bigger = estimate(str(tmp_path), max_num_batched_tokens=1536)
+    assert some(shorter.overhead).activations < some(original.overhead).activations
+    assert some(bigger.overhead).activations == 2 * some(original.overhead).activations
+    assert any("up to 128 tokens" in w for w in shorter.warnings)
+    assert original.weights.bytes == shorter.weights.bytes == bigger.weights.bytes
+
+
+def test_encoder_runtime_and_replica_fit(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("BF16", [1024, 1024, 2048])})
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["BertModel"], model_type="bert"))
+    result = estimate(str(tmp_path), gpu_memory="2x3")
+    assert (some(result.fit).gpus, some(result.fit).needed, some(result.fit).fits) == (1, None, False)
+    assert any("one replica per GPU" in w for w in result.warnings)
+    assert some(result.overhead).runtime > 0
+    assert some(result.fit).required == result.total
+
+
+def test_sentence_transformers_decoder_uses_forward_overhead(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config(hidden_act="silu", rms_norm_eps=1e-6))
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "generation_config.json"), {})
+    result = estimate(str(tmp_path), max_num_batched_tokens=512)
+    assert result.kv_cache is None and some(result.overhead).activations > 0
+
+
+def test_masked_language_model_counts_logits_unless_embedding_pooling(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(architectures=["BertForMaskedLM"], model_type="bert", vocab_size=30522),
+    )
+    masked = estimate(str(tmp_path), max_num_batched_tokens=512)
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    pooled = estimate(str(tmp_path), max_num_batched_tokens=512)
+    write_json(str(tmp_path / "document_1_SpladePooling/config.json"), {})
+    sparse = estimate(str(tmp_path), max_num_batched_tokens=512)
+    assert (
+        some(sparse.overhead).activations
+        > some(masked.overhead).activations
+        > some(pooled.overhead).activations
+    )
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"is_encoder_decoder": True},
+        {"vision_config": {"hidden_size": 64}},
+        {"audio_config": {"hidden_size": 64}},
+    ],
+)
+def test_other_models_do_not_take_the_encoder_path(tmp_path: Path, extra: dict[str, object]) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config(architectures=["T5Model"], **extra))
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    result = estimate(str(tmp_path))
+    assert result.overhead is None
+    assert not any("Encoder warmup" in w for w in result.warnings)
+
+
+def test_unknown_encoder_length_skips_warmup_until_overridden(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("BF16", [1000, 64])})
+    write_json(
+        str(tmp_path / "config.json"), llama_config(architectures=["BertModel"], max_position_embeddings=None)
+    )
+    result = estimate(str(tmp_path))
+    assert result.overhead is None and any("sequence length is unknown" in w for w in result.warnings)
+    assert estimate(str(tmp_path), max_model_len=512).overhead is not None
+
+
+@pytest.mark.parametrize("extra", [{"num_experts": 8}, {"layer_types": ["mamba"] * 4}, {"kv_lora_rank": 64}])
+def test_encoder_warmup_skips_unmodeled_architectures(tmp_path: Path, extra: dict[str, object]) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(
+        str(tmp_path / "config.json"), llama_config(architectures=["LlamaForSequenceClassification"], **extra)
+    )
+    result = estimate(str(tmp_path))
+    assert result.overhead is None and any("Encoder warmup estimation skipped" in w for w in result.warnings)
+
+
+@pytest.mark.parametrize(
+    "dtype,target,size", [("float16", "F16", 2), ("float32", "F32", 4), ("bfloat16", "BF16", 2)]
+)
+def test_encoder_precision_override_keeps_components_and_buffer_storage(
+    tmp_path: Path, dtype: str, target: str, size: int
+) -> None:
+    write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {"w": ("F32", [1000, 64]), "norm.weight": ("F32", [64]), "position_ids": ("I64", [512])},
+    )
+    write_safetensors(str(tmp_path / "2_Dense/model.safetensors"), {"linear.weight": ("BF16", [64, 32])})
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(architectures=["BertModel"], model_type="bert", torch_dtype="float32"),
+    )
+    write_json(str(tmp_path / "config_sentence_transformers.json"), {})
+    write_json(str(tmp_path / "modules.json"), [{"path": ""}, {"path": "1_Pooling"}, {"path": "2_Dense"}])
+    before = estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384)
+    result = estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384, dtype=dtype)
+    assert result.weights.params == before.weights.params
+    assert result.weights.bytes == (64000 + 64 + 2048) * size + 512 * 8
+    assert set(result.weights.dtypes) == {target, "I64"}
+    assert result.weights.dtypes["I64"].to_dict() == before.weights.dtypes["I64"].to_dict()
+    assert {name: w.bytes for name, w in result.components.items()} == {
+        "0_Transformer": (64000 + 64) * size + 512 * 8,
+        "2_Dense": 2048 * size,
+    }
+    # Two sequences of 384 tokens, which only keep the attention tensors in F32
+    per_token, attention = 7 * 256 + 2 * 1024, 3 * 8 * 2 * 384**2
+    assert some(before.overhead).activations == (768 * per_token + attention) * 4
+    assert some(result.overhead).activations == (768 * per_token + (attention if size == 4 else 0)) * size
+    assert result.total == result.weights.bytes + some(result.overhead).bytes
+    assert (
+        estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384).weights.to_dict()
+        == before.weights.to_dict()
+    )
+
+
+@pytest.mark.parametrize("model_type", ["bert", "mpnet"])
+def test_encoder_dtype_override_keeps_attention_and_warmup_shape(tmp_path: Path, model_type: str) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), {"w": ("F32", [1000, 64])})
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(architectures=["BertModel"], model_type=model_type, torch_dtype="float32"),
+    )
+    half = estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384, dtype="float16")
+    full = estimate(str(tmp_path), max_num_batched_tokens=768, max_model_len=384, dtype="float32")
+    # MPNet always runs eager, while BERT only materializes the attention scores in F32
+    if model_type == "mpnet":
+        assert some(full.overhead).activations == 2 * some(half.overhead).activations
+    else:
+        assert some(full.overhead).activations > 2 * some(half.overhead).activations
+    assert some(full.overhead).runtime == some(half.overhead).runtime
+    assert ("eager attention" in " ".join(half.warnings)) == (model_type == "mpnet")
+    assert "eager attention" in " ".join(full.warnings)
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        llama_config(),
+        llama_config(architectures=["BertModel"], quantization_config={"quant_method": "fp8"}),
+        {
+            "architectures": ["LlavaForConditionalGeneration"],
+            "text_config": llama_config(),
+            "vision_config": {"hidden_size": 64},
+        },
+    ],
+)
+def test_dtype_override_rejects_other_workloads_without_changing_defaults(
+    tmp_path: Path, config: dict[str, object]
+) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), config)
+    before = estimate(str(tmp_path)).to_dict()
+    with pytest.raises(RuntimeError, match="only supports unquantized Safetensors text encoders"):
+        estimate(str(tmp_path), dtype="float16")
+    assert estimate(str(tmp_path)).to_dict() == before
+
+
+def test_precision_cast_preserves_non_parameter_bytes_without_mutating_weights() -> None:
+    weights = Weights()
+    weights.add("F32", 0, 4096)
+    weights.add("BF16", 1024, 2048)
+    weights.add("U8", 512, 512)
+    before = weights.to_dict()
+    result = weights.cast("float16")
+    assert result.bytes == weights.bytes and result.params == weights.params
+    assert result.dtypes["F32"].bytes == 4096 and result.dtypes["F32"].params == 0
+    assert result.dtypes["F16"].bytes == 2048 and result.dtypes["U8"].bytes == 512
+    assert weights.to_dict() == before

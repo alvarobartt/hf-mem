@@ -146,6 +146,22 @@ $ uvx hf-mem google/embeddinggemma-2
 └─────────────────┴──────────────────────────────────┘
 ```
 
+Text encoders, rerankers and Sentence Transformers include a warmup estimate over `--max-num-batched-tokens` tokens, using `--max-model-len` as the sequence length (otherwise the Sentence Transformers or model configuration). The batch can contain several sequences. No KV cache or decoding graphs are added.
+
+```bash
+uvx hf-mem BAAI/bge-base-en-v1.5 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
+```
+
+By default, weights keep their stored dtypes, including mixed precision and quantization buffers. Activations use the configured dtype or the dominant floating-point weight dtype. For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` explicitly casts floating-point parameters and activations; integer tensors remain unchanged. Other model types reject this option. Warmup assumes memory-efficient attention in half precision, and eager attention for MPNet, DeBERTa, configurations selecting it, and F32 activations, as memory-efficient attention kernels need half precision. Fit checks assume one replica per GPU.
+
+To estimate a Text Embeddings Inference deployment, use its configured `--dtype` (`float16` or `float32`) and the actual number of warmup tokens, which may be smaller than its batch limit:
+
+```bash
+uvx hf-mem BAAI/bge-base-en-v1.5 --dtype float16 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
+```
+
+Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Casting while loading holds the largest tensor both as stored and as cast, so F32 checkpoints with large vocabularies loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
+
 ### GGUF
 
 GGUF repositories list every file, and a quantization tag as in llama.cpp (`<model>:Q4_K_M`, case-insensitive) or `--file` (a tag, file, directory or any shard of a sharded file) estimates a single one. The `mmproj` projector of vision and audio models is included as llama.cpp does, picking the one with the same quantization, or else Q8_0, F16, BF16 or F32, together with the compute buffer of its encoders in the overhead.
@@ -319,14 +335,14 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
   "offloaded": null,
   "components": null,
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628},
+  "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628, "buffers": 0, "loading": 0},
   "moe": null,
   "fit": null,
   "warnings": []
 }
 ```
 
-- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
+- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` is `null` for non-generative models; text encoders include warmup `overhead`, while other non-generative models have no overhead estimate.
 - `file`, `offloaded` (weights in CPU memory, not in `total`), `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
 - `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
 - `format` is `safetensors`, `gguf` or `onnx`.
@@ -343,7 +359,7 @@ print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead
 print(result.to_dict())
 ```
 
-`run` takes the same options as the CLI (`revision`, `file`, `format`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization` and `max_num_batched_tokens`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF and ONNX repositories.
+`run` takes the same options as the CLI (`revision`, `file`, `format`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization`, `max_num_batched_tokens` and `dtype`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF and ONNX repositories.
 
 ### Agents
 
@@ -365,11 +381,16 @@ hf extensions add alvarobartt/hf-mem
 - **KV cache**: what the engine allocates for `--max-model-len` tokens and `--batch-size` sequences, following the model's attention: full attention caches every token, sliding window layers only the window, latent and compressed attention (e.g. DeepSeek, GLM) a smaller record per token, and linear attention or Mamba layers a fixed state per sequence.
 - **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, the CUDA graphs, and the runtime (the CUDA context and library workspaces).
 
-The KV cache and the overhead follow vLLM for Safetensors models and llama.cpp for GGUF models, as validated on NVIDIA T4 to H200 GPUs with vLLM 0.33, SGLang 0.5 and llama.cpp on 50+ models: the KV cache matches vLLM exactly for most architectures (within 3% for DeepSeek-V4.1, Kimi Linear and Qwen3.8-Flash-Next), the overhead is within 10% of vLLM's on median, and the vision and audio encoders of GGUF models are within 5% of llama.cpp's.
+Decoder KV cache and overhead follow vLLM for Safetensors models and llama.cpp for GGUF models, as validated on NVIDIA T4 to H200 GPUs with vLLM 0.33, SGLang 0.5 and llama.cpp on 50+ models: the KV cache matches vLLM exactly for most architectures (within 3% for DeepSeek-V4.1, Kimi Linear and Qwen3.8-Flash-Next), the overhead is within 10% of vLLM's on median, and the vision and audio encoders of GGUF models are within 5% of llama.cpp's.
+
+Encoder warmup uses model dimensions, activation precision and the token budget, with a 0.32 GiB allowance for the device context and library workspaces. It includes masked-language-model logits unless the model supplies embedding pooling, and includes SPLADE logits and transformations. MoE, recurrent and latent-attention encoders have no warmup estimate. Text Embeddings Inference is a validation reference; its loading policies and warmup scheduling are not assumed.
+
+With eager attention, each sequence keeps tensors of attention scores (heads x length x length) at once, counted from the architecture: the scores and the probabilities; a bias per position term (MPNet's relative positions, ALiBi, or DeBERTa's two disentangled terms), which also carries the padding; and the masks: one per attention pattern when the layers alternate between full and sliding window attention (ModernBERT, Gemma 3), a causal mask, or else a padding mask once several sequences share a batch. Eager ALiBi attention also keeps the biases of every pair of positions for the model's lifetime (`buffers` in the overhead), and `--dtype` casts that change the stored dtype add the loading peak of the largest tensor, assumed to be the token embeddings, which load first (`loading`, only what exceeds the warmup). Against the startup peak of Text Embeddings Inference 1.9 with `--dtype float32` on an L4, this is within 6% for a single input of 2048 tokens with ModernBERT, NomicBERT, JinaBERT, Gemma 3 and Qwen3. At 4096 tokens it is 14% and 16% below for ModernBERT and NomicBERT, which keep the tensors their architecture needs while CUDA's memory pool fragments and reserves about one more attention tensor, and 9% below for Qwen3, whose causal mask takes one more tensor while it is built in Text Embeddings Inference 1.9.4 (fixed on its main branch).
 
 ## Limitations
 
-- The estimates follow vLLM and llama.cpp with their default settings, so other engines (e.g. SGLang, which reserves a fixed share of the GPU instead) and non-default settings use different amounts of memory.
+- CPU memory is not estimated for text encoders: CPU backends can differ for F32 and F16, and loading peaks on CPUs differ from steady memory.
+- Decoder estimates follow vLLM and llama.cpp with their default settings, so other engines (e.g. SGLang, which reserves a fixed share of the GPU instead) and non-default settings use different amounts of memory.
 - ONNX models have no overhead estimate, and GGUF and ONNX listings estimate each file from its size, so a single file (`:<quantization>` or `--file`) gives the most accurate numbers.
 - vLLM profiles the vision encoder of some models (e.g. Qwen2.5-VL) with a video when it has more tokens than an image, which can reserve a few GiB more (`hf-mem` warns about it).
 - PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, and encoder-decoder models (e.g. Whisper) have no KV cache estimate.
