@@ -28,7 +28,14 @@ _ALIASES = {
     "num_attention_heads": ("num_attention_heads", "n_heads", "n_head", "num_heads"),
     "num_key_value_heads": ("num_key_value_heads", "n_kv_heads", "num_kv_heads", "multi_query_group_num"),
     "hidden_size": ("hidden_size", "d_model", "n_embd", "dim"),
-    "max_position_embeddings": ("max_position_embeddings", "n_positions", "max_seq_len", "seq_length"),
+    "max_position_embeddings": (
+        "max_position_embeddings",
+        "model_max_length",
+        "n_positions",
+        "max_seq_len",
+        "seq_length",
+    ),
+    "sliding_window": ("sliding_window", "sliding_window_size", "attention_window_size"),
 }
 _DEFAULTS: dict[str, dict[str, Any]] = {
     "gemma2": {
@@ -70,18 +77,19 @@ _ENCODER_ARCHS = (
 )
 _GENERATIVE_ARCHS = ("ForCausalLM", "ForConditionalGeneration", "LMHeadModel")
 _STATE = ("linear", "conv", "mamba", "ssm", "recurrent", "delta", "rwkv", "lightning")
-_NO_CACHE = ("mlp", "moe")
+_NO_CACHE = ("mlp", "moe", "dummy")
 _SLIDING = ("sliding", "local", "chunked", "swa")
 
 
 def normalize(config: dict[str, Any]) -> dict[str, Any]:
-    config = {
-        **_DEFAULTS.get(str(config.get("model_type")), {}),
-        **{k: v for k, v in config.items() if v is not None},
-    }
+    config = {k: v for k, v in config.items() if v is not None}
     for key, aliases in _ALIASES.items():
         if config.get(key) is None:
-            config[key] = next((config[a] for a in aliases if isinstance(config.get(a), int)), None)
+            value = next((config[a] for a in aliases if isinstance(config.get(a), int)), None)
+            config[key] = (
+                value if value is not None else _DEFAULTS.get(str(config.get("model_type")), {}).get(key)
+            )
+    config = {**_DEFAULTS.get(str(config.get("model_type")), {}), **config}
     if isinstance(linear := config.get("linear_attn_config"), dict) and config.get("layer_types") is None:
         full, heads, head_dim = (
             set(linear.get("full_attn_layers") or []),
@@ -160,9 +168,12 @@ def text_config(config: dict[str, Any]) -> dict[str, Any] | None:
         return None
 
     found = normalize(found)
-    for key in ("dtype", "torch_dtype", "quantization_config"):
-        if found.get(key) is None and config.get(key) is not None:
-            found[key] = config[key]
+    if found.get("dtype") is None and found.get("torch_dtype") is None:
+        for key in ("dtype", "torch_dtype"):
+            if config.get(key) is not None:
+                found[key] = config[key]
+    if found.get("quantization_config") is None and config.get("quantization_config") is not None:
+        found["quantization_config"] = config["quantization_config"]
     return found
 
 
@@ -187,7 +198,7 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
     scheme = quantization.get("kv_cache_scheme") or {}
     if scheme.get("num_bits") == 8 or quantization.get("kv_cache_quant_algo") == "FP8":
         return "F8_E4M3"
-    dtype = config.get("torch_dtype") or config.get("dtype")
+    dtype = config.get("dtype") or config.get("torch_dtype")
     if isinstance(dtype, str):
         return _TORCH.get(dtype.removeprefix("torch."), "F16")
 
@@ -214,13 +225,43 @@ def layer_kinds(config: dict[str, Any]) -> list[str]:
                 kinds.append("none")
             else:
                 kinds.append("full")
-        return kinds
+    elif isinstance(local := config.get("local_layer_ids"), list):
+        kinds = ["sliding" if i in local else "full" for i in range(layers)]
+    elif isinstance(pattern := config.get("sliding_window_pattern"), int) and pattern > 0:
+        kinds = ["full" if (i + 1) % pattern == 0 else "sliding" for i in range(layers)]
+    elif isinstance(pattern := config.get("hybrid_override_pattern"), str):
+        kinds = ["full" if c == "*" else ("state" if c == "M" else "none") for c in pattern]
+    else:
+        kinds = [
+            "sliding"
+            if (layer.get("sliding_window") or layer.get("attention_chunk_size"))
+            and layer.get("use_sliding_window") is not False
+            else "full"
+            for layer in _layer_configs(config)
+        ]
+    modes = config.get("kv_sharing_modes")
+    if modes is None and isinstance(sources := config.get("kv_source_layers"), list):
+        modes = [None if i == source else "reuse" for i, source in enumerate(sources)]
+    modes = modes or []
+    shared = config.get("num_kv_shared_layers") or 0
+    return [
+        "none"
+        if (i < len(modes) and modes[i] in ("reuse", "reuse_but_indexer")) or (shared and i >= layers - shared)
+        else kind
+        for i, kind in enumerate(kinds)
+    ]
 
-    if isinstance(pattern := config.get("sliding_window_pattern"), int) and pattern > 0:
-        return ["full" if (i + 1) % pattern == 0 else "sliding" for i in range(layers)]
-    if isinstance(pattern := config.get("hybrid_override_pattern"), str):
-        return ["full" if c == "*" else ("state" if c == "M" else "none") for c in pattern]
-    return ["full"] * layers
+
+def _layer_configs(config: dict[str, Any]) -> list[dict[str, Any]]:
+    # Transformers serializes a sparse mapping with integer or zero-padded string indices.
+    overrides = config.get("per_layer_config") or {}
+    overrides = {int(i): value for i, value in overrides.items()}
+    layers = [normalize({**config, **overrides.get(i, {})}) for i in range(config["num_hidden_layers"])]
+    if config.get("kv_lora_rank") and isinstance(rope := config.get("no_rope_layers"), list):
+        for layer, uses_rope in zip(layers, rope):
+            if not uses_rope:
+                layer["qk_rope_head_dim"] = 0
+    return layers
 
 
 def _cdiv(a: int, b: int) -> int:
@@ -257,6 +298,8 @@ def kv_heads(config: dict[str, Any]) -> int:
     config = normalize(config)
     if config.get("kv_lora_rank"):
         return 1
+    if config.get("per_layer_config"):
+        return max(kv_heads({**layer, "per_layer_config": None}) for layer in _layer_configs(config))
     return (
         config.get("num_global_key_value_heads")
         or config["num_key_value_heads"]
@@ -326,6 +369,28 @@ def kv_cache(
     config = normalize(config)
     if packed := _packed_mla(config, dtype, max_model_len, batch_size, tensor_parallel_size):
         return packed
+    if (
+        config.get("per_layer_config") or (config.get("kv_lora_rank") and config.get("no_rope_layers"))
+    ) and "state" not in (kinds := layer_kinds(config)):
+        size, counts = 0, dict.fromkeys(("full", "sliding", "state", "none"), 0)
+        for i, (layer, kind) in enumerate(zip(_layer_configs(config), kinds)):
+            counts[kind] += 1
+            # Explicit per-layer dimensions supersede the legacy global-attention overrides.
+            for key in (
+                "per_layer_config",
+                "num_kv_shared_layers",
+                "kv_sharing_modes",
+                "kv_source_layers",
+                "no_rope_layers",
+                "global_head_dim",
+                "num_global_key_value_heads",
+            ):
+                layer.pop(key, None)
+            layer.update(num_hidden_layers=1, layer_types=["dummy" if kind == "none" else f"{kind}_attention"])
+            if isinstance(indexer_types := config.get("indexer_types"), list):
+                layer["indexer_types"] = indexer_types[i : i + 1]
+            size += kv_cache(layer, dtype, max_model_len, batch_size, batched_tokens, tensor_parallel_size)[0]
+        return size, counts
     if tensor_parallel_size > 1:
         if config.get("linear_attn_config"):
             sharded = {
@@ -347,7 +412,11 @@ def kv_cache(
         rope = config.get("qk_rope_head_dim") or 0
         width = full_width = rank + _cdiv(rank, 128) * 4 + 2 * rope if dtype == "FP8_DS_MLA" else rank + rope
     else:
-        width = 2 * cache_heads * head_dim
+        width = (
+            2
+            * (config.get("swa_num_key_value_heads") or cache_heads)
+            * (config.get("swa_head_dim") or head_dim)
+        )
         full_width = (
             2
             * (config.get("num_global_key_value_heads") or cache_heads)

@@ -61,6 +61,37 @@ def test_external_data_and_large_inline_files(tmp_path: Path, monkeypatch: pytes
     assert any("estimated from their file sizes" in w for w in result.warnings)
 
 
+@pytest.mark.parametrize("prefix", ["past_key_values", "cache", "cache_params", "input.cache"])
+@pytest.mark.parametrize("large", [False, True])
+def test_transformers_cache_input_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prefix: str, large: bool
+) -> None:
+    inputs: list[tuple[str, int, list[int | str]]] = [
+        (f"{prefix}.layers.{i}.{kind}", 10, ["batch", 2, "past_sequence_length", 16])
+        for i in range(2)
+        for kind in ("keys", "values")
+    ]
+    inputs += [("cache_position", 7, ["sequence"]), (f"{prefix}.layers.0.cumulative_length", 7, [])]
+    write_onnx(str(tmp_path / "model.onnx"), WEIGHTS, inputs)
+    write_json(str(tmp_path / "config.json"), llama_config(max_position_embeddings=None, model_max_length=2048))
+    if large:
+        monkeypatch.setattr(_onnx, "SMALL_FILE", 1)
+
+    result = some(estimate(str(tmp_path), batch_size=2).kv_cache)
+
+    assert (result.max_model_len, result.dtype, result.bytes) == (2048, "F16", PER_TOKEN * 2048 * 2)
+
+
+@pytest.mark.parametrize("large", [False, True])
+def test_cache_position_alone_is_not_a_kv_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, large: bool
+) -> None:
+    write_onnx(str(tmp_path / "model.onnx"), WEIGHTS, [("cache_position", 7, ["sequence"])])
+    if large:
+        monkeypatch.setattr(_onnx, "SMALL_FILE", 1)
+    assert estimate(str(tmp_path), max_model_len=1024).kv_cache is None
+
+
 def test_variants_and_encoder_decoder_parts_are_grouped() -> None:
     files = dict.fromkeys(
         [
@@ -154,9 +185,19 @@ def test_review_fixes(tmp_path: Path) -> None:
     assert no_length.kv_cache is None and any("--max-model-len" in w for w in no_length.warnings)
 
 
-def test_decoder_with_past_and_encoder_caches(tmp_path: Path) -> None:
+@pytest.mark.parametrize("prefix", ["past_key_values", "cache"])
+@pytest.mark.parametrize("large", [False, True])
+def test_decoder_with_past_and_encoder_caches(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, prefix: str, large: bool
+) -> None:
     cross: list[tuple[str, int, list[int | str]]] = [
-        (f"past_key_values.0.{side}.{kind}", 1, ["batch", 2, f"{side}_sequence_length", 16])
+        (
+            f"past_key_values.0.{side}.{kind}"
+            if prefix == "past_key_values"
+            else f"input.cache.{'cross' if side == 'encoder' else 'self'}_attention_cache.layers.0.{kind}s",
+            1,
+            ["batch", 2, f"{side}_sequence_length", 16],
+        )
         for side in ("decoder", "encoder")
         for kind in ("key", "value")
     ]
@@ -166,6 +207,8 @@ def test_decoder_with_past_and_encoder_caches(tmp_path: Path) -> None:
     write_json(
         str(tmp_path / "config.json"), {**llama_config(max_position_embeddings=100), "max_source_positions": 10}
     )
+    if large:
+        monkeypatch.setattr(_onnx, "SMALL_FILE", 1)
 
     result = estimate(str(tmp_path))
 
