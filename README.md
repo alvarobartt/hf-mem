@@ -63,8 +63,6 @@ $ uvx hf-mem zai-org/GLM-5.3-Flash
 
 For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, which as in vLLM is the model dtype unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
 
-Both `max_position_embeddings` and `model_max_length` are supported, as are `torch_dtype` and `dtype`. Attention settings can use the older global fields or Transformers' sparse `per_layer_config` mapping. Local attention layers (including Inkling-2's `local_layer_ids`) and shared KV layers are accounted for in the cache estimate.
-
 ```console
 $ uvx hf-mem Qwen/Qwen3.8-27B --max-model-len 32768 --batch-size 4
 ┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
