@@ -41,6 +41,22 @@ def test_table(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[st
     assert len({len(line) for line in out.splitlines()}) == 1
 
 
+def test_table_without_context_length(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str
+) -> None:
+    config = llama_config()
+    del config["max_position_embeddings"]
+    write_json(str(Path(model) / "config.json"), config)
+
+    code, out, err = cli(monkeypatch, capsys, model)
+
+    assert code == 0
+    assert "MODEL (" in out and "BF16" in out and "F32" in out
+    assert "KV CACHE (" not in out
+    assert "KV cache estimation skipped, as the context length is not in `config.json`" in err
+    assert len({len(line) for line in out.splitlines()}) == 1
+
+
 @pytest.mark.parametrize(
     "tty,color,no_color,expected",
     [
