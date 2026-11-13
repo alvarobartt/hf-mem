@@ -1,0 +1,16 @@
+[
+  {
+    "name": "qwen3-4b-c8192-p2048-s8",
+    "model": "Qwen/Qwen3-4B",
+    "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+    "max_model_len": 8192,
+    "prompt_tokens": 8160,
+    "max_num_batched_tokens": 2048,
+    "num_gpu_blocks_override": 513,
+    "pool_tokens": 8448,
+    "repeats": 1,
+    "startup_timeout": 700,
+    "extra": [],
+    "native_graph_defaults": true
+  }
+]

@@ -1,0 +1,20 @@
+[
+  {
+    "model": "Qwen/Qwen3-1.7B",
+    "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+    "extra": [
+      "--dtype",
+      "float16"
+    ],
+    "startup_timeout": 900,
+    "request_timeout": 600,
+    "repeats": 1,
+    "name": "default-context",
+    "max_model_len": 40960,
+    "prompt_tokens": 40928,
+    "native_context_defaults": true,
+    "native_cache_defaults": true,
+    "native_scheduler_defaults": true,
+    "native_prefill_defaults": true
+  }
+]

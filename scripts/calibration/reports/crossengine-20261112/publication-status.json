@@ -1,0 +1,6 @@
+{
+  "state": "blocked_pending_explicit_approval",
+  "destination": "https://huggingface.co/buckets/alvarobartt/hf-mem-validation",
+  "reason": "Automatic approval review rejected new source/forecast and native-only uploads because explicit payload/destination authorization was missing.",
+  "new_payload_uploaded": false
+}

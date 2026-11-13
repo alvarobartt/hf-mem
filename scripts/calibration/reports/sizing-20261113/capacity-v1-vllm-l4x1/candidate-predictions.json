@@ -1,0 +1,317 @@
+[
+  {
+    "case": "qwen3-4b-native-defaults",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "engine": "vllm"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "file": null,
+      "format": "safetensors",
+      "total": 16345744018,
+      "recommended_gpu_memory": 17541553634,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 8044936192,
+        "params": 4022468096,
+        "dtypes": {
+          "BF16": {
+            "bytes": 8044936192,
+            "params": 4022468096
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 2261010066,
+        "activations": 1288547860,
+        "encoder": 0,
+        "graphs": 180577611,
+        "runtime": 791884595,
+        "max_num_seqs": 256,
+        "reference_engine": "vllm"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "file": null,
+      "format": "safetensors",
+      "total": 15394915572,
+      "recommended_gpu_memory": 16807200129,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 8044936192,
+        "params": 4022468096,
+        "dtypes": {
+          "BF16": {
+            "bytes": 8044936192,
+            "params": 4022468096
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 1310181620,
+        "activations": 450651750,
+        "encoder": 0,
+        "graphs": 301184122,
+        "runtime": 558345748,
+        "max_num_seqs": 256,
+        "reference_engine": "vllm",
+        "gpu_type": "nvidia-l4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 24008867184,
+        "usable": 21876415921,
+        "required": 15394915572,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960,
+        "overhead_per_gpu": 1310181620
+      },
+      "warnings": []
+    }
+  },
+  {
+    "case": "qwen3-8b-native-defaults",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "engine": "vllm"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "file": null,
+      "format": "safetensors",
+      "total": 24797435149,
+      "recommended_gpu_memory": 26932321557,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 16381470720,
+        "params": 8190735360,
+        "dtypes": {
+          "BF16": {
+            "bytes": 16381470720,
+            "params": 8190735360
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 2376166669,
+        "activations": 1371595079,
+        "encoder": 0,
+        "graphs": 212686995,
+        "runtime": 791884595,
+        "max_num_seqs": 256,
+        "reference_engine": "vllm"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "file": null,
+      "format": "safetensors",
+      "total": 23829090548,
+      "recommended_gpu_memory": 26178505658,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 16381470720,
+        "params": 8190735360,
+        "dtypes": {
+          "BF16": {
+            "bytes": 16381470720,
+            "params": 8190735360
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 1407822068,
+        "activations": 523003494,
+        "encoder": 0,
+        "graphs": 326472826,
+        "runtime": 558345748,
+        "max_num_seqs": 256,
+        "reference_engine": "vllm",
+        "gpu_type": "nvidia-l4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 24008867184,
+        "usable": 21876415921,
+        "required": 23829090548,
+        "gpus": null,
+        "needed": 2,
+        "fits": false,
+        "max_model_len": 27712,
+        "overhead_per_gpu": 1407822068
+      },
+      "warnings": []
+    }
+  },
+  {
+    "case": "qwen3-4b-c8192-p2048-s8",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "engine": "vllm",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 2048,
+      "max_num_seqs": 8
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "file": null,
+      "format": "safetensors",
+      "total": 10151514348,
+      "recommended_gpu_memory": 10659076223,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 8044936192,
+        "params": 4022468096,
+        "dtypes": {
+          "BF16": {
+            "bytes": 8044936192,
+            "params": 4022468096
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 1207959552,
+        "dtype": "BF16",
+        "max_model_len": 8192,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 898618604,
+        "activations": 299931238,
+        "encoder": 0,
+        "graphs": 31281921,
+        "runtime": 567405445,
+        "max_num_seqs": 8,
+        "reference_engine": "vllm"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "file": null,
+      "format": "safetensors",
+      "total": 9861604055,
+      "recommended_gpu_memory": 10659076222,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 8044936192,
+        "params": 4022468096,
+        "dtypes": {
+          "BF16": {
+            "bytes": 8044936192,
+            "params": 4022468096
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 1207959552,
+        "dtype": "BF16",
+        "max_model_len": 8192,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 608708311,
+        "activations": 299931238,
+        "encoder": 0,
+        "graphs": 31281921,
+        "runtime": 277495152,
+        "max_num_seqs": 8,
+        "reference_engine": "vllm",
+        "gpu_type": "nvidia-l4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 24008867184,
+        "usable": 21876415921,
+        "required": 9861604055,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960,
+        "overhead_per_gpu": 608708311
+      },
+      "warnings": []
+    }
+  }
+]

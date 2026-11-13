@@ -1,0 +1,24 @@
+[
+  {
+    "case": {
+      "name": "qwen35-4b-language-model-only",
+      "model": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "max_model_len": 6144,
+      "prompt_tokens": 6112,
+      "max_num_batched_tokens": 1024,
+      "num_gpu_blocks_override": 385,
+      "pool_tokens": 6400,
+      "repeats": 1,
+      "startup_timeout": 900,
+      "request_timeout": 300,
+      "extra": [
+        "--language-model-only"
+      ],
+      "native_graph_defaults": true,
+      "native_plan": true
+    },
+    "max_num_seqs": 16,
+    "tensor_parallel_size": 1
+  }
+]

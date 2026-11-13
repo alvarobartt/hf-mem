@@ -1,0 +1,22 @@
+{
+  "resolved_manifest_digest": "sha256:7cdd32fdd1acdd44207ff2b1483ea776d31769d600241d77fefe878dd0e4fa44",
+  "config_digest": "sha256:bd2700cdd010d324eddff61b88ce480e45ddf5cbb1e3d4c3d9fbe9bf69b5effc",
+  "entrypoint": [
+    "/opt/nvidia/nvidia_entrypoint.sh"
+  ],
+  "cmd": null,
+  "labels": {
+    "ai.radixark.base.image": "lmsysorg/sglang:nightly-dev-20261103-797af717@sha256:b4323a896f349d43a267c419c0267538b06c64a73110a0d0fd87496234df5dcd",
+    "ai.radixark.deep_gemm.revision": "0f96f7291e8ee459c725b3ea893611491083d669",
+    "ai.sglang.build.commit": "797af7170f34dd4cb9e397e0038c52371ef5e050",
+    "ai.sglang.build.url": "https://github.com/sgl-project/sglang/actions/runs/41551391737",
+    "ai.sglang.image.tag": "lmsysorg/sglang:nightly-dev-20261103-797af717",
+    "com.nvidia.cudnn.version": "9.14.0.64-1",
+    "maintainer": "NVIDIA CORPORATION <cudatools@nvidia.com>",
+    "org.opencontainers.image.revision": "797af7170f34dd4cb9e397e0038c52371ef5e050",
+    "org.opencontainers.image.source": "https://github.com/sgl-project/sglang",
+    "org.opencontainers.image.url": "https://github.com/sgl-project/sglang/actions/runs/41551391737",
+    "org.opencontainers.image.version": "lmsysorg/sglang:nightly-dev-20261103-797af717"
+  },
+  "layer_compressed_bytes": 15795495861
+}

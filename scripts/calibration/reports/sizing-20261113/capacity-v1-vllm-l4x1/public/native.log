@@ -1,0 +1,47 @@
+Diagnostic excerpts only; full traces/logs retained locally.
+HFMEM_LOG_START qwen3-8b-native-defaults
+HFMEM_NATIVE {"kind": "worker_memory", "pid": 457, "rank": 0, "time": 1794600019.6016273, "phase": "init_device", "local_rank": 0, "cuda_device_index": 0, "tensor_parallel_size": 1, "max_num_seqs": 256, "runner_type": "GPUModelRunner", "cudagraph_capture_sizes": [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], "cudagraph_mode": "FULL_AND_PIECEWISE", "torch_allocated_bytes": 8555008, "torch_reserved_bytes": 23068672, "torch_peak_allocated_bytes": 8555008, "torch_peak_reserved_bytes": 23068672, "cuda_free_bytes": 23363452928, "cuda_total_bytes": 23659151360, "model_memory_usage_bytes": 0, "requested_memory_bytes": 21766419252}
+(Worker pid=457) INFO 11-13 20:01:26 [weight_utils.py:1174] Auto-prefetch is disabled because the filesystem (OVERLAY) is not a recognized network FS (NFS/Lustre) and the checkpoint size (15.26 GiB) exceeds 90% of available RAM (11.90 GiB).
+(Worker pid=457) INFO 11-13 20:01:49 [model_runner.py:428] Model loading took 15.27 GiB memory and 90.221560 seconds
+HFMEM_NATIVE {"kind": "worker_memory", "pid": 457, "rank": 0, "time": 1794600109.8484733, "phase": "load_model", "local_rank": 0, "cuda_device_index": 0, "tensor_parallel_size": 1, "max_num_seqs": 256, "runner_type": "GPUModelRunner", "cudagraph_capture_sizes": [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], "cudagraph_mode": "FULL_AND_PIECEWISE", "torch_allocated_bytes": 16574301696, "torch_reserved_bytes": 16577986560, "torch_peak_allocated_bytes": 16574301696, "torch_peak_reserved_bytes": 16577986560, "cuda_free_bytes": 6808535040, "cuda_total_bytes": 23659151360, "model_memory_usage_bytes": 16394146816, "requested_memory_bytes": 21766419252}
+(Worker pid=457) INFO 11-13 20:02:26 [gpu_worker.py:772] Available KV cache memory: 3.2 GiB
+(Worker pid=457) INFO 11-13 20:02:26 [gpu_worker.py:787] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.9200 is equivalent to --gpu-memory-utilization=0.9001 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9399. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+HFMEM_NATIVE {"kind": "worker_memory", "pid": 457, "rank": 0, "time": 1794600146.9927592, "phase": "determine_available_memory", "local_rank": 0, "cuda_device_index": 0, "tensor_parallel_size": 1, "max_num_seqs": 256, "runner_type": "GPUModelRunner", "cudagraph_capture_sizes": [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128, 136, 144, 152, 160, 168, 176, 184, 192, 200, 208, 216, 224, 232, 240, 248, 256, 272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512], "cudagraph_mode": "FULL_AND_PIECEWISE", "torch_allocated_bytes": 16580719616, "torch_reserved_bytes": 16601055232, "torch_peak_allocated_bytes": 17853586432, "torch_peak_reserved_bytes": 18704498688, "cuda_free_bytes": 6468796416, "cuda_total_bytes": 23659151360, "model_memory_usage_bytes": 16394146816, "total_consumed_bytes": 16580083712, "peak_activation_memory_bytes": 1750095360, "cudagraph_memory_estimate_bytes": 471859200, "available_kv_cache_memory_bytes_bytes": 3436240180, "requested_memory_bytes": 21766419252}
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584] EngineCore failed to start.
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584] Traceback (most recent call last):
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 1555, in run_engine_core
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     return func(*args, **kwargs)
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 1232, in __init__
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     super().__init__(
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 163, in __init__
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     kv_cache_config = self._initialize_kv_caches(vllm_config)
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     return func(*args, **kwargs)
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 321, in _initialize_kv_caches
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     kv_cache_configs = get_kv_cache_configs(
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]                        ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/tmp/hfmem-hooks/sitecustomize.py", line 103, in plan
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     result = original(config, specs, available, groups)
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_planning.py", line 1554, in get_kv_cache_configs
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     _check_enough_kv_cache_memory(
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_planning.py", line 77, in _check_enough_kv_cache_memory
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584]     raise ValueError(
+(EngineCore pid=426) ERROR 11-13 20:02:27 [core.py:1584] ValueError: To serve at least one request with the model's max seq len (40960), (5.62 GiB KV cache is needed, which is larger than the available KV cache memory (3.2 GiB). Based on the available memory, the estimated maximum model length is 23280. Try increasing `gpu_memory_utilization` (which also controls CPU memory on the CPU backend) or decreasing `max_model_len` when initializing the engine. See https://docs.vllm.ai/en/latest/configuration/conserving_memory/ for more details.
+(EngineCore pid=426) ERROR 11-13 20:02:30 [multiproc_executor.py:380] Worker proc VllmWorker-0 died unexpectedly (exit code: None), shutting down executor.
+Traceback (most recent call last):
+    _check_enough_kv_cache_memory(
+  File "/usr/local/lib/python3.12/dist-packages/vllm/v1/core/kv_cache_planning.py", line 77, in _check_enough_kv_cache_memory
+    raise ValueError(
+ValueError: To serve at least one request with the model's max seq len (40960), (5.62 GiB KV cache is needed, which is larger than the available KV cache memory (3.2 GiB). Based on the available memory, the estimated maximum model length is 23280. Try increasing `gpu_memory_utilization` (which also controls CPU memory on the CPU backend) or decreasing `max_model_len` when initializing the engine. See https://docs.vllm.ai/en/latest/configuration/conserving_memory/ for more details.
+Traceback (most recent call last):
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked shared_memory objects to clean up at shutdown
+HFMEM_LOG_END

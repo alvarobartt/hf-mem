@@ -1,0 +1,921 @@
+{
+  "registration_sha256": "c3808a4d756f582328f5cd2c786f5eed780c36e9d8f10a6a17654e3ec0348d65",
+  "protocol": {
+    "created_at_utc": "2026-11-12T20:21:52.664359+00:00",
+    "candidate_source_sha256": {
+      "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+      "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+      "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+      "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+      "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+      "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+      "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+      "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+      "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+      "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+      "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+      "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+    },
+    "training_fixture_sha256": "8ab5409214bc8465c965926cc914a12257261b8bc778dc647f62e6a62cbc3c6f",
+    "training_observations": 21,
+    "tests_passed": 249,
+    "validation": "Separate models, hardware and settings; forecasts and source hashes published before new Job submission. All exact tokens and ranks required. Failed requests remain diagnostic and cannot pass gold. Numeric changes after observing these trials require another candidate version and fresh validation.",
+    "acceptance_targets": {
+      "median_absolute_total_error_pct": 3,
+      "median_absolute_overhead_error_pct": 10,
+      "p90_absolute_overhead_error_pct": 25
+    },
+    "not_used_for_fitting": [
+      "Mistral TP1/2/4 at prefill4096/seq16 on A10G and A100",
+      "Llama3.2-3B TP2/4/8 at seq16 on H200",
+      "Llama3.2-3B and Qwen3-4B at prefill4096/12288 and seq1/64 on RTX PRO 6000"
+    ],
+    "additional_check": "Report capacity-only predictions alongside named-hardware predictions. Native-default scheduler controls will be measured separately before finalizing default assumptions."
+  },
+  "experiments": [
+    {
+      "directory": "validation-v1-vllm-a10g-largex4",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "a10g-largex4",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "mistral7b-tp1-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp2-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp4-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "ec31b6f6621cce67377446220b0a5f94ca709aa8dfb3633960284125ad06687b",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "4ea0500697e1480af974945afee72158fb5e50e2cb2f4ca25785226a33791b42",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "1a26100aaa24a6e9463064221b42cf3bba231b8175bde5cc9fbf1ca972b1ecbd",
+          "cases-1.json": "9c7ae4a6e2dd183d0341416abc5b3d385366ad71656f684daaa7fa1015255ce7",
+          "cases-2.json": "04f988569984ead57918606c3ab14ce5a075a475eef844b222b4b480d63c8359"
+        }
+      },
+      "forecast_sha256": "83f1487707df5a25d7658aebea45ae80fdc669de4567a7eb0edff3c789280411",
+      "job": {
+        "job_id": "6af621290f431c4f7b564a6a",
+        "stage": "SCHEDULING",
+        "flavor": "a10g-largex4"
+      }
+    },
+    {
+      "directory": "validation-v1-sglang-a10g-largex4",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "a10g-largex4",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "mistral7b-tp1-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp2-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp4-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "d8f6a58de25a8b3c101434886cb802d851f04e23d64e5fcc822f462f0b8242ad",
+          "sitecustomize.py": "d47f47296266923fbffb967247715ca591e9bddfc17261b23edb82f0f111a6dc",
+          "trials.json": "4ea0500697e1480af974945afee72158fb5e50e2cb2f4ca25785226a33791b42",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "1a26100aaa24a6e9463064221b42cf3bba231b8175bde5cc9fbf1ca972b1ecbd",
+          "cases-1.json": "9c7ae4a6e2dd183d0341416abc5b3d385366ad71656f684daaa7fa1015255ce7",
+          "cases-2.json": "04f988569984ead57918606c3ab14ce5a075a475eef844b222b4b480d63c8359"
+        }
+      },
+      "forecast_sha256": "5edad1874136778e7ac47fa5926a40e078cc15df6a0dc91a669d24d1543ac99f",
+      "job": {
+        "job_id": "6af621295f2f1b7284b8b568",
+        "stage": "SCHEDULING",
+        "flavor": "a10g-largex4"
+      }
+    },
+    {
+      "directory": "validation-v1-vllm-a100x4",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "a100x4",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "mistral7b-tp1-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 32768,
+              "prompt_tokens": 32736,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp2-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 32768,
+              "prompt_tokens": 32736,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp4-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 32768,
+              "prompt_tokens": 32736,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "ec31b6f6621cce67377446220b0a5f94ca709aa8dfb3633960284125ad06687b",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "9b3f3d14f3ea272de40be3dd36ac6bf1661fd4438f37747df527fd30adf2d515",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "4953dffb8c24dfaadaf38a167dbc8e048e9706c6ebe808715be8e7e28228f16f",
+          "cases-1.json": "cb9abb96c386e6a28e6bf7ca16842d2ebd7265dc569bf8677b224e4a744c34db",
+          "cases-2.json": "5485cfdb552a92396e993d829a6bab524bce58843f3a03e98bdce02899943a47"
+        }
+      },
+      "forecast_sha256": "c8481eaeac8406fa3d7df21a76221abfde94c68bb4f15ff3f5d9e5c61aa26706",
+      "job": {
+        "job_id": "6af621290f431c4f7b564a6c",
+        "stage": "SCHEDULING",
+        "flavor": "a100x4"
+      }
+    },
+    {
+      "directory": "validation-v1-sglang-a100x4",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "a100x4",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "mistral7b-tp1-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 32768,
+              "prompt_tokens": 32736,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp2-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 32768,
+              "prompt_tokens": 32736,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "mistral7b-tp4-s16-p4096",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 32768,
+              "prompt_tokens": 32736,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "d8f6a58de25a8b3c101434886cb802d851f04e23d64e5fcc822f462f0b8242ad",
+          "sitecustomize.py": "d47f47296266923fbffb967247715ca591e9bddfc17261b23edb82f0f111a6dc",
+          "trials.json": "9b3f3d14f3ea272de40be3dd36ac6bf1661fd4438f37747df527fd30adf2d515",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "4953dffb8c24dfaadaf38a167dbc8e048e9706c6ebe808715be8e7e28228f16f",
+          "cases-1.json": "cb9abb96c386e6a28e6bf7ca16842d2ebd7265dc569bf8677b224e4a744c34db",
+          "cases-2.json": "5485cfdb552a92396e993d829a6bab524bce58843f3a03e98bdce02899943a47"
+        }
+      },
+      "forecast_sha256": "499c0d2ddf3e4d4c6eeba20d863b6f7576d0ede354af54ed234cd7fa7b387a73",
+      "job": {
+        "job_id": "6af621290f431c4f7b564a72",
+        "stage": "SCHEDULING",
+        "flavor": "a100x4"
+      }
+    },
+    {
+      "directory": "validation-v1-vllm-h200x8",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "h200x8",
+        "timeout": "12m",
+        "trials": [
+          {
+            "case": {
+              "name": "llama32-3b-tp2-s16-p8192",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 8192,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "llama32-3b-tp4-s16-p8192",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 8192,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 4
+          },
+          {
+            "case": {
+              "name": "llama32-3b-tp8-s16-p8192",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 8192,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 8
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "ec31b6f6621cce67377446220b0a5f94ca709aa8dfb3633960284125ad06687b",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "2273718752085c18d385f4e8cd793dfb679a911fdcfb4ad952de16a77f603a24",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "64e022f6b82ad0a9fcaa24b513b35aee9815bee1dbcb26ae17778ab28de39041",
+          "cases-1.json": "f35685287fa13b19366c12330a17b76e72c7d595fd18524fdf872cd2265ddb07",
+          "cases-2.json": "df40de93a55adf5c5e9108a9fa3526f874dcd8d2b986cc07d3d6e8a8e2be2bb6"
+        }
+      },
+      "forecast_sha256": "32fb267649b273eefb9e45f5155d50d9c78c0348dfcc806d99a53847d7be7deb",
+      "job": {
+        "job_id": "6af621295f2f1b7284b8b56c",
+        "stage": "SCHEDULING",
+        "flavor": "h200x8"
+      }
+    },
+    {
+      "directory": "validation-v1-sglang-h200x8",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "h200x8",
+        "timeout": "12m",
+        "trials": [
+          {
+            "case": {
+              "name": "llama32-3b-tp2-s16-p8192",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 8192,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "llama32-3b-tp4-s16-p8192",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 8192,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 4
+          },
+          {
+            "case": {
+              "name": "llama32-3b-tp8-s16-p8192",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 8192,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 8
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "d8f6a58de25a8b3c101434886cb802d851f04e23d64e5fcc822f462f0b8242ad",
+          "sitecustomize.py": "d47f47296266923fbffb967247715ca591e9bddfc17261b23edb82f0f111a6dc",
+          "trials.json": "2273718752085c18d385f4e8cd793dfb679a911fdcfb4ad952de16a77f603a24",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "64e022f6b82ad0a9fcaa24b513b35aee9815bee1dbcb26ae17778ab28de39041",
+          "cases-1.json": "f35685287fa13b19366c12330a17b76e72c7d595fd18524fdf872cd2265ddb07",
+          "cases-2.json": "df40de93a55adf5c5e9108a9fa3526f874dcd8d2b986cc07d3d6e8a8e2be2bb6"
+        }
+      },
+      "forecast_sha256": "bf294b5f51299ba782113ca3861b91c24c8f762b13373669b1b14dd49fa0b8c1",
+      "job": {
+        "job_id": "6af621290f431c4f7b564a76",
+        "stage": "SCHEDULING",
+        "flavor": "h200x8"
+      }
+    },
+    {
+      "directory": "validation-v1-vllm-rtx-pro-6000",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "rtx-pro-6000",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "llama32-3b-tp1-s1-p4096",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 1,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "llama32-3b-tp1-s64-p12288",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 12288,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 64,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "qwen3-4b-tp1-s1-p4096",
+              "model": "Qwen/Qwen3-4B",
+              "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 1,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "qwen3-4b-tp1-s64-p12288",
+              "model": "Qwen/Qwen3-4B",
+              "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 12288,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 64,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "ec31b6f6621cce67377446220b0a5f94ca709aa8dfb3633960284125ad06687b",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "aa20c66c0b0832b1176d0ba5cdca1d82df35230084d38dd4ca89bd5432505215",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "d0d492bffb63256b5969e9e3824cdbaa4ad2df40a5eb8f25c85f7c89154f466f",
+          "cases-1.json": "cebd0edc584d951842819b34b1771e3d3e2293c35dfcafaa97c3804cab989170",
+          "cases-2.json": "7a541115437fa7cd9b18660d44796633732ac0af91f7b71cf3394c9c6232e6fa",
+          "cases-3.json": "4dd68740a2fcb3ec5ed608a2c3c38e205ebc3a8290d7c6aea7e02f7d6ee7759c"
+        }
+      },
+      "forecast_sha256": "c95a82bb1d74274d5bf79d8018d6ef432c00adbc34d4ab032d4083bf1ec1ae4e",
+      "job": {
+        "job_id": "6af621295f2f1b7284b8b56f",
+        "stage": "SCHEDULING",
+        "flavor": "rtx-pro-6000"
+      }
+    },
+    {
+      "directory": "validation-v1-sglang-rtx-pro-6000",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "rtx-pro-6000",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "llama32-3b-tp1-s1-p4096",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 1,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "llama32-3b-tp1-s64-p12288",
+              "model": "meta-llama/Llama-3.2-3B-Instruct",
+              "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 12288,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 64,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "qwen3-4b-tp1-s1-p4096",
+              "model": "Qwen/Qwen3-4B",
+              "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 1,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "qwen3-4b-tp1-s64-p12288",
+              "model": "Qwen/Qwen3-4B",
+              "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 12288,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 360,
+              "extra": []
+            },
+            "max_num_seqs": 64,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "Prospective candidate-v1 validation, not used for fitting; exact forecasts frozen before launch.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+          "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "baseline_estimator_sha256": {
+          "src/hf_mem/_overhead.py": "ff86d0b0541c694d501c2a139dbe2b18455cb4554246795bfa4f419410db8fa9",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+          "src/hf_mem/estimate.py": "856a323c804c8b0b0dd8da42c8114af8bfb9205dc02a2344d81992912de2ec07",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "0b6673783b1f49db907b9f9a07e748faf4772ad16674c47552e042644e22d401",
+          "src/hf_mem/_safetensors.py": "fa841c854ce8bba046471ef8361e622de17d94f5920bdfaa772aa01ead9cf104",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "d8f6a58de25a8b3c101434886cb802d851f04e23d64e5fcc822f462f0b8242ad",
+          "sitecustomize.py": "d47f47296266923fbffb967247715ca591e9bddfc17261b23edb82f0f111a6dc",
+          "trials.json": "aa20c66c0b0832b1176d0ba5cdca1d82df35230084d38dd4ca89bd5432505215",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "cases-0.json": "d0d492bffb63256b5969e9e3824cdbaa4ad2df40a5eb8f25c85f7c89154f466f",
+          "cases-1.json": "cebd0edc584d951842819b34b1771e3d3e2293c35dfcafaa97c3804cab989170",
+          "cases-2.json": "7a541115437fa7cd9b18660d44796633732ac0af91f7b71cf3394c9c6232e6fa",
+          "cases-3.json": "4dd68740a2fcb3ec5ed608a2c3c38e205ebc3a8290d7c6aea7e02f7d6ee7759c"
+        }
+      },
+      "forecast_sha256": "7629b381417f57372fdca261a37678f34a46a14a2ecaeef0c67ccbc5c74bcf44",
+      "job": {
+        "job_id": "6af6212a0f431c4f7b564a78",
+        "stage": "SCHEDULING",
+        "flavor": "rtx-pro-6000"
+      }
+    }
+  ]
+}

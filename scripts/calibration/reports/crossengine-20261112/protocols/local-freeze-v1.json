@@ -1,0 +1,19 @@
+{
+  "frozen_at_utc": "2026-11-12T20:27:21.197707+00:00",
+  "registration_sha256": "c3808a4d756f582328f5cd2c786f5eed780c36e9d8f10a6a17654e3ec0348d65",
+  "candidate_source_sha256": {
+    "src/hf_mem/_overhead.py": "30d6d6d7a0e2640df8fbab67eee62fee670667ae5b118e17094e30f4e47b7d3d",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "af8ef6f29ccc27247f7023aa58c97a25af6dfa49a0f19b6d3b418b8f61a3019d",
+    "src/hf_mem/estimate.py": "2041e57f837fa38ada642d41957fdd1ebb909b4f403b94ac74cda76f27e589bd",
+    "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+    "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+    "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+    "src/hf_mem/cli.py": "c336876dc824ba2ce3f30f8b35f35125f0860d6479445c0db12f94437bfe376c",
+    "src/hf_mem/_safetensors.py": "c663ca974fa8f53e63878d50f4979205849b3614d37870e078c440f1ef72a6a7",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "publication_status": "Pending explicit publication approval; no source or forecast uploaded by this script."
+}

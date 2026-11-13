@@ -1,0 +1,62 @@
+{
+  "manifest": {
+    "job_stage": "COMPLETED",
+    "mode": "full_context_inference",
+    "expected_cases": [
+      "full-swa-previous-budget-control",
+      "full-swa-recommended-budget"
+    ],
+    "observed_cases": [
+      "full-swa-previous-budget-control",
+      "full-swa-recommended-budget"
+    ],
+    "complete": false,
+    "invalid_records": 0,
+    "duplicate_transport_records": 2,
+    "scope": "One T4. Runtime and load-only component audits are separate processes/jobs. All models use immutable revisions and full GGUF SHA-256 checks. Sampled peaks are lower bounds; CPU-mapped model bytes are not GPU memory. The native context-boundary flag is retained; completion validity requires every requested prompt and decode token."
+  },
+  "measurements": [
+    {
+      "case": "full-swa-recommended-budget",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "load_only": false,
+      "healthy": true,
+      "completed_full_token_counts": true,
+      "native_context_boundary_flag": true,
+      "sampled_runtime_or_ready_footprint_bytes": 3405316096,
+      "sampled_startup_footprint_bytes": 3390636032,
+      "baseline_bytes": 147027001344,
+      "bounded_free_memory_bytes": 3727818752,
+      "file_sha256_verified": true,
+      "gpu_model_bytes": 1091378872,
+      "host_mapped_model_bytes": 215041966,
+      "native_rounding": "Native MiB values are rounded to 0.01 MiB; conversion does not increase precision.",
+      "gpu_kv_bytes": 1476395008,
+      "gpu_recurrent_bytes": 639631,
+      "gpu_compute_bytes": 198254264
+    },
+    {
+      "case": "full-swa-previous-budget-control",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "load_only": false,
+      "healthy": false,
+      "completed_full_token_counts": false,
+      "native_context_boundary_flag": null,
+      "sampled_runtime_or_ready_footprint_bytes": null,
+      "sampled_startup_footprint_bytes": 3323527168,
+      "baseline_bytes": 147400294400,
+      "bounded_free_memory_bytes": 3354525696,
+      "file_sha256_verified": true,
+      "gpu_model_bytes": 1091378872,
+      "host_mapped_model_bytes": 215041966,
+      "native_rounding": "Native MiB values are rounded to 0.01 MiB; conversion does not increase precision.",
+      "gpu_kv_bytes": 1476395008,
+      "gpu_recurrent_bytes": 639631,
+      "gpu_compute_bytes": 198254264
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "checks": {
+    "pytest": 321,
+    "ruff": "passed",
+    "format": "passed",
+    "ty": "passed",
+    "git_diff_check": "passed",
+    "native_jobs": "Both COMPLETED, image and payload/source hashes verified through Jobs API.",
+    "native_trace": "Both independent sample maxima re-computed; complete all-rank/token/device trace gates passed.",
+    "forecast_replay": "Both original frozen forecasts reproduced exactly with original source.",
+    "regression": "150 prior complete configurations retain identical numerical predictions."
+  },
+  "source": {
+    "src/hf_mem/_overhead.py": "5c40d8edac4a179009339b053f9b8f95d677485b5b2605f9eb88df6760b8cf62",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "94fd44bb0616a2272771fd5b1e9396808bb8f195c2eb62781f0ab4c187c45d18",
+    "src/hf_mem/estimate.py": "9911c722abc22493b632ec605237cf9855f97e9826a54fbcdb3889af69ada5cc",
+    "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+    "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+    "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+    "src/hf_mem/cli.py": "ff01f2fbc9c7e0c0dda246560bdad349fd8b9d8a71f8eaca589bb6ba82c0018d",
+    "src/hf_mem/_safetensors.py": "2216fe99d34829ac4d4e18d4a83d80936b1d8ddfa4acba3e947042bf385d0e0c",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "scope": "Native measurements validate the original requested deployments. Metadata-fix estimates are retrospective; custom FA4/EP graph and opaque packed-weight allocation costs remain documented limits. No claim of pure residual-overhead accuracy or maximum image-workload validation.",
+  "full_local_evidence": "/tmp/hf-mem-inkling-validation-20261113",
+  "publication": "Local only; no new bucket upload authorized."
+}

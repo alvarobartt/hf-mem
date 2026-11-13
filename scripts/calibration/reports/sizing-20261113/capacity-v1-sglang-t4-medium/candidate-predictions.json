@@ -1,0 +1,325 @@
+[
+  {
+    "case": "qwen3-06b-native-defaults",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-0.6B",
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "engine": "sglang"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-0.6B",
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "file": null,
+      "format": "safetensors",
+      "total": 8727075700,
+      "recommended_gpu_memory": 9076366614,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1192099840,
+        "params": 596049920,
+        "dtypes": {
+          "BF16": {
+            "bytes": 1192099840,
+            "params": 596049920
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 4697620480,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 2837355380,
+        "activations": 1590034432,
+        "encoder": 0,
+        "graphs": 119728193,
+        "runtime": 1127592755,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.29 GiB checkpoint table is counted once."
+      ]
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-0.6B",
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "file": null,
+      "format": "safetensors",
+      "total": 7501402138,
+      "recommended_gpu_memory": 8167864759,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1192099840,
+        "params": 596049920,
+        "dtypes": {
+          "BF16": {
+            "bytes": 1192099840,
+            "params": 596049920
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 4697620480,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 1611681818,
+        "activations": 1088250675,
+        "encoder": 0,
+        "graphs": 28339431,
+        "runtime": 495091712,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang",
+        "gpu_type": "nvidia-t4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14239964068,
+        "required": 7501402138,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960,
+        "overhead_per_gpu": 1611681818
+      },
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.29 GiB checkpoint table is counted once."
+      ]
+    }
+  },
+  {
+    "case": "qwen3-4b-native-defaults",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "engine": "sglang"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "file": null,
+      "format": "safetensors",
+      "total": 17594468273,
+      "recommended_gpu_memory": 18929025028,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 8044936192,
+        "params": 4022468096,
+        "dtypes": {
+          "BF16": {
+            "bytes": 8044936192,
+            "params": 4022468096
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 3509734321,
+        "activations": 2201563955,
+        "encoder": 0,
+        "graphs": 180577611,
+        "runtime": 1127592755,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-4B",
+      "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "file": null,
+      "format": "safetensors",
+      "total": 15856938262,
+      "recommended_gpu_memory": 17451793786,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 8044936192,
+        "params": 4022468096,
+        "dtypes": {
+          "BF16": {
+            "bytes": 8044936192,
+            "params": 4022468096
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 1772204310,
+        "activations": 1241133056,
+        "encoder": 0,
+        "graphs": 35979542,
+        "runtime": 495091712,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang",
+        "gpu_type": "nvidia-t4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14239964068,
+        "required": 15856938262,
+        "gpus": null,
+        "needed": 2,
+        "fits": false,
+        "max_model_len": 30560,
+        "overhead_per_gpu": 1772204310
+      },
+      "warnings": []
+    }
+  },
+  {
+    "case": "qwen3-06b-c8192-p2048-s8",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-0.6B",
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "engine": "sglang",
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 2048,
+      "max_num_seqs": 8
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-0.6B",
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "file": null,
+      "format": "safetensors",
+      "total": 3815914399,
+      "recommended_gpu_memory": 3815914399,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1192099840,
+        "params": 596049920,
+        "dtypes": {
+          "BF16": {
+            "bytes": 1192099840,
+            "params": 596049920
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 939524096,
+        "dtype": "BF16",
+        "max_model_len": 8192,
+        "batch_size": 1,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 1684290463,
+        "activations": 1088250675,
+        "encoder": 0,
+        "graphs": 28339431,
+        "runtime": 567700357,
+        "max_num_seqs": 8,
+        "reference_engine": "sglang"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.29 GiB checkpoint table is counted once."
+      ]
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-0.6B",
+      "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+      "file": null,
+      "format": "safetensors",
+      "total": 3407892506,
+      "recommended_gpu_memory": 3619520724,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1192099840,
+        "params": 596049920,
+        "dtypes": {
+          "BF16": {
+            "bytes": 1192099840,
+            "params": 596049920
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 939524096,
+        "dtype": "BF16",
+        "max_model_len": 8192,
+        "batch_size": 1,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 1276268570,
+        "activations": 1088250675,
+        "encoder": 0,
+        "graphs": 28339431,
+        "runtime": 159678464,
+        "max_num_seqs": 8,
+        "reference_engine": "sglang",
+        "gpu_type": "nvidia-t4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14239964068,
+        "required": 3407892506,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960,
+        "overhead_per_gpu": 1276268570
+      },
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.29 GiB checkpoint table is counted once."
+      ]
+    }
+  }
+]

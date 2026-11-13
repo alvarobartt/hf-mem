@@ -1,0 +1,14 @@
+[
+  {
+    "directory": "native-h200x4",
+    "job_id": "6af746dd29dd05ff036543e3",
+    "stage": "COMPLETED",
+    "url": "https://huggingface.co/jobs/alvarobartt/6af746dd29dd05ff036543e3"
+  },
+  {
+    "directory": "native-h200x8",
+    "job_id": "6af7471029dd05ff03654438",
+    "stage": "COMPLETED",
+    "url": "https://huggingface.co/jobs/alvarobartt/6af7471029dd05ff03654438"
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "job_stage": "COMPLETED",
+  "mode": "full_context_inference",
+  "expected_cases": [
+    "lfm3-17b-c65536-q4",
+    "llama32-3b-full",
+    "llama32-3b-q4-parallel",
+    "qwen3-8b-c24576"
+  ],
+  "observed_cases": [
+    "lfm3-17b-c65536-q4",
+    "llama32-3b-full",
+    "llama32-3b-q4-parallel",
+    "qwen3-8b-c24576"
+  ],
+  "complete": false,
+  "invalid_records": 0,
+  "duplicate_transport_records": 4,
+  "scope": "One T4. Runtime and load-only component audits are separate processes/jobs. All models use immutable revisions and full GGUF SHA-256 checks. Sampled peaks are lower bounds; CPU-mapped model bytes are not GPU memory. The native context-boundary flag is retained; completion validity requires every requested prompt and decode token."
+}

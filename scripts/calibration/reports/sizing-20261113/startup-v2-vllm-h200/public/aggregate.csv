@@ -1,0 +1,2 @@
+case,model,revision,engine,tensor_parallel_size,max_num_seqs,max_model_len,prefill_tokens,resolved_max_num_seqs,resolved_prefill_tokens,native_scheduler_defaults,native_prefill_defaults,request_count,workload,request_completed,native_parameter_bytes,native_buffer_bytes,native_physical_cache_bytes,sampled_runtime_bytes,native_residual_bytes,missing_evidence,usable_for_accuracy
+qwen35-4b-language-model-only,Qwen/Qwen3.5-4B,851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a,vllm,1,16,6144,1024,16,1024,False,False,1,text,True,8411504128,33554560,396361728,10130096128,1322230272,[],True

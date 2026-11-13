@@ -1,0 +1,25 @@
+{
+  "created_at_utc": "2026-11-12T21:51:37.295057+00:00",
+  "candidate_source_sha256": {
+    "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+    "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+    "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+    "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+    "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+    "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+    "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "tests_passed": 268,
+  "scope": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+  "targets": {
+    "median_absolute_total_error_pct": 3,
+    "median_absolute_overhead_error_pct": 10,
+    "p90_absolute_overhead_error_pct": 25
+  },
+  "sampling": "Two exact long prompts with different token IDs and eight decode tokens, warmed server. Actual all-rank native storage/pools/control readback and empty NVML baseline required. These repeats are not independent deployment replicates."
+}

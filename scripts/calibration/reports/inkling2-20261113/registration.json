@@ -1,0 +1,127 @@
+{
+  "frozen_at_utc": "2026-11-13T17:20:29.380708+00:00",
+  "forecasts_sha256": "525259b28ab2127335d3821632c16f308912f4ce7872ef4781d6d50037667329",
+  "experiments": [
+    {
+      "directory": "native-h200x4",
+      "specification_sha256": "24f9ae3526282f3b58b445ff20acf2ac57b4de18f61aeafffe60b45121bef2f4",
+      "specification": {
+        "model": "thinkingmachines/Inkling-2-Small",
+        "revision": "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+        "image": "lmsysorg/sglang:dev-inkling-2-small@sha256:424c1da97f6d6eef1612006c77b2ca791657a8184c1fbdbc682ebf9485d3b32c",
+        "flavor": "h200x4",
+        "timeout": "60m",
+        "gpus": 4,
+        "context_length": 262144,
+        "server_arguments": [
+          "--model-path",
+          "thinkingmachines/Inkling-2-Small",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "30000",
+          "--revision",
+          "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+          "--tp",
+          "4",
+          "--ep",
+          "4",
+          "--attention-backend",
+          "fa4",
+          "--dtype",
+          "bfloat16",
+          "--page-size",
+          "128",
+          "--grammar-backend",
+          "xgrammar",
+          "--enable-multimodal",
+          "--reasoning-parser",
+          "inkling",
+          "--tool-call-parser",
+          "inkling2",
+          "--max-running-requests",
+          "64",
+          "--context-length",
+          "262144",
+          "--served-model-name",
+          "thinkingmachines/Inkling-2-Small"
+        ],
+        "prompt_lengths": [
+          1024,
+          32768,
+          258048
+        ],
+        "startup_timeout_seconds": 1800,
+        "request_timeout_seconds": 900,
+        "sampling_interval_target_seconds": 0.01,
+        "multimodal_encoder_enabled": true,
+        "expert_parallel_size": 4,
+        "source_sha256": {
+          "driver.py": "2b64d0adb519759f26ec60680bb643ac32727f71115d6589a7537bb3661f8f06",
+          "hooks/sitecustomize.py": "cdafc6299a07fecf1f37f0d2e195b298a5021f2b30c8113e8726c33d1cb559fc"
+        },
+        "scope": "Exact requested native flags; no controlled cache cap, no radix override, no mem-fraction override. Hub Jobs supplies GPU visibility and container networking. Record actual /dev/shm capacity; no public port exposure required for local probes. Text probes do not establish full vision-workload peaks."
+      }
+    },
+    {
+      "directory": "native-h200x8",
+      "specification_sha256": "c9b727d584b37cac6c44a37ac327876377f088688c450e40ad37feb1f30b0e23",
+      "specification": {
+        "model": "thinkingmachines/Inkling-2-Small",
+        "revision": "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+        "image": "lmsysorg/sglang:dev-inkling-2-small@sha256:424c1da97f6d6eef1612006c77b2ca791657a8184c1fbdbc682ebf9485d3b32c",
+        "flavor": "h200x8",
+        "timeout": "60m",
+        "gpus": 8,
+        "context_length": 1048576,
+        "server_arguments": [
+          "--model-path",
+          "thinkingmachines/Inkling-2-Small",
+          "--host",
+          "0.0.0.0",
+          "--port",
+          "30000",
+          "--revision",
+          "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+          "--tp",
+          "8",
+          "--ep",
+          "8",
+          "--attention-backend",
+          "fa4",
+          "--dtype",
+          "bfloat16",
+          "--page-size",
+          "128",
+          "--grammar-backend",
+          "xgrammar",
+          "--enable-multimodal",
+          "--reasoning-parser",
+          "inkling",
+          "--tool-call-parser",
+          "inkling2",
+          "--context-length",
+          "1048576",
+          "--served-model-name",
+          "thinkingmachines/Inkling-2-Small"
+        ],
+        "prompt_lengths": [
+          1024,
+          32768,
+          1044480
+        ],
+        "startup_timeout_seconds": 1800,
+        "request_timeout_seconds": 900,
+        "sampling_interval_target_seconds": 0.01,
+        "multimodal_encoder_enabled": true,
+        "expert_parallel_size": 8,
+        "source_sha256": {
+          "driver.py": "2b64d0adb519759f26ec60680bb643ac32727f71115d6589a7537bb3661f8f06",
+          "hooks/sitecustomize.py": "cdafc6299a07fecf1f37f0d2e195b298a5021f2b30c8113e8726c33d1cb559fc"
+        },
+        "scope": "Exact requested native flags; no controlled cache cap, no radix override, no mem-fraction override. Hub Jobs supplies GPU visibility and container networking. Record actual /dev/shm capacity; no public port exposure required for local probes. Text probes do not establish full vision-workload peaks."
+      }
+    }
+  ],
+  "publication": "Local freeze only; no new public upload authorized."
+}

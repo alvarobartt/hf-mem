@@ -1,0 +1,5 @@
+Diagnostic excerpts only; full traces/logs retained locally.
+HFMEM_LOG_START llama32-3b-full
+0.00.972.586 E ggml_backend_cuda_buffer_type_alloc_buffer: allocating 14336.00 MiB on device 0: cudaMalloc failed: out of memory
+0.00.973.532 E srv  server_run_i: exiting due to model loading error
+HFMEM_LOG_END

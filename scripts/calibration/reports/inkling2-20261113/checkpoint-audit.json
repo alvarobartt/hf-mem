@@ -1,0 +1,132 @@
+{
+  "scope": "Independent exact Safetensors header-byte audit at requested model revision; runtime repacking may change storage.",
+  "selected_paths": [
+    "model-00001-of-00024.safetensors",
+    "model-00002-of-00024.safetensors",
+    "model-00003-of-00024.safetensors",
+    "model-00004-of-00024.safetensors",
+    "model-00005-of-00024.safetensors",
+    "model-00006-of-00024.safetensors",
+    "model-00007-of-00024.safetensors",
+    "model-00008-of-00024.safetensors",
+    "model-00009-of-00024.safetensors",
+    "model-00010-of-00024.safetensors",
+    "model-00011-of-00024.safetensors",
+    "model-00012-of-00024.safetensors",
+    "model-00013-of-00024.safetensors",
+    "model-00014-of-00024.safetensors",
+    "model-00015-of-00024.safetensors",
+    "model-00016-of-00024.safetensors",
+    "model-00017-of-00024.safetensors",
+    "model-00018-of-00024.safetensors",
+    "model-00019-of-00024.safetensors",
+    "model-00020-of-00024.safetensors",
+    "model-00021-of-00024.safetensors",
+    "model-00022-of-00024.safetensors",
+    "model-00023-of-00024.safetensors",
+    "model-00024-of-00024.safetensors"
+  ],
+  "header_bytes": 390056448320,
+  "top_level_groups": {
+    "llm": 389401061696,
+    "visual": 655386624
+  },
+  "serialized_dtypes": {
+    "F32": 2261312,
+    "BF16": 13963530240,
+    "F8_E4M3": 128421199872,
+    "U8": 247669456896
+  },
+  "fused_expert_examples": [
+    {
+      "name": "model.llm.layers.0.mlp.experts.w13_weight_scale",
+      "bytes": 509607936,
+      "shape": [
+        384,
+        4608,
+        288
+      ],
+      "dtype": "F8_E4M3"
+    },
+    {
+      "name": "model.llm.layers.0.mlp.experts.w2_weight_scale",
+      "bytes": 254803968,
+      "shape": [
+        384,
+        4608,
+        144
+      ],
+      "dtype": "F8_E4M3"
+    },
+    {
+      "name": "model.llm.layers.1.mlp.experts.w13_weight_scale",
+      "bytes": 509607936,
+      "shape": [
+        384,
+        4608,
+        288
+      ],
+      "dtype": "F8_E4M3"
+    },
+    {
+      "name": "model.llm.layers.1.mlp.experts.w2_weight_scale",
+      "bytes": 254803968,
+      "shape": [
+        384,
+        4608,
+        144
+      ],
+      "dtype": "F8_E4M3"
+    },
+    {
+      "name": "model.llm.layers.0.mlp.experts.w13_weight",
+      "bytes": 4076863488,
+      "shape": [
+        384,
+        4608,
+        2304
+      ],
+      "dtype": "U8"
+    },
+    {
+      "name": "model.llm.layers.0.mlp.experts.w2_weight",
+      "bytes": 2038431744,
+      "shape": [
+        384,
+        4608,
+        1152
+      ],
+      "dtype": "U8"
+    },
+    {
+      "name": "model.llm.layers.1.mlp.experts.w13_weight",
+      "bytes": 4076863488,
+      "shape": [
+        384,
+        4608,
+        2304
+      ],
+      "dtype": "U8"
+    },
+    {
+      "name": "model.llm.layers.1.mlp.experts.w2_weight",
+      "bytes": 2038431744,
+      "shape": [
+        384,
+        4608,
+        1152
+      ],
+      "dtype": "U8"
+    }
+  ],
+  "layers_from_config": {
+    "full": 8,
+    "sliding": 40,
+    "window": 1024
+  },
+  "ordinary_loader_skipped_prefixes": [
+    "audio.",
+    "mtp."
+  ],
+  "ordinary_loader_header_bytes": 390056448320
+}

@@ -1,0 +1,8 @@
+{
+  "prepared_at_utc": "2026-11-13T19:41:30.356729+00:00",
+  "experiments": [
+    "controlled-h200x4",
+    "controlled-h200x8"
+  ],
+  "purpose": "Separate minimum-workload allocations from native whole-device cache reservation. No numerical changes to backend profiles precede these probes."
+}

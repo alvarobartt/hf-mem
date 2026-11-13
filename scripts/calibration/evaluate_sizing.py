@@ -67,6 +67,37 @@ def failure_reason(text: str) -> tuple[str, str | None]:
     return "inconclusive_failure", None
 
 
+def unstarted_cancellation(directory: Path, verification: dict[str, Any]) -> list[dict[str, Any]] | None:
+    """Keep hardware-queue cancellations without turning them into engine outcomes."""
+    job = next((j for j in verification["jobs"] if j["directory"] == directory.name), {})
+    if (
+        not job.get("verified")
+        or job.get("stage") != "CANCELED"
+        or "started_at" not in job
+        or job["started_at"] is not None
+    ):
+        return None
+    frozen = read_json(directory / "candidate-predictions.json")
+    if isinstance(frozen, dict):
+        frozen = [{"case": "native", **frozen}]
+    spec = read_json(directory / "specification.json")
+    return [
+        {
+            "directory": directory.name,
+            "case": f["case"],
+            "engine": spec.get("engine", "sglang"),
+            "arguments": f["arguments"],
+            "frozen_estimate": f.get("hardware") or f.get("estimate"),
+            "cohort": "diagnostic",
+            "outcome": "canceled_before_start",
+            "request_completed": False,
+            "measurement_complete": False,
+            "failure_reason": "Job canceled while waiting for hardware; no engine execution or memory outcome.",
+        }
+        for f in frozen
+    ]
+
+
 def evaluate(directory: Path) -> list[dict[str, Any]]:
     spec = read_json(directory / "specification.json")
     predictions = directory / "candidate-predictions.json"
@@ -224,6 +255,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
     args = parser.parse_args()
+    verification = read_json(args.directory / "job-verification.json")
     rows = []
     for path in sorted(args.directory.glob("*/candidate-predictions.json")):
         directory = path.parent
@@ -238,6 +270,9 @@ def main() -> None:
                 "public/measurements.csv",
             ]
         ):
+            if canceled := unstarted_cancellation(directory, verification):
+                rows.extend(canceled)
+                continue
             raise ValueError("Uncollected experiment: " + directory.name)
         rows.extend(evaluate(directory))
     primary = [r for r in rows if r["cohort"] == "prospective"]
@@ -245,7 +280,6 @@ def main() -> None:
     defaults = [r for r in primary if "non_kv_error_pct" in r]
     fit_checks = [r for r in primary if r.get("fit_matches_native") is not None]
     bounded = [r for r in rows if r["cohort"] == "bounded_sufficiency"]
-    verification = read_json(args.directory / "job-verification.json")
     result = {
         "scope": "Frozen forecasts and outcomes are retained. Current allocations are replayed separately; capacity policy now puts the whole allocation inside its headroom budget. Native default spare-KV reservations are excluded from total-error scores. Development data, instrumentation failures, unsupported options and timeout diagnostics are separate from prospective sizing accuracy.",
         "prospective_configurations": len(primary),

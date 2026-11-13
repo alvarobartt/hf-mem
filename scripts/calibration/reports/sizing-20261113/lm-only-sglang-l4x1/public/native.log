@@ -1,0 +1,6 @@
+Diagnostic excerpts only; full traces/logs retained locally.
+HFMEM_LOG_START qwen35-2b-language-model-only
+Traceback (most recent call last):
+    raise ValueError(
+ValueError: --language-model-only does not support ['Qwen3_5ForConditionalGeneration']. Supported: ['DeepseekV4ForCausalLM', 'MuseGlimmerForConditionalGeneration', 'Cosmos3ForConditionalGeneration', 'Cosmos3EdgeForConditionalGeneration'].
+HFMEM_LOG_END

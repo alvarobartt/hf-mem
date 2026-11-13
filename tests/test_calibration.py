@@ -723,3 +723,32 @@ def test_concurrent_requests_require_all_sequences_and_tokens(failure: str | Non
     elif failure == "individual_decode":
         record["request"]["sequence_usage"][1]["completion_tokens"] = 7
     assert collect.request_succeeded(record) is (failure is None)
+
+
+@pytest.mark.parametrize("failure", [None, "started", "missing_start_evidence", "unverified", "error"])
+def test_only_verified_pre_start_cancellations_are_excluded_from_fit_scoring(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str | None
+) -> None:
+    monkeypatch.syspath_prepend(str(Path(__file__).parents[1] / "scripts/calibration"))
+    sizing = importlib.import_module("evaluate_sizing")
+    (tmp_path / "specification.json").write_text(json.dumps({"engine": "vllm"}))
+    (tmp_path / "candidate-predictions.json").write_text(
+        json.dumps([{"case": "cold-start", "arguments": {"model_id": "org/model"}, "hardware": {"total": 123}}])
+    )
+    job: dict[str, Any] = {
+        "directory": tmp_path.name,
+        "verified": failure != "unverified",
+        "stage": "ERROR" if failure == "error" else "CANCELED",
+        "started_at": "2026-11-13T22:00:00+00:00" if failure == "started" else None,
+    }
+    if failure == "missing_start_evidence":
+        job.pop("started_at")
+    result = sizing.unstarted_cancellation(tmp_path, {"jobs": [job]})
+    if failure:
+        assert result is None
+    else:
+        assert result is not None and len(result) == 1
+        assert result[0]["cohort"] == "diagnostic"
+        assert result[0]["outcome"] == "canceled_before_start"
+        assert result[0]["frozen_estimate"] == {"total": 123}
+        assert "fit_matches_native" not in result[0]

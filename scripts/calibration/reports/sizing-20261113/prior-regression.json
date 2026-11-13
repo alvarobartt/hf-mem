@@ -1,0 +1,4373 @@
+{
+  "scope": "Retrospective regression against 150 complete prior native configurations after integrating current main. Includes calibration data. Capacity recommendations/default budget are new; this checks the allocation breakdown only.",
+  "source_sha256": {
+    "src/hf_mem/_overhead.py": "264de2ddb0261765aea1e1b80bd029de6c3492d20c19ada148aa5d13cb29d06b",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "65baff736a09117500d9e4cd46bf47153c181b7b1add89fbacfebbad81b8d415",
+    "src/hf_mem/estimate.py": "886d42dfad3c16b1922d8129a54c6e57f161428b2747773b216692888f700911",
+    "src/hf_mem/_onnx.py": "be14c336571a1a87b76570d78422d004b337076aa42cdf10f6e5d8ddf029522f",
+    "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+    "src/hf_mem/_render.py": "a959d001451db0e6e759d1f9492c0a632e13daa15481f6f48661cd63c6b20e7d",
+    "src/hf_mem/cli.py": "9ab372afafc1fbd7bd7d2e7cad9a526ac95ad2c6770a000e081e9c7086553bea",
+    "src/hf_mem/_safetensors.py": "b6ee917bb89038c778526e4e1e324d4247e8c96ca717bd42890c375360b72a72",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "configurations": 150,
+  "unchanged": 150,
+  "median_absolute_total_error_pct": 0.8061926727334023,
+  "median_absolute_overhead_error_pct": 3.0361756978561525,
+  "observations": [
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "moe-tp2-p4096-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 68793408454,
+        "overhead": 6923856838,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 68793408454,
+        "overhead": 6923856838,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -0.5769951306890508,
+      "overhead_error_pct": -4.790631341922113
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "moe-tp4-p4096-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 77155072704,
+        "overhead": 15285521088,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 77155072704,
+        "overhead": 15285521088,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -0.6936237476181217,
+      "overhead_error_pct": -2.7786894623022307
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "hybrid-tp1-p4096-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 7598063400,
+        "overhead": 2738766952,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 7598063400,
+        "overhead": 2738766952,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": -0.8905472742102738,
+      "overhead_error_pct": -2.322453145425585
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "hybrid-tp2-p4096-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 11660552694,
+        "overhead": 6801256246,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 11660552694,
+        "overhead": 6801256246,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": -1.8572620509825999,
+      "overhead_error_pct": -3.048416009533128
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "hybrid-tp4-p4096-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 19194973284,
+        "overhead": 14235013540,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 19194973284,
+        "overhead": 14235013540,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": -2.516517258646478,
+      "overhead_error_pct": -3.084479165683096
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "moe-tp2-p4096-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 66792673890,
+        "overhead": 4923122274,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 66792673890,
+        "overhead": 4923122274,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": 0.04528472248945814,
+      "overhead_error_pct": 1.1795512605862424
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "moe-tp4-p4096-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 71402733316,
+        "overhead": 9533181700,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 71402733316,
+        "overhead": 9533181700,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -0.030165109741431273,
+      "overhead_error_pct": 0.5992870970327413
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "hybrid-tp1-p4096-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 5855275146,
+        "overhead": 1281723850,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 5855275146,
+        "overhead": 1281723850,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": -0.7956736481796844,
+      "overhead_error_pct": -3.04707208301912
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "hybrid-tp2-p4096-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 8233222290,
+        "overhead": 3659670994,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 8233222290,
+        "overhead": 3659670994,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 3.180953897781791,
+      "overhead_error_pct": 7.929778930786924
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "hybrid-tp4-p4096-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 11525566628,
+        "overhead": 6804952548,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 11525566628,
+        "overhead": 6804952548,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 5.087593815694702,
+      "overhead_error_pct": 9.110194333804
+    },
+    {
+      "dataset": "defaults-v1-sglang-a100x4",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4700412788,
+        "overhead": 2568788852,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 4700412788,
+        "overhead": 2568788852,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -3.5480867137753225,
+      "overhead_error_pct": -5.288460891816449
+    },
+    {
+      "dataset": "defaults-v1-sglang-a100x4",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 9834437964,
+        "overhead": 7702814028,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 9834437964,
+        "overhead": 7702814028,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -3.8584259495412887,
+      "overhead_error_pct": -4.5250631540494695
+    },
+    {
+      "dataset": "defaults-v1-sglang-a100x4",
+      "case": "qwen3-06b-tp4-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 22430406800,
+        "overhead": 20298782864,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 22430406800,
+        "overhead": 20298782864,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": 0.5301260507277306,
+      "overhead_error_pct": 0.7352147203434578
+    },
+    {
+      "dataset": "defaults-v1-sglang-h200x2",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 3907186015,
+        "overhead": 1775562079,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 3907186015,
+        "overhead": 1775562079,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -2.599367373247896,
+      "overhead_error_pct": -4.042334289612937
+    },
+    {
+      "dataset": "defaults-v1-sglang-h200x2",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 7625549706,
+        "overhead": 5493925770,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 7625549706,
+        "overhead": 5493925770,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -3.23288110054315,
+      "overhead_error_pct": -3.936912094351608
+    },
+    {
+      "dataset": "defaults-v1-sglang-rtx-pro-6000",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4893686316,
+        "overhead": 2762062380,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 4893686316,
+        "overhead": 2762062380,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -1.63901254822868,
+      "overhead_error_pct": -1.8502984172502068
+    },
+    {
+      "dataset": "defaults-v1-sglang-t4-medium",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74",
+        "text_only": true
+      },
+      "prior": {
+        "required": 3474739226,
+        "overhead": 1343115290,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 3474739226,
+        "overhead": 1343115290,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -1.810598731937263,
+      "overhead_error_pct": -2.5113253970031058
+    },
+    {
+      "dataset": "defaults-v1-vllm-a100x4",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 3457791752,
+        "overhead": 1326167816,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 3457791752,
+        "overhead": 1326167816,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -1.234130836524372,
+      "overhead_error_pct": -3.0252793126931854
+    },
+    {
+      "dataset": "defaults-v1-vllm-a100x4",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 6087968682,
+        "overhead": 3956344746,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 6087968682,
+        "overhead": 3956344746,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": 0.4900693816059176,
+      "overhead_error_pct": 0.8065824028055557
+    },
+    {
+      "dataset": "defaults-v1-vllm-a100x4",
+      "case": "qwen3-06b-tp4-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 10002789820,
+        "overhead": 7871165884,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 10002789820,
+        "overhead": 7871165884,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -0.084799751307707,
+      "overhead_error_pct": -0.07948427628756694
+    },
+    {
+      "dataset": "defaults-v1-vllm-h200x2",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4524554796,
+        "overhead": 2392930860,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 4524554796,
+        "overhead": 2392930860,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -0.8242322067907981,
+      "overhead_error_pct": -1.4727131496081403
+    },
+    {
+      "dataset": "defaults-v1-vllm-h200x2",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 9652171864,
+        "overhead": 7520547928,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 9652171864,
+        "overhead": 7520547928,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": 0.12267468917297464,
+      "overhead_error_pct": 0.183732424023475
+    },
+    {
+      "dataset": "defaults-v1-vllm-rtx-pro-6000",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4331281267,
+        "overhead": 2199657331,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 4331281267,
+        "overhead": 2199657331,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -1.656016511895686,
+      "overhead_error_pct": -3.1310940474162496
+    },
+    {
+      "dataset": "defaults-v1-vllm-t4-medium",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74",
+        "text_only": true
+      },
+      "prior": {
+        "required": 3049769859,
+        "overhead": 918145923,
+        "weights": 1192099840
+      },
+      "current": {
+        "required": 3049769859,
+        "overhead": 918145923,
+        "weights": 1192099840
+      },
+      "unchanged": true,
+      "total_error_pct": -1.9018614451465798,
+      "overhead_error_pct": -5.873454933812372
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "mistral7b-tp4-c16384-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 31219312592,
+        "overhead": 14575781840,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 31219312592,
+        "overhead": 14575781840,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.4595155719609112,
+      "overhead_error_pct": -0.7411626671286697
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "mistral7b-tp4-c32768-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 35661548344,
+        "overhead": 16870533944,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 35661548344,
+        "overhead": 16870533944,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 1.75631008737418,
+      "overhead_error_pct": 4.012395809684777
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "mistral7b-tp4-c32768-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 33371252688,
+        "overhead": 14580238288,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 33371252688,
+        "overhead": 14580238288,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.44169178718773683,
+      "overhead_error_pct": -0.7675016369147136
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "qwen3-8b-tp4-c32768-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 35801281060,
+        "overhead": 14587972132,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 35801281060,
+        "overhead": 14587972132,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -2.6231379925460985,
+      "overhead_error_pct": -5.960747573868264
+    },
+    {
+      "dataset": "diagnostic-v2-sglang-image",
+      "case": "hybrid-text-then-image-3520",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": false
+      },
+      "prior": {
+        "required": 9851734975,
+        "overhead": 5098410239,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 9851734975,
+        "overhead": 5098410239,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 0.579788358799882,
+      "overhead_error_pct": 1.1897142608586542
+    },
+    {
+      "dataset": "diagnostic-v2-vllm-image",
+      "case": "hybrid-text-then-image-3520",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": false
+      },
+      "prior": {
+        "required": 8067881209,
+        "overhead": 3447537209,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 8067881209,
+        "overhead": 3447537209,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 1.0681807392459053,
+      "overhead_error_pct": 2.740168983823321
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp2-p2048",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 23148324698,
+        "overhead": 4350934874,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 23148324698,
+        "overhead": 4350934874,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.45391157439392815,
+      "overhead_error_pct": -1.517423911335991
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp2-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 24978922792,
+        "overhead": 6181532968,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 24978922792,
+        "overhead": 6181532968,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.12244179961269364,
+      "overhead_error_pct": 1.1298189620757348
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20468701921,
+        "overhead": 1671312097,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 20468701921,
+        "overhead": 1671312097,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.1424019989808789,
+      "overhead_error_pct": 0.5236832179686957
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21482147681,
+        "overhead": 2684757857,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 21482147681,
+        "overhead": 2684757857,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.434188562135307,
+      "overhead_error_pct": -2.035494964090012
+    },
+    {
+      "dataset": "sglang-h200x2",
+      "case": "qwen3-8b-tp2-s1-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.80072021484375",
+        "text_only": true
+      },
+      "prior": {
+        "required": 27707831346,
+        "overhead": 6494522418,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 27707831346,
+        "overhead": 6494522418,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.1857693026462881,
+      "overhead_error_pct": 1.4035128624996007
+    },
+    {
+      "dataset": "sglang-h200x2",
+      "case": "qwen3-8b-tp1-s1-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.80072021484375",
+        "text_only": true
+      },
+      "prior": {
+        "required": 23574733132,
+        "overhead": 2361424204,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 23574733132,
+        "overhead": 2361424204,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.26177126041324605,
+      "overhead_error_pct": -1.0051829187475936
+    },
+    {
+      "dataset": "sglang-h200x2",
+      "case": "qwen3-8b-tp2-s16-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.80072021484375",
+        "text_only": true
+      },
+      "prior": {
+        "required": 27777953264,
+        "overhead": 6564644336,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 27777953264,
+        "overhead": 6564644336,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.05994500603379027,
+      "overhead_error_pct": 0.8472884743470299
+    },
+    {
+      "dataset": "sglang-h200x8",
+      "case": "qwen3-8b-tp4-s1-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.80072021484375",
+        "text_only": true
+      },
+      "prior": {
+        "required": 33826544124,
+        "overhead": 12613235196,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 33826544124,
+        "overhead": 12613235196,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.7728017845126556,
+      "overhead_error_pct": -1.7426471697534085
+    },
+    {
+      "dataset": "sglang-h200x8",
+      "case": "qwen3-8b-tp8-s1-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.80072021484375",
+        "text_only": true
+      },
+      "prior": {
+        "required": 46063969688,
+        "overhead": 24850660760,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 46063969688,
+        "overhead": 24850660760,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -1.089690630968565,
+      "overhead_error_pct": -1.8378679774454842
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.98",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20683450286,
+        "overhead": 1886060462,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 20683450286,
+        "overhead": 1886060462,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.15899521403217598,
+      "overhead_error_pct": 0.263575559134277
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.98",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21696896046,
+        "overhead": 2899506222,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 21696896046,
+        "overhead": 2899506222,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.4470358055346346,
+      "overhead_error_pct": -2.011877936845907
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "llama31-8b-tp1-p2048",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+        "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.98",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20104339704,
+        "overhead": 1896333560,
+        "weights": 16060522496
+      },
+      "current": {
+        "required": 20104339704,
+        "overhead": 1896333560,
+        "weights": 16060522496
+      },
+      "unchanged": true,
+      "total_error_pct": 0.47322959101663287,
+      "overhead_error_pct": 7.261325799150886
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "llama31-8b-tp1-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+        "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.98",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21153324413,
+        "overhead": 2945318269,
+        "weights": 16060522496
+      },
+      "current": {
+        "required": 21153324413,
+        "overhead": 2945318269,
+        "weights": 16060522496
+      },
+      "unchanged": true,
+      "total_error_pct": -0.01638178076844854,
+      "overhead_error_pct": 1.0366594375641913
+    },
+    {
+      "dataset": "sglang-t4-diagnostic",
+      "case": "qwen3-17b-tp1-p2048-fp16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74127197265625",
+        "text_only": true
+      },
+      "prior": {
+        "required": 5686564197,
+        "overhead": 1305890149,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 5686564197,
+        "overhead": 1305890149,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": -0.7638743196462738,
+      "overhead_error_pct": -1.0830090895909361
+    },
+    {
+      "dataset": "validation-v1-sglang-a100x4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21077538906,
+        "overhead": 2286524506,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 21077538906,
+        "overhead": 2286524506,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 0.23709008165351264,
+      "overhead_error_pct": 3.792131082715655
+    },
+    {
+      "dataset": "validation-v1-sglang-a100x4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 25405850598,
+        "overhead": 6614836198,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 25405850598,
+        "overhead": 6614836198,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.38787085703198,
+      "overhead_error_pct": -0.9687429540098269
+    },
+    {
+      "dataset": "validation-v1-sglang-a100x4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 33371252688,
+        "overhead": 14580238288,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 33371252688,
+        "overhead": 14580238288,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.44169178718773683,
+      "overhead_error_pct": -0.7675016369147136
+    },
+    {
+      "dataset": "validation-v1-sglang-a10g-largex4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 18714192781,
+        "overhead": 2070662029,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 18714192781,
+        "overhead": 2070662029,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 0.286196972069086,
+      "overhead_error_pct": 4.390675020923895
+    },
+    {
+      "dataset": "validation-v1-sglang-a10g-largex4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21705923968,
+        "overhead": 5062393216,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 21705923968,
+        "overhead": 5062393216,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 1.1322558410661987,
+      "overhead_error_pct": 5.793599647165171
+    },
+    {
+      "dataset": "validation-v1-sglang-a10g-largex4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "4x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 26615644520,
+        "overhead": 9972113768,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 26615644520,
+        "overhead": 9972113768,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 3.5128983772146682,
+      "overhead_error_pct": 10.389382365371858
+    },
+    {
+      "dataset": "validation-v1-sglang-h200x8",
+      "case": "llama32-3b-tp2-s16-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 14154854262,
+        "overhead": 5850306422,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 14154854262,
+        "overhead": 5850306422,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": -1.2879401682386438,
+      "overhead_error_pct": -2.578773941252932
+    },
+    {
+      "dataset": "validation-v1-sglang-h200x8",
+      "case": "llama32-3b-tp4-s16-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 19723303456,
+        "overhead": 11418755616,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 19723303456,
+        "overhead": 11418755616,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": -3.7514784732249673,
+      "overhead_error_pct": -6.072473619986296
+    },
+    {
+      "dataset": "validation-v1-sglang-h200x8",
+      "case": "llama32-3b-tp8-s16-p8192",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 30860201840,
+        "overhead": 22555654000,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 30860201840,
+        "overhead": 22555654000,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": -4.884681358926701,
+      "overhead_error_pct": -6.441322880457124
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s1-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 10538672456,
+        "overhead": 2234124616,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 10538672456,
+        "overhead": 2234124616,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": 0.698457032839972,
+      "overhead_error_pct": 4.812096898458584
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s64-p12288",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 12288,
+        "max_num_seqs": 64,
+        "engine": "sglang",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 11653550081,
+        "overhead": 3349002241,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 11653550081,
+        "overhead": 3349002241,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": 1.5807088837938466,
+      "overhead_error_pct": 6.717800591410339
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s1-p4096",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 1,
+        "engine": "sglang",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 12747276796,
+        "overhead": 2286421500,
+        "weights": 8044936192
+      },
+      "current": {
+        "required": 12747276796,
+        "overhead": 2286421500,
+        "weights": 8044936192
+      },
+      "unchanged": true,
+      "total_error_pct": -1.1385082687169201,
+      "overhead_error_pct": -4.54651957439236
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s64-p12288",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 12288,
+        "max_num_seqs": 64,
+        "engine": "sglang",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 13968501160,
+        "overhead": 3507645864,
+        "weights": 8044936192
+      },
+      "current": {
+        "required": 13968501160,
+        "overhead": 3507645864,
+        "weights": 8044936192
+      },
+      "unchanged": true,
+      "total_error_pct": -0.5772867246354285,
+      "overhead_error_pct": -1.2168988453362894
+    },
+    {
+      "dataset": "validation-v1-vllm-a100x4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20081875798,
+        "overhead": 1290861398,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 20081875798,
+        "overhead": 1290861398,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.23568145069465807,
+      "overhead_error_pct": -3.3934840396742882
+    },
+    {
+      "dataset": "validation-v1-vllm-a100x4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 22381718968,
+        "overhead": 3590704568,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 22381718968,
+        "overhead": 3590704568,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 0.7706941124875799,
+      "overhead_error_pct": 5.086628381292235
+    },
+    {
+      "dataset": "validation-v1-vllm-a100x4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 25585540936,
+        "overhead": 6794526536,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 25585540936,
+        "overhead": 6794526536,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 0.5471237746942359,
+      "overhead_error_pct": 2.148614660140402
+    },
+    {
+      "dataset": "validation-v1-vllm-a10g-largex4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 17719643785,
+        "overhead": 1076113033,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 17719643785,
+        "overhead": 1076113033,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.26583938164960186,
+      "overhead_error_pct": -4.025356559364068
+    },
+    {
+      "dataset": "validation-v1-vllm-a10g-largex4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 18623622584,
+        "overhead": 1980091832,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 18623622584,
+        "overhead": 1980091832,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.7308137924632363,
+      "overhead_error_pct": -6.3595187191768705
+    },
+    {
+      "dataset": "validation-v1-vllm-a10g-largex4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "4x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20216831816,
+        "overhead": 3573301064,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 20216831816,
+        "overhead": 3573301064,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -1.6676318095402154,
+      "overhead_error_pct": -8.66883777521954
+    },
+    {
+      "dataset": "validation-v1-vllm-h200x8",
+      "case": "llama32-3b-tp2-s16-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 14367374404,
+        "overhead": 6062826564,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 14367374404,
+        "overhead": 6062826564,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": 0.11724577233511724,
+      "overhead_error_pct": 0.3145467731199947
+    },
+    {
+      "dataset": "validation-v1-vllm-h200x8",
+      "case": "llama32-3b-tp4-s16-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20054391328,
+        "overhead": 11749843488,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 20054391328,
+        "overhead": 11749843488,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": -0.9446572455421909,
+      "overhead_error_pct": -1.5778438080911172
+    },
+    {
+      "dataset": "validation-v1-vllm-h200x8",
+      "case": "llama32-3b-tp8-s16-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 31428425176,
+        "overhead": 23123877336,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 31428425176,
+        "overhead": 23123877336,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": -1.1200782018778832,
+      "overhead_error_pct": -1.4982537226081005
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s1-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 9624798276,
+        "overhead": 1320250436,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 9624798276,
+        "overhead": 1320250436,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": 0.07343304323372823,
+      "overhead_error_pct": 0.6785057219444113
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s64-p12288",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-3B-Instruct",
+        "revision": "0cb88a4f764b7a12671c53f0838cd831a0843b95",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 12288,
+        "max_num_seqs": 64,
+        "engine": "vllm",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 10484615906,
+        "overhead": 2180068066,
+        "weights": 6425499648
+      },
+      "current": {
+        "required": 10484615906,
+        "overhead": 2180068066,
+        "weights": 6425499648
+      },
+      "unchanged": true,
+      "total_error_pct": -0.7275340442515987,
+      "overhead_error_pct": -3.325977686899073
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s1-p4096",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 11814947679,
+        "overhead": 1354092383,
+        "weights": 8044936192
+      },
+      "current": {
+        "required": 11814947679,
+        "overhead": 1354092383,
+        "weights": 8044936192
+      },
+      "unchanged": true,
+      "total_error_pct": -1.0587755852638048,
+      "overhead_error_pct": -8.393723210577642
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s64-p12288",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 12288,
+        "max_num_seqs": 64,
+        "engine": "vllm",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 12691353942,
+        "overhead": 2230498646,
+        "weights": 8044936192
+      },
+      "current": {
+        "required": 12691353942,
+        "overhead": 2230498646,
+        "weights": 8044936192
+      },
+      "unchanged": true,
+      "total_error_pct": -4.2919591781585105,
+      "overhead_error_pct": -20.261706336486483
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 5789206162,
+        "overhead": 2780706450,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 5789206162,
+        "overhead": 2780706450,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": -0.6575773267471052,
+      "overhead_error_pct": -1.0637962985776017
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 10918722850,
+        "overhead": 7910223138,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 10918722850,
+        "overhead": 7910223138,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 1.8551395104595025,
+      "overhead_error_pct": 2.692849961170274
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial2-tp4-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 22437872988,
+        "overhead": 19429373276,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 22437872988,
+        "overhead": 19429373276,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 0.601411266501306,
+      "overhead_error_pct": 0.7412684154881388
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial3-tp2-p6144-s32",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 24576,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 9624447974,
+        "overhead": 6347512806,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 9624447974,
+        "overhead": 6347512806,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 1.4965730505290376,
+      "overhead_error_pct": 2.428087091598785
+    },
+    {
+      "dataset": "validation-v2-sglang-a10g-largex2",
+      "case": "trial0-tp1-p6144-s32",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 18556240248,
+        "overhead": 2449580408,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 18556240248,
+        "overhead": 2449580408,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 0.14882155356077398,
+      "overhead_error_pct": 2.5649890062314995
+    },
+    {
+      "dataset": "validation-v2-sglang-a10g-largex2",
+      "case": "trial1-tp2-p6144-s32",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "sglang",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21850553480,
+        "overhead": 5743893640,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 21850553480,
+        "overhead": 5743893640,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": 1.3900251337102043,
+      "overhead_error_pct": 6.169598403662313
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 7530328865,
+        "overhead": 2210130721,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 7530328865,
+        "overhead": 2210130721,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": -0.16881290527199777,
+      "overhead_error_pct": 0.7632548838674813
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 11700038416,
+        "overhead": 6379840272,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 11700038416,
+        "overhead": 6379840272,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": 1.0759439120018532,
+      "overhead_error_pct": 2.477980111141087
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial2-tp8-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 34379677904,
+        "overhead": 29059479760,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 34379677904,
+        "overhead": 29059479760,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": -0.615290017083181,
+      "overhead_error_pct": -0.6211625867740378
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial3-tp2-p6144-s8",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 69835412284,
+        "overhead": 7563207484,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 69835412284,
+        "overhead": 7563207484,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -0.3098629701232536,
+      "overhead_error_pct": -2.1504175186009666
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial4-tp4-p6144-s8",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 78534157676,
+        "overhead": 16261952876,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 78534157676,
+        "overhead": 16261952876,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -0.5823884247310174,
+      "overhead_error_pct": -2.1541897335874527
+    },
+    {
+      "dataset": "validation-v2-sglang-hybrid-a100x4",
+      "case": "trial0-tp1-p6144-s8",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 8039795647,
+        "overhead": 3286470911,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 8039795647,
+        "overhead": 3286470911,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 2.406232216017967,
+      "overhead_error_pct": 6.206809139509906
+    },
+    {
+      "dataset": "validation-v2-sglang-hybrid-a100x4",
+      "case": "trial1-tp4-p6144-s8",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 19977066584,
+        "overhead": 15072746904,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 19977066584,
+        "overhead": 15072746904,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": -0.20270585775722383,
+      "overhead_error_pct": 0.01252297514604539
+    },
+    {
+      "dataset": "validation-v2-sglang-l4x1",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "l4",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 7177522375,
+        "overhead": 1857324231,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 7177522375,
+        "overhead": 1857324231,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": -1.4325186195019213,
+      "overhead_error_pct": -3.8733190839080445
+    },
+    {
+      "dataset": "validation-v2-sglang-l4x1",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "sglang",
+        "gpu_type": "l4",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4859465694,
+        "overhead": 1850965982,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 4859465694,
+        "overhead": 1850965982,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 3.2493622329302196,
+      "overhead_error_pct": 9.549746716804176
+    },
+    {
+      "dataset": "validation-v2-sglang-rtx-pro-6000",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 24576,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 6434826202,
+        "overhead": 3157891034,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 6434826202,
+        "overhead": 3157891034,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 1.3539531671064253,
+      "overhead_error_pct": 3.0808475590072604
+    },
+    {
+      "dataset": "validation-v2-sglang-rtx-pro-6000",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 24576,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "sglang",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 5627936897,
+        "overhead": 2351001729,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 5627936897,
+        "overhead": 2351001729,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 2.530567324590227,
+      "overhead_error_pct": 6.685420727637492
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4229821233,
+        "overhead": 1221321521,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 4229821233,
+        "overhead": 1221321521,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 0.2749164397275905,
+      "overhead_error_pct": 1.0023879080977016
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 6736277500,
+        "overhead": 3727777788,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 6736277500,
+        "overhead": 3727777788,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 0.7305202161510316,
+      "overhead_error_pct": 1.3460813554618811
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial2-tp4-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 10353325664,
+        "overhead": 7344825952,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 10353325664,
+        "overhead": 7344825952,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 1.3779021012011228,
+      "overhead_error_pct": 1.9664866607471465
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial3-tp2-p6144-s32",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 24576,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 6852627320,
+        "overhead": 3575692152,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 6852627320,
+        "overhead": 3575692152,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 4.302039700553295,
+      "overhead_error_pct": 8.60477737126557
+    },
+    {
+      "dataset": "validation-v2-vllm-a10g-largex2",
+      "case": "trial0-tp1-p6144-s32",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 17490047952,
+        "overhead": 1383388112,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 17490047952,
+        "overhead": 1383388112,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -0.47735006262072943,
+      "overhead_error_pct": -5.582388448393949
+    },
+    {
+      "dataset": "validation-v2-vllm-a10g-largex2",
+      "case": "trial1-tp2-p6144-s32",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 18508196074,
+        "overhead": 2401536234,
+        "weights": 14496047104
+      },
+      "current": {
+        "required": 18508196074,
+        "overhead": 2401536234,
+        "weights": 14496047104
+      },
+      "unchanged": true,
+      "total_error_pct": -1.2135567050193252,
+      "overhead_error_pct": -8.557260499562336
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 7798698785,
+        "overhead": 2478500641,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 7798698785,
+        "overhead": 2478500641,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": -1.2139200884186296,
+      "overhead_error_pct": -3.6539685747680517
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 13122615260,
+        "overhead": 7802417116,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 13122615260,
+        "overhead": 7802417116,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": 0.7807464117309815,
+      "overhead_error_pct": 1.3475496757982874
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial2-tp8-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 35402437696,
+        "overhead": 30082239552,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 35402437696,
+        "overhead": 30082239552,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": 0.22083700085389069,
+      "overhead_error_pct": 0.2719242533156363
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial3-tp2-p6144-s8",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 69689125010,
+        "overhead": 7416920210,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 69689125010,
+        "overhead": 7416920210,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -0.16976863273970855,
+      "overhead_error_pct": -1.216670159277189
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial4-tp4-p6144-s8",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 76827823056,
+        "overhead": 14555618256,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 76827823056,
+        "overhead": 14555618256,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -0.314325376737834,
+      "overhead_error_pct": -1.1135869553496769
+    },
+    {
+      "dataset": "validation-v2-vllm-l4x1",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "l4",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 6448433806,
+        "overhead": 1128235662,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 6448433806,
+        "overhead": 1128235662,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": 0.06029453023108644,
+      "overhead_error_pct": 0.5096340169525648
+    },
+    {
+      "dataset": "validation-v2-vllm-l4x1",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "vllm",
+        "gpu_type": "l4",
+        "gpu_memory": "1x22.49",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4084656285,
+        "overhead": 1076156573,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 4084656285,
+        "overhead": 1076156573,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 3.1083057266243497,
+      "overhead_error_pct": 12.982776660694206
+    },
+    {
+      "dataset": "validation-v2-vllm-rtx-pro-6000",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 24576,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 5550233070,
+        "overhead": 2273297902,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 5550233070,
+        "overhead": 2273297902,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": -2.4164498567276205,
+      "overhead_error_pct": -5.680637049124071
+    },
+    {
+      "dataset": "validation-v2-vllm-rtx-pro-6000",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 24576,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 32,
+        "engine": "vllm",
+        "gpu_type": "rtx-pro-6000",
+        "gpu_memory": "1x95.56",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4852046144,
+        "overhead": 1575110976,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 4852046144,
+        "overhead": 1575110976,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 2.3690231777062642,
+      "overhead_error_pct": 7.714576499900572
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial0-tp2-p8192-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "deepseek-ai/DeepSeek-V2-Lite-Chat",
+        "revision": "85864749cd611b4353ce1decdb286193298f64c7",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 40223779976,
+        "overhead": 7791595656,
+        "weights": 31412968448
+      },
+      "current": {
+        "required": 40223779976,
+        "overhead": 7791595656,
+        "weights": 31412968448
+      },
+      "unchanged": true,
+      "total_error_pct": 0.7065556312465748,
+      "overhead_error_pct": 4.970833515119777
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial1-tp4-p8192-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "deepseek-ai/DeepSeek-V2-Lite-Chat",
+        "revision": "85864749cd611b4353ce1decdb286193298f64c7",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 50357894416,
+        "overhead": 16906494224,
+        "weights": 31412968448
+      },
+      "current": {
+        "required": 50357894416,
+        "overhead": 16906494224,
+        "weights": 31412968448
+      },
+      "unchanged": true,
+      "total_error_pct": 2.3055328732060065,
+      "overhead_error_pct": 8.881983600911791
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial2-tp1-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 13976644076,
+        "overhead": 3619760108,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 13976644076,
+        "overhead": 3619760108,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": 0.8167116972871202,
+      "overhead_error_pct": 3.4772786388105104
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial3-tp4-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 26058564012,
+        "overhead": 15701680044,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 26058564012,
+        "overhead": 15701680044,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -5.817142047898482,
+      "overhead_error_pct": -9.193480812485532
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial0-tp2-p8192-s32",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 32,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 71004323604,
+        "overhead": 8329465620,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 71004323604,
+        "overhead": 8329465620,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": 0.005537890576334803,
+      "overhead_error_pct": 0.6620648981238597
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial1-tp8-p4096-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 94143928600,
+        "overhead": 31469070616,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 94143928600,
+        "overhead": 31469070616,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -3.065527896823861,
+      "overhead_error_pct": -7.485757562380668
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial2-tp4-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 27994556912,
+        "overhead": 17771890672,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 27994556912,
+        "overhead": 17771890672,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -0.9015126311952115,
+      "overhead_error_pct": -1.3042776587713356
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial3-tp1-image",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": false
+      },
+      "prior": {
+        "required": 8549027682,
+        "overhead": 3846034594,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 8549027682,
+        "overhead": 3846034594,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": -0.6845911295185081,
+      "overhead_error_pct": -1.4294877226143976
+    },
+    {
+      "dataset": "validation-v3-sglang-t4-medium",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "sglang",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4304106096,
+        "overhead": 1429824112,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 4304106096,
+        "overhead": 1429824112,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": 5.495947282880409,
+      "overhead_error_pct": 19.43319648135857
+    },
+    {
+      "dataset": "validation-v3-sglang-t4-medium",
+      "case": "trial1-tp1-p4096-s16",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74",
+        "text_only": true
+      },
+      "prior": {
+        "required": 10959294179,
+        "overhead": 1706398435,
+        "weights": 8044936192
+      },
+      "current": {
+        "required": 10959294179,
+        "overhead": 1706398435,
+        "weights": 8044936192
+      },
+      "unchanged": true,
+      "total_error_pct": -1.501078992516458,
+      "overhead_error_pct": -7.034448499512836
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial0-tp2-p8192-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "deepseek-ai/DeepSeek-V2-Lite-Chat",
+        "revision": "85864749cd611b4353ce1decdb286193298f64c7",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 38204175414,
+        "overhead": 5771991094,
+        "weights": 31412968448
+      },
+      "current": {
+        "required": 38204175414,
+        "overhead": 5771991094,
+        "weights": 31412968448
+      },
+      "unchanged": true,
+      "total_error_pct": -0.8902874347613499,
+      "overhead_error_pct": -4.4911293884851595
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial1-tp4-p8192-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "deepseek-ai/DeepSeek-V2-Lite-Chat",
+        "revision": "85864749cd611b4353ce1decdb286193298f64c7",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 44222288268,
+        "overhead": 10770888076,
+        "weights": 31412968448
+      },
+      "current": {
+        "required": 44222288268,
+        "overhead": 10770888076,
+        "weights": 31412968448
+      },
+      "unchanged": true,
+      "total_error_pct": -1.7469206054841036,
+      "overhead_error_pct": -5.0425061982576675
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial2-tp1-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 11692857562,
+        "overhead": 2095273690,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 11692857562,
+        "overhead": 2095273690,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -0.5141896853390948,
+      "overhead_error_pct": -2.017330758793001
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial3-tp4-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 17445414824,
+        "overhead": 7847830952,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 17445414824,
+        "overhead": 7847830952,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -2.520907826561236,
+      "overhead_error_pct": -4.945505547627693
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial0-tp2-p8192-s32",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 32,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 70892624044,
+        "overhead": 8217766060,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 70892624044,
+        "overhead": 8217766060,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": 0.24126764608145557,
+      "overhead_error_pct": 2.4662151515773445
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial1-tp8-p4096-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 89889244096,
+        "overhead": 27214386112,
+        "weights": 61064245248
+      },
+      "current": {
+        "required": 89889244096,
+        "overhead": 27214386112,
+        "weights": 61064245248
+      },
+      "unchanged": true,
+      "total_error_pct": -1.083421702751608,
+      "overhead_error_pct": -2.1605341892833585
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial2-tp4-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21475926920,
+        "overhead": 12016755080,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 21475926920,
+        "overhead": 12016755080,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -1.2854891512497413,
+      "overhead_error_pct": -1.337418946754454
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial3-tp1-image",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": false
+      },
+      "prior": {
+        "required": 7301928392,
+        "overhead": 2728377096,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 7301928392,
+        "overhead": 2728377096,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 0.09755195670453354,
+      "overhead_error_pct": 1.374611741340881
+    },
+    {
+      "dataset": "validation-v3-vllm-t4-medium",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.2-1B-Instruct",
+        "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": null,
+        "max_num_seqs": null,
+        "engine": "vllm",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74",
+        "text_only": true
+      },
+      "prior": {
+        "required": 3687581612,
+        "overhead": 813299628,
+        "weights": 2471628800
+      },
+      "current": {
+        "required": 3687581612,
+        "overhead": 813299628,
+        "weights": 2471628800
+      },
+      "unchanged": true,
+      "total_error_pct": -0.23045149072357107,
+      "overhead_error_pct": -0.9732735400115211
+    },
+    {
+      "dataset": "validation-v3-vllm-t4-medium",
+      "case": "trial1-tp1-p4096-s16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74",
+        "text_only": true
+      },
+      "prior": {
+        "required": 10044491476,
+        "overhead": 791595732,
+        "weights": 8044936192
+      },
+      "current": {
+        "required": 10044491476,
+        "overhead": 791595732,
+        "weights": 8044936192
+      },
+      "unchanged": true,
+      "total_error_pct": -1.498234763709505,
+      "overhead_error_pct": -15.967864426449852
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial0-tp1-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 14348740891,
+        "overhead": 4269729563,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 14348740891,
+        "overhead": 4269729563,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": 2.816386503795454,
+      "overhead_error_pct": 10.3783276566912
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial1-tp2-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 18579882858,
+        "overhead": 8500871530,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 18579882858,
+        "overhead": 8500871530,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -1.7720424583860361,
+      "overhead_error_pct": -3.6601832833543124
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial2-tp4-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 26777086776,
+        "overhead": 16698075448,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 26777086776,
+        "overhead": 16698075448,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -4.494272305132807,
+      "overhead_error_pct": -6.9139864360593055
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial3-tp1-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-9B",
+        "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 22609228436,
+        "overhead": 3057556148,
+        "weights": 18819635168
+      },
+      "current": {
+        "required": 22609228436,
+        "overhead": 3057556148,
+        "weights": 18819635168
+      },
+      "unchanged": true,
+      "total_error_pct": -1.0070480630358203,
+      "overhead_error_pct": -6.757460708001384
+    },
+    {
+      "dataset": "validation-v4-sglang-h200x8",
+      "case": "trial0-tp2-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 18951231582,
+        "overhead": 9006437982,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 18951231582,
+        "overhead": 9006437982,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": 1.3251452163264288,
+      "overhead_error_pct": 2.9733601330144577
+    },
+    {
+      "dataset": "validation-v4-sglang-h200x8",
+      "case": "trial1-tp8-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 47273715784,
+        "overhead": 36926269000,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 47273715784,
+        "overhead": 36926269000,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -2.7037696542777656,
+      "overhead_error_pct": -3.1128136611936252
+    },
+    {
+      "dataset": "validation-v4-sglang-h200x8",
+      "case": "trial2-tp1-image",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": false
+      },
+      "prior": {
+        "required": 10376158961,
+        "overhead": 5416199217,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 10376158961,
+        "overhead": 5416199217,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 2.2557050181600813,
+      "overhead_error_pct": 4.476059845025326
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial0-tp1-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 12297718371,
+        "overhead": 2561722467,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 12297718371,
+        "overhead": 2561722467,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -0.023820508425931308,
+      "overhead_error_pct": 0.5639288863858116
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial1-tp2-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "2x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 14725558654,
+        "overhead": 4989562750,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 14725558654,
+        "overhead": 4989562750,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": 0.38340272737960035,
+      "overhead_error_pct": 1.672041357371823
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial2-tp4-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "4x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 18136720924,
+        "overhead": 8400725020,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 18136720924,
+        "overhead": 8400725020,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -2.144069876118748,
+      "overhead_error_pct": -4.0494042486634125
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial3-tp1-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-9B",
+        "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 4096,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "a100",
+        "gpu_memory": "1x79.15",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20867928615,
+        "overhead": 1667660359,
+        "weights": 18819635168
+      },
+      "current": {
+        "required": 20867928615,
+        "overhead": 1667660359,
+        "weights": 18819635168
+      },
+      "unchanged": true,
+      "total_error_pct": 0.7716669380731123,
+      "overhead_error_pct": 11.880924187785702
+    },
+    {
+      "dataset": "validation-v4-vllm-h200x8",
+      "case": "trial0-tp2-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 16612800060,
+        "overhead": 7015216188,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 16612800060,
+        "overhead": 7015216188,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": 2.123604807439916,
+      "overhead_error_pct": 6.673953782132669
+    },
+    {
+      "dataset": "validation-v4-vllm-h200x8",
+      "case": "trial1-tp8-text-only",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 35489364312,
+        "overhead": 25372735320,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 35489364312,
+        "overhead": 25372735320,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": -2.81043174265172,
+      "overhead_error_pct": -3.4007078929666257
+    },
+    {
+      "dataset": "validation-v4-vllm-h200x8",
+      "case": "trial2-tp1-image",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": false
+      },
+      "prior": {
+        "required": 9508414807,
+        "overhead": 4834593431,
+        "weights": 4426488512
+      },
+      "current": {
+        "required": 9508414807,
+        "overhead": 4834593431,
+        "weights": 4426488512
+      },
+      "unchanged": true,
+      "total_error_pct": 6.3453022493327405,
+      "overhead_error_pct": 14.062304131358228
+    },
+    {
+      "dataset": "validation-v5-sglang-h200x2",
+      "case": "trial0-tp2-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 16,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "2x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 19936329468,
+        "overhead": 9445227772,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 19936329468,
+        "overhead": 9445227772,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": 1.2128221190231603,
+      "overhead_error_pct": 2.731192900541135
+    },
+    {
+      "dataset": "validation-v5-sglang-h200x2",
+      "case": "trial1-tp1-text-only",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-9B",
+        "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+        "max_model_len": 12288,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": true
+      },
+      "prior": {
+        "required": 23008610762,
+        "overhead": 3322720746,
+        "weights": 18819635168
+      },
+      "current": {
+        "required": 23008610762,
+        "overhead": 3322720746,
+        "weights": 18819635168
+      },
+      "unchanged": true,
+      "total_error_pct": -0.6990317663375212,
+      "overhead_error_pct": -4.417213130493581
+    },
+    {
+      "dataset": "validation-v5-sglang-h200x2",
+      "case": "trial2-tp1-image",
+      "engine": "sglang",
+      "arguments": {
+        "model_id": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 6144,
+        "max_num_seqs": 8,
+        "engine": "sglang",
+        "gpu_type": "h200",
+        "gpu_memory": "1x139.8",
+        "text_only": false
+      },
+      "prior": {
+        "required": 15612289123,
+        "overhead": 5533277795,
+        "weights": 9078538752
+      },
+      "current": {
+        "required": 15612289123,
+        "overhead": 5533277795,
+        "weights": 9078538752
+      },
+      "unchanged": true,
+      "total_error_pct": 2.674619971045522,
+      "overhead_error_pct": 8.110459800880609
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp2-p2048",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20321604978,
+        "overhead": 1524215154,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 20321604978,
+        "overhead": 1524215154,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.31350368173292953,
+      "overhead_error_pct": 4.560902167245384
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp2-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "2x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 21436654808,
+        "overhead": 2639264984,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 21436654808,
+        "overhead": 2639264984,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 1.1676885336903808,
+      "overhead_error_pct": 10.481963505025549
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 19535170437,
+        "overhead": 737780613,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 19535170437,
+        "overhead": 737780613,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.1525540179784013,
+      "overhead_error_pct": 4.551109649441831
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "a10g",
+        "gpu_memory": "1x22.30126953125",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20396195189,
+        "overhead": 1598805365,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 20396195189,
+        "overhead": 1598805365,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.20356164143879862,
+      "overhead_error_pct": 2.816299341471651
+    },
+    {
+      "dataset": "vllm-h200x8",
+      "case": "qwen3-8b-tp4-s1-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "4x139.80072021484375",
+        "text_only": true
+      },
+      "prior": {
+        "required": 33189639064,
+        "overhead": 11976330136,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 33189639064,
+        "overhead": 11976330136,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": -0.6018250170586992,
+      "overhead_error_pct": -1.6162251951964413
+    },
+    {
+      "dataset": "vllm-h200x8",
+      "case": "qwen3-8b-tp8-s1-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 32768,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "h200",
+        "gpu_memory": "8x139.80072021484375",
+        "text_only": true
+      },
+      "prior": {
+        "required": 44790159560,
+        "overhead": 23576850632,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 44790159560,
+        "overhead": 23576850632,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.045027169078748486,
+      "overhead_error_pct": 0.11394087481668702
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.39215087890625",
+        "text_only": true
+      },
+      "prior": {
+        "required": 19749918802,
+        "overhead": 952528978,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 19749918802,
+        "overhead": 952528978,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.15315604279864115,
+      "overhead_error_pct": 3.539388659261511
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.39215087890625",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20610943554,
+        "overhead": 1813553730,
+        "weights": 16381470720
+      },
+      "current": {
+        "required": 20610943554,
+        "overhead": 1813553730,
+        "weights": 16381470720
+      },
+      "unchanged": true,
+      "total_error_pct": 0.2036073745153244,
+      "overhead_error_pct": 2.5003712398631084
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "llama31-8b-tp1-p2048",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+        "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.39215087890625",
+        "text_only": true
+      },
+      "prior": {
+        "required": 19187585436,
+        "overhead": 979579292,
+        "weights": 16060522496
+      },
+      "current": {
+        "required": 19187585436,
+        "overhead": 979579292,
+        "weights": 16060522496
+      },
+      "unchanged": true,
+      "total_error_pct": -0.06269775138120215,
+      "overhead_error_pct": -1.0045861918779098
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "llama31-8b-tp1-p8192",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "meta-llama/Llama-3.1-8B-Instruct",
+        "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+        "max_model_len": 16384,
+        "max_num_batched_tokens": 8192,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "l40s",
+        "gpu_memory": "1x44.39215087890625",
+        "text_only": true
+      },
+      "prior": {
+        "required": 20023751160,
+        "overhead": 1815745016,
+        "weights": 16060522496
+      },
+      "current": {
+        "required": 20023751160,
+        "overhead": 1815745016,
+        "weights": 16060522496
+      },
+      "unchanged": true,
+      "total_error_pct": -0.6143913220277741,
+      "overhead_error_pct": -6.2808668289884295
+    },
+    {
+      "dataset": "vllm-t4-canary",
+      "case": "qwen3-17b-tp1-p2048-fp16",
+      "engine": "vllm",
+      "arguments": {
+        "model_id": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "max_model_len": 8192,
+        "max_num_batched_tokens": 2048,
+        "max_num_seqs": 1,
+        "engine": "vllm",
+        "gpu_type": "t4",
+        "gpu_memory": "1x14.74127197265625",
+        "text_only": true
+      },
+      "prior": {
+        "required": 4736321034,
+        "overhead": 355646986,
+        "weights": 3441149952
+      },
+      "current": {
+        "required": 4736321034,
+        "overhead": 355646986,
+        "weights": 3441149952
+      },
+      "unchanged": true,
+      "total_error_pct": -1.0941240042590783,
+      "overhead_error_pct": -12.44674383123554
+    }
+  ]
+}

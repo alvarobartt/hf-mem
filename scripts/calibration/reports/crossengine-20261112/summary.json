@@ -1,0 +1,209 @@
+{
+  "status": "Estimator work and native validation complete; public artifact upload pending explicit user authorization.",
+  "source_sha256": {
+    "src/hf_mem/_overhead.py": "af93632112282b7a1cf1fd6d82b2fe696ef000372eb1bfa98c20c5c7fc9382da",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+    "src/hf_mem/estimate.py": "31fbcb6687572c359fc7b6bad65f92b0e869734ba9937fd20d3536c58921f6ab",
+    "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+    "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+    "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+    "src/hf_mem/cli.py": "6b416bb9f6f10cb53b8c31a69670235d67a40bded396144fe272a15a4f19b3bd",
+    "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "final_independent_validation": {
+    "scope": "Final-candidate independent check: 11 concurrent V4 cases with forecasts exactly unchanged under V5, whose outcomes were not used to choose V5, plus 3 fresh V5 SGLang Hopper cases. V4 SGLang Hopper training cases excluded. Local freezes precede Job submission; publication pending authorization. Two warmed-server requests per text case, actual mixed image inputs where specified. Sampled peaks are lower bounds; not independent deployment replicates. Compare aggregate fit.required to native runtime use after empty baseline, and residual overhead separately.",
+    "metrics": {
+      "all": {
+        "configurations": 14,
+        "total_error_pct": {
+          "median_absolute": 1.947823632912976,
+          "p90_absolute": 4.494272305132807,
+          "max_absolute": 6.3453022493327405
+        },
+        "overhead_error_pct": {
+          "median_absolute": 5.545583456313125,
+          "p90_absolute": 11.880924187785702,
+          "max_absolute": 14.062304131358228
+        },
+        "capacity_only_total_error_pct": {
+          "median_absolute": 1.9438632757461216,
+          "p90_absolute": 4.494272305132807,
+          "max_absolute": 6.338096797042492
+        },
+        "capacity_only_overhead_error_pct": {
+          "median_absolute": 5.545053325648491,
+          "p90_absolute": 11.880924187785702,
+          "max_absolute": 14.04710449354505
+        },
+        "baseline_total_error_pct": {
+          "median_absolute": 7.366414912981667,
+          "p90_absolute": 36.11860273077711,
+          "max_absolute": 48.2974689821722
+        },
+        "baseline_overhead_error_pct": {
+          "median_absolute": 40.152097628389605,
+          "p90_absolute": 99.97592167706553,
+          "max_absolute": 190.8237768146247
+        }
+      },
+      "vllm": {
+        "configurations": 7,
+        "total_error_pct": {
+          "median_absolute": 2.123604807439916,
+          "p90_absolute": 6.3453022493327405,
+          "max_absolute": 6.3453022493327405
+        },
+        "overhead_error_pct": {
+          "median_absolute": 4.0494042486634125,
+          "p90_absolute": 14.062304131358228,
+          "max_absolute": 14.062304131358228
+        },
+        "capacity_only_total_error_pct": {
+          "median_absolute": 2.115684093106207,
+          "p90_absolute": 6.338096797042492,
+          "max_absolute": 6.338096797042492
+        },
+        "capacity_only_overhead_error_pct": {
+          "median_absolute": 4.0494042486634125,
+          "p90_absolute": 14.04710449354505,
+          "max_absolute": 14.04710449354505
+        },
+        "baseline_total_error_pct": {
+          "median_absolute": 22.673638073100012,
+          "p90_absolute": 48.2974689821722,
+          "max_absolute": 48.2974689821722
+        },
+        "baseline_overhead_error_pct": {
+          "median_absolute": 59.07845815469277,
+          "p90_absolute": 190.8237768146247,
+          "max_absolute": 190.8237768146247
+        }
+      },
+      "sglang": {
+        "configurations": 7,
+        "total_error_pct": {
+          "median_absolute": 1.7720424583860361,
+          "p90_absolute": 4.494272305132807,
+          "max_absolute": 4.494272305132807
+        },
+        "overhead_error_pct": {
+          "median_absolute": 6.757460708001384,
+          "p90_absolute": 10.3783276566912,
+          "max_absolute": 10.3783276566912
+        },
+        "capacity_only_total_error_pct": {
+          "median_absolute": 1.7720424583860361,
+          "p90_absolute": 4.494272305132807,
+          "max_absolute": 4.494272305132807
+        },
+        "capacity_only_overhead_error_pct": {
+          "median_absolute": 6.757460708001384,
+          "p90_absolute": 10.3783276566912,
+          "max_absolute": 10.3783276566912
+        },
+        "baseline_total_error_pct": {
+          "median_absolute": 1.9798198468182426,
+          "p90_absolute": 7.782713344434944,
+          "max_absolute": 7.782713344434944
+        },
+        "baseline_overhead_error_pct": {
+          "median_absolute": 4.869269473774107,
+          "p90_absolute": 48.107340742345464,
+          "max_absolute": 48.107340742345464
+        }
+      }
+    },
+    "report": "final-independent-validation.json"
+  },
+  "retrospective_coverage": {
+    "scope": "Current-source workload-aware RETROSPECTIVE replay across all collected native matrices; includes training and older validation, not a final-candidate holdout. Complete/partial native gates remain on each row.",
+    "primary_scope": "Only complete datasets; excludes usable rows from partial datasets.",
+    "metrics": {
+      "all": {
+        "configurations": 150,
+        "median_absolute_total_error_pct": 0.8061926727334023,
+        "median_absolute_overhead_error_pct": 3.0361756978561525
+      },
+      "vllm": {
+        "configurations": 69,
+        "median_absolute_total_error_pct": 0.7706941124875799,
+        "median_absolute_overhead_error_pct": 3.04707208301912
+      },
+      "sglang": {
+        "configurations": 81,
+        "median_absolute_total_error_pct": 1.0070480630358203,
+        "median_absolute_overhead_error_pct": 2.9733601330144577
+      }
+    },
+    "excluded_partial_dataset_rows": 1,
+    "gpu_families": [
+      "a100",
+      "a10g",
+      "h200",
+      "l4",
+      "l40s",
+      "rtx-pro-6000",
+      "t4"
+    ],
+    "tensor_parallel_sizes": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "models": [
+      "Qwen/Qwen3-0.6B",
+      "Qwen/Qwen3-1.7B",
+      "Qwen/Qwen3-30B-A3B",
+      "Qwen/Qwen3-4B",
+      "Qwen/Qwen3-8B",
+      "Qwen/Qwen3.5-2B",
+      "Qwen/Qwen3.5-4B",
+      "Qwen/Qwen3.5-9B",
+      "deepseek-ai/DeepSeek-V2-Lite-Chat",
+      "meta-llama/Llama-3.1-8B-Instruct",
+      "meta-llama/Llama-3.2-1B-Instruct",
+      "meta-llama/Llama-3.2-3B-Instruct",
+      "mistralai/Mistral-7B-Instruct-v0.3"
+    ],
+    "report": "final-retrospective-coverage.json"
+  },
+  "legacy_eight_model_regression": {
+    "vllm": {
+      "total_error_pct": 0.45916263874011265,
+      "overhead_error_pct": 6.789399759026987
+    },
+    "sglang": {
+      "total_error_pct": 1.1041642915952166,
+      "overhead_error_pct": 11.884742277642202
+    }
+  },
+  "validation": {
+    "pytest_passed": 278,
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "ty": "passed",
+    "git_diff_check": "passed",
+    "executed_source_verified_datasets": 54
+  },
+  "limits": [
+    "Pinned vLLM 0.33.0 and SGLang 0.5.23 images; engine upgrades and optional kernels can change allocations.",
+    "10 ms target NVML samples are lower bounds; sequential warmed requests are not independent deployment replicates.",
+    "Minimum workload memory differs from whole-VRAM automatic cache/radix reservation. Explicit SGLang recurrent-state capacity follows the controlled disabled-radix-cache configuration.",
+    "H100 initialization is interpolated, not directly validated; named hardware defaults do not identify arbitrary topologies, MIG or every Blackwell GPU.",
+    "Logical cache differs from native padding/admission blocks; packed weight tile padding is included in selected topology totals.",
+    "Legacy SGLang GPT-OSS registered packed parameter storage is incomplete: its residual overhead is omitted.",
+    "Final independent cohort has 14 configurations on hybrid text/image paths; broader 150-configuration replay includes training and prior validation.",
+    "Final SGLang median overhead error is 6.76% versus baseline 4.87%; worst overhead error improves from 48.11% to 10.38%."
+  ],
+  "publication": {
+    "state": "blocked_pending_explicit_approval",
+    "destination": "https://huggingface.co/buckets/alvarobartt/hf-mem-validation",
+    "reason": "Automatic approval review rejected new source/forecast and native-only uploads because explicit payload/destination authorization was missing.",
+    "new_payload_uploaded": false
+  }
+}

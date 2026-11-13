@@ -1,0 +1,2733 @@
+{
+  "done": true,
+  "device_trace_valid": true,
+  "empty_baseline_valid": true,
+  "all_rank_startup_audited": true,
+  "runtime_measurement_complete": true,
+  "invalid_transport_records": 0,
+  "invalid_native_records": 0,
+  "sample_count": 72168,
+  "samples_complete": true,
+  "all_declared_requests_passed": true,
+  "component_audits_complete": true,
+  "healthy": true,
+  "native_source": "/tmp/hf-mem-default-calibration-20261113/controlled-h200x4/live-private.log",
+  "scope": "Exact native user configuration with automatic cache reservation retained. Native pooled storage is not the estimator minimum workload KV. Runtime peaks use aggregate devices in each sampling iteration after an empty baseline. Device reads are sequential and 10 ms sampling is a lower bound. Text-only probes on a multimodal-enabled server do not establish the maximum image workload footprint.",
+  "rank_audits": [
+    {
+      "rank": 0,
+      "phases": [
+        "alloc_memory_pool",
+        "init_cuda_graphs",
+        "init_torch_distributed",
+        "initialize",
+        "load_model"
+      ],
+      "cuda_device_indices": [
+        0
+      ],
+      "model_storage": {
+        "summary": {
+          "parameters/torch.bfloat16": 4116215808,
+          "parameters/torch.float32": 2169152,
+          "buffers/torch.float32": 216,
+          "unregistered/torch.int32": 85639299088,
+          "unregistered/torch.uint64": 4194304,
+          "unregistered/torch.uint8": 96501760,
+          "unregistered/torch.uint32": 528,
+          "unregistered/torch.float8_e4m3fn": 7644119040,
+          "unregistered/torch.bfloat16": 1631763456,
+          "unregistered/torch.float32": 2064384
+        },
+        "parameter_storage_bytes": 4118384960,
+        "buffer_storage_bytes": 216,
+        "unregistered_storage_bytes": 95017942560,
+        "model_storage_bytes": 99136327736,
+        "largest": [
+          {
+            "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          }
+        ]
+      },
+      "cache": {
+        "type": "SWAKVPool",
+        "size": 262400,
+        "size_swa": 17536,
+        "page_size": 128,
+        "head_num": 2,
+        "head_dim": 128,
+        "layer_num": 48,
+        "start_layer": 0,
+        "dtype": "torch.bfloat16",
+        "swa_layer_nums": 40,
+        "full_layer_nums": 8,
+        "full_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 262400,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 8,
+          "start_layer": 0,
+          "end_layer": 7,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "1075314688",
+            "1075314688"
+          ],
+          "allocated_cache_bytes": 2150629376
+        },
+        "swa_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 40,
+          "start_layer": 0,
+          "end_layer": 39,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "361758720",
+            "361758720"
+          ],
+          "allocated_cache_bytes": 723517440
+        },
+        "native_size_bytes": [
+          "1437073408",
+          "1437073408"
+        ],
+        "allocated_cache_bytes": 2874146816
+      },
+      "last_stage": {
+        "kind": "runner_memory",
+        "pid": 754,
+        "time": 1794599814.9830487,
+        "phase": "init_cuda_graphs",
+        "rank": 0,
+        "tensor_parallel_size": 4,
+        "cuda_device_index": 0,
+        "cuda_free_bytes": 37583323136,
+        "cuda_total_bytes": 150109880320,
+        "torch_allocated_bytes": 105001058304,
+        "torch_reserved_bytes": 108647153664,
+        "torch_peak_allocated_bytes": 108055463424,
+        "torch_peak_reserved_bytes": 112258449408,
+        "max_total_num_tokens": 262400,
+        "full_max_total_num_tokens": 262400,
+        "swa_max_total_num_tokens": 17536,
+        "max_running_requests": 64,
+        "page_size": 128,
+        "graph_memory_usage": {
+          "prefill": 5.3828125,
+          "decode": 0.04296875,
+          "target_verify": 0.0,
+          "draft_prefill": 0.0,
+          "draft_decode": 0.0,
+          "draft_extend": 0.0
+        },
+        "weight_load_mem_usage": 92.6953125,
+        "cache": {
+          "type": "SWAKVPool",
+          "size": 262400,
+          "size_swa": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "layer_num": 48,
+          "start_layer": 0,
+          "dtype": "torch.bfloat16",
+          "swa_layer_nums": 40,
+          "full_layer_nums": 8,
+          "full_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 262400,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 8,
+            "start_layer": 0,
+            "end_layer": 7,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "1075314688",
+              "1075314688"
+            ],
+            "allocated_cache_bytes": 2150629376
+          },
+          "swa_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 17536,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 40,
+            "start_layer": 0,
+            "end_layer": 39,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "361758720",
+              "361758720"
+            ],
+            "allocated_cache_bytes": 723517440
+          },
+          "native_size_bytes": [
+            "1437073408",
+            "1437073408"
+          ],
+          "allocated_cache_bytes": 2874146816
+        },
+        "backend_type": "InklingShortConvHybridAttnBackend",
+        "model_storage": {
+          "summary": {
+            "parameters/torch.bfloat16": 4116215808,
+            "parameters/torch.float32": 2169152,
+            "buffers/torch.float32": 216,
+            "unregistered/torch.int32": 85639299088,
+            "unregistered/torch.uint64": 4194304,
+            "unregistered/torch.uint8": 96501760,
+            "unregistered/torch.uint32": 528,
+            "unregistered/torch.float8_e4m3fn": 7644119040,
+            "unregistered/torch.bfloat16": 1631763456,
+            "unregistered/torch.float32": 2064384
+          },
+          "parameter_storage_bytes": 4118384960,
+          "buffer_storage_bytes": 216,
+          "unregistered_storage_bytes": 95017942560,
+          "model_storage_bytes": 99136327736,
+          "largest": [
+            {
+              "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            }
+          ]
+        }
+      },
+      "registered_weight_storage_complete": true,
+      "load_torch_allocated_delta_bytes": 98989570048,
+      "unregistered_or_nonparameter_load_bytes": -146757688
+    },
+    {
+      "rank": 1,
+      "phases": [
+        "alloc_memory_pool",
+        "init_cuda_graphs",
+        "init_torch_distributed",
+        "initialize",
+        "load_model"
+      ],
+      "cuda_device_indices": [
+        1
+      ],
+      "model_storage": {
+        "summary": {
+          "parameters/torch.bfloat16": 4116215808,
+          "parameters/torch.float32": 2169152,
+          "buffers/torch.float32": 216,
+          "unregistered/torch.int32": 85639299088,
+          "unregistered/torch.uint64": 4194304,
+          "unregistered/torch.uint8": 96501760,
+          "unregistered/torch.uint32": 528,
+          "unregistered/torch.float8_e4m3fn": 7644119040,
+          "unregistered/torch.bfloat16": 1631763456,
+          "unregistered/torch.float32": 2064384
+        },
+        "parameter_storage_bytes": 4118384960,
+        "buffer_storage_bytes": 216,
+        "unregistered_storage_bytes": 95017942560,
+        "model_storage_bytes": 99136327736,
+        "largest": [
+          {
+            "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          }
+        ]
+      },
+      "cache": {
+        "type": "SWAKVPool",
+        "size": 262400,
+        "size_swa": 17536,
+        "page_size": 128,
+        "head_num": 2,
+        "head_dim": 128,
+        "layer_num": 48,
+        "start_layer": 0,
+        "dtype": "torch.bfloat16",
+        "swa_layer_nums": 40,
+        "full_layer_nums": 8,
+        "full_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 262400,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 8,
+          "start_layer": 0,
+          "end_layer": 7,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "1075314688",
+            "1075314688"
+          ],
+          "allocated_cache_bytes": 2150629376
+        },
+        "swa_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 40,
+          "start_layer": 0,
+          "end_layer": 39,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "361758720",
+            "361758720"
+          ],
+          "allocated_cache_bytes": 723517440
+        },
+        "native_size_bytes": [
+          "1437073408",
+          "1437073408"
+        ],
+        "allocated_cache_bytes": 2874146816
+      },
+      "last_stage": {
+        "kind": "runner_memory",
+        "pid": 819,
+        "time": 1794599815.0260904,
+        "phase": "init_cuda_graphs",
+        "rank": 1,
+        "tensor_parallel_size": 4,
+        "cuda_device_index": 1,
+        "cuda_free_bytes": 37532991488,
+        "cuda_total_bytes": 150109880320,
+        "torch_allocated_bytes": 105001058304,
+        "torch_reserved_bytes": 108647153664,
+        "torch_peak_allocated_bytes": 108055463424,
+        "torch_peak_reserved_bytes": 112258449408,
+        "max_total_num_tokens": 262400,
+        "full_max_total_num_tokens": 262400,
+        "swa_max_total_num_tokens": 17536,
+        "max_running_requests": 64,
+        "page_size": 128,
+        "graph_memory_usage": {
+          "prefill": 5.3828125,
+          "decode": 0.04296875,
+          "target_verify": 0.0,
+          "draft_prefill": 0.0,
+          "draft_decode": 0.0,
+          "draft_extend": 0.0
+        },
+        "weight_load_mem_usage": 92.6953125,
+        "cache": {
+          "type": "SWAKVPool",
+          "size": 262400,
+          "size_swa": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "layer_num": 48,
+          "start_layer": 0,
+          "dtype": "torch.bfloat16",
+          "swa_layer_nums": 40,
+          "full_layer_nums": 8,
+          "full_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 262400,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 8,
+            "start_layer": 0,
+            "end_layer": 7,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "1075314688",
+              "1075314688"
+            ],
+            "allocated_cache_bytes": 2150629376
+          },
+          "swa_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 17536,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 40,
+            "start_layer": 0,
+            "end_layer": 39,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "361758720",
+              "361758720"
+            ],
+            "allocated_cache_bytes": 723517440
+          },
+          "native_size_bytes": [
+            "1437073408",
+            "1437073408"
+          ],
+          "allocated_cache_bytes": 2874146816
+        },
+        "backend_type": "InklingShortConvHybridAttnBackend",
+        "model_storage": {
+          "summary": {
+            "parameters/torch.bfloat16": 4116215808,
+            "parameters/torch.float32": 2169152,
+            "buffers/torch.float32": 216,
+            "unregistered/torch.int32": 85639299088,
+            "unregistered/torch.uint64": 4194304,
+            "unregistered/torch.uint8": 96501760,
+            "unregistered/torch.uint32": 528,
+            "unregistered/torch.float8_e4m3fn": 7644119040,
+            "unregistered/torch.bfloat16": 1631763456,
+            "unregistered/torch.float32": 2064384
+          },
+          "parameter_storage_bytes": 4118384960,
+          "buffer_storage_bytes": 216,
+          "unregistered_storage_bytes": 95017942560,
+          "model_storage_bytes": 99136327736,
+          "largest": [
+            {
+              "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            }
+          ]
+        }
+      },
+      "registered_weight_storage_complete": true,
+      "load_torch_allocated_delta_bytes": 98989570048,
+      "unregistered_or_nonparameter_load_bytes": -146757688
+    },
+    {
+      "rank": 2,
+      "phases": [
+        "alloc_memory_pool",
+        "init_cuda_graphs",
+        "init_torch_distributed",
+        "initialize",
+        "load_model"
+      ],
+      "cuda_device_indices": [
+        2
+      ],
+      "model_storage": {
+        "summary": {
+          "parameters/torch.bfloat16": 4116215808,
+          "parameters/torch.float32": 2169152,
+          "buffers/torch.float32": 216,
+          "unregistered/torch.int32": 85639299088,
+          "unregistered/torch.uint64": 4194304,
+          "unregistered/torch.uint8": 96501760,
+          "unregistered/torch.uint32": 528,
+          "unregistered/torch.float8_e4m3fn": 7644119040,
+          "unregistered/torch.bfloat16": 1631763456,
+          "unregistered/torch.float32": 2064384
+        },
+        "parameter_storage_bytes": 4118384960,
+        "buffer_storage_bytes": 216,
+        "unregistered_storage_bytes": 95017942560,
+        "model_storage_bytes": 99136327736,
+        "largest": [
+          {
+            "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          }
+        ]
+      },
+      "cache": {
+        "type": "SWAKVPool",
+        "size": 262400,
+        "size_swa": 17536,
+        "page_size": 128,
+        "head_num": 2,
+        "head_dim": 128,
+        "layer_num": 48,
+        "start_layer": 0,
+        "dtype": "torch.bfloat16",
+        "swa_layer_nums": 40,
+        "full_layer_nums": 8,
+        "full_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 262400,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 8,
+          "start_layer": 0,
+          "end_layer": 7,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "1075314688",
+            "1075314688"
+          ],
+          "allocated_cache_bytes": 2150629376
+        },
+        "swa_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 40,
+          "start_layer": 0,
+          "end_layer": 39,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "361758720",
+            "361758720"
+          ],
+          "allocated_cache_bytes": 723517440
+        },
+        "native_size_bytes": [
+          "1437073408",
+          "1437073408"
+        ],
+        "allocated_cache_bytes": 2874146816
+      },
+      "last_stage": {
+        "kind": "runner_memory",
+        "pid": 884,
+        "time": 1794599815.0011034,
+        "phase": "init_cuda_graphs",
+        "rank": 2,
+        "tensor_parallel_size": 4,
+        "cuda_device_index": 2,
+        "cuda_free_bytes": 37532991488,
+        "cuda_total_bytes": 150109880320,
+        "torch_allocated_bytes": 105001058304,
+        "torch_reserved_bytes": 108647153664,
+        "torch_peak_allocated_bytes": 108055463424,
+        "torch_peak_reserved_bytes": 112258449408,
+        "max_total_num_tokens": 262400,
+        "full_max_total_num_tokens": 262400,
+        "swa_max_total_num_tokens": 17536,
+        "max_running_requests": 64,
+        "page_size": 128,
+        "graph_memory_usage": {
+          "prefill": 5.3828125,
+          "decode": 0.04296875,
+          "target_verify": 0.0,
+          "draft_prefill": 0.0,
+          "draft_decode": 0.0,
+          "draft_extend": 0.0
+        },
+        "weight_load_mem_usage": 92.6953125,
+        "cache": {
+          "type": "SWAKVPool",
+          "size": 262400,
+          "size_swa": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "layer_num": 48,
+          "start_layer": 0,
+          "dtype": "torch.bfloat16",
+          "swa_layer_nums": 40,
+          "full_layer_nums": 8,
+          "full_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 262400,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 8,
+            "start_layer": 0,
+            "end_layer": 7,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "1075314688",
+              "1075314688"
+            ],
+            "allocated_cache_bytes": 2150629376
+          },
+          "swa_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 17536,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 40,
+            "start_layer": 0,
+            "end_layer": 39,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "361758720",
+              "361758720"
+            ],
+            "allocated_cache_bytes": 723517440
+          },
+          "native_size_bytes": [
+            "1437073408",
+            "1437073408"
+          ],
+          "allocated_cache_bytes": 2874146816
+        },
+        "backend_type": "InklingShortConvHybridAttnBackend",
+        "model_storage": {
+          "summary": {
+            "parameters/torch.bfloat16": 4116215808,
+            "parameters/torch.float32": 2169152,
+            "buffers/torch.float32": 216,
+            "unregistered/torch.int32": 85639299088,
+            "unregistered/torch.uint64": 4194304,
+            "unregistered/torch.uint8": 96501760,
+            "unregistered/torch.uint32": 528,
+            "unregistered/torch.float8_e4m3fn": 7644119040,
+            "unregistered/torch.bfloat16": 1631763456,
+            "unregistered/torch.float32": 2064384
+          },
+          "parameter_storage_bytes": 4118384960,
+          "buffer_storage_bytes": 216,
+          "unregistered_storage_bytes": 95017942560,
+          "model_storage_bytes": 99136327736,
+          "largest": [
+            {
+              "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            }
+          ]
+        }
+      },
+      "registered_weight_storage_complete": true,
+      "load_torch_allocated_delta_bytes": 98989570048,
+      "unregistered_or_nonparameter_load_bytes": -146757688
+    },
+    {
+      "rank": 3,
+      "phases": [
+        "alloc_memory_pool",
+        "init_cuda_graphs",
+        "init_torch_distributed",
+        "initialize",
+        "load_model"
+      ],
+      "cuda_device_indices": [
+        3
+      ],
+      "model_storage": {
+        "summary": {
+          "parameters/torch.bfloat16": 4116215808,
+          "parameters/torch.float32": 2169152,
+          "buffers/torch.float32": 216,
+          "unregistered/torch.int32": 85639299088,
+          "unregistered/torch.uint64": 4194304,
+          "unregistered/torch.uint8": 96501760,
+          "unregistered/torch.uint32": 528,
+          "unregistered/torch.float8_e4m3fn": 7644119040,
+          "unregistered/torch.bfloat16": 1631763456,
+          "unregistered/torch.float32": 2064384
+        },
+        "parameter_storage_bytes": 4118384960,
+        "buffer_storage_bytes": 216,
+        "unregistered_storage_bytes": 95017942560,
+        "model_storage_bytes": 99136327736,
+        "largest": [
+          {
+            "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              18432
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 2038431744
+          },
+          {
+            "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          },
+          {
+            "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+            "kind": "unregistered",
+            "shape": [
+              96,
+              288,
+              9216
+            ],
+            "dtype": "torch.int32",
+            "storage_bytes": 1019215872
+          }
+        ]
+      },
+      "cache": {
+        "type": "SWAKVPool",
+        "size": 262400,
+        "size_swa": 17536,
+        "page_size": 128,
+        "head_num": 2,
+        "head_dim": 128,
+        "layer_num": 48,
+        "start_layer": 0,
+        "dtype": "torch.bfloat16",
+        "swa_layer_nums": 40,
+        "full_layer_nums": 8,
+        "full_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 262400,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 8,
+          "start_layer": 0,
+          "end_layer": 7,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "1075314688",
+            "1075314688"
+          ],
+          "allocated_cache_bytes": 2150629376
+        },
+        "swa_kv_pool": {
+          "type": "MHATokenToKVPool",
+          "size": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "v_head_dim": 128,
+          "layer_num": 40,
+          "start_layer": 0,
+          "end_layer": 39,
+          "dtype": "torch.bfloat16",
+          "native_size_bytes": [
+            "361758720",
+            "361758720"
+          ],
+          "allocated_cache_bytes": 723517440
+        },
+        "native_size_bytes": [
+          "1437073408",
+          "1437073408"
+        ],
+        "allocated_cache_bytes": 2874146816
+      },
+      "last_stage": {
+        "kind": "runner_memory",
+        "pid": 949,
+        "time": 1794599814.9217124,
+        "phase": "init_cuda_graphs",
+        "rank": 3,
+        "tensor_parallel_size": 4,
+        "cuda_device_index": 3,
+        "cuda_free_bytes": 37784649728,
+        "cuda_total_bytes": 150109880320,
+        "torch_allocated_bytes": 105001058304,
+        "torch_reserved_bytes": 108647153664,
+        "torch_peak_allocated_bytes": 108055463424,
+        "torch_peak_reserved_bytes": 112258449408,
+        "max_total_num_tokens": 262400,
+        "full_max_total_num_tokens": 262400,
+        "swa_max_total_num_tokens": 17536,
+        "max_running_requests": 64,
+        "page_size": 128,
+        "graph_memory_usage": {
+          "prefill": 5.3828125,
+          "decode": 0.04296875,
+          "target_verify": 0.0,
+          "draft_prefill": 0.0,
+          "draft_decode": 0.0,
+          "draft_extend": 0.0
+        },
+        "weight_load_mem_usage": 92.6953125,
+        "cache": {
+          "type": "SWAKVPool",
+          "size": 262400,
+          "size_swa": 17536,
+          "page_size": 128,
+          "head_num": 2,
+          "head_dim": 128,
+          "layer_num": 48,
+          "start_layer": 0,
+          "dtype": "torch.bfloat16",
+          "swa_layer_nums": 40,
+          "full_layer_nums": 8,
+          "full_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 262400,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 8,
+            "start_layer": 0,
+            "end_layer": 7,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "1075314688",
+              "1075314688"
+            ],
+            "allocated_cache_bytes": 2150629376
+          },
+          "swa_kv_pool": {
+            "type": "MHATokenToKVPool",
+            "size": 17536,
+            "page_size": 128,
+            "head_num": 2,
+            "head_dim": 128,
+            "v_head_dim": 128,
+            "layer_num": 40,
+            "start_layer": 0,
+            "end_layer": 39,
+            "dtype": "torch.bfloat16",
+            "native_size_bytes": [
+              "361758720",
+              "361758720"
+            ],
+            "allocated_cache_bytes": 723517440
+          },
+          "native_size_bytes": [
+            "1437073408",
+            "1437073408"
+          ],
+          "allocated_cache_bytes": 2874146816
+        },
+        "backend_type": "InklingShortConvHybridAttnBackend",
+        "model_storage": {
+          "summary": {
+            "parameters/torch.bfloat16": 4116215808,
+            "parameters/torch.float32": 2169152,
+            "buffers/torch.float32": 216,
+            "unregistered/torch.int32": 85639299088,
+            "unregistered/torch.uint64": 4194304,
+            "unregistered/torch.uint8": 96501760,
+            "unregistered/torch.uint32": 528,
+            "unregistered/torch.float8_e4m3fn": 7644119040,
+            "unregistered/torch.bfloat16": 1631763456,
+            "unregistered/torch.float32": 2064384
+          },
+          "parameter_storage_bytes": 4118384960,
+          "buffer_storage_bytes": 216,
+          "unregistered_storage_bytes": 95017942560,
+          "model_storage_bytes": 99136327736,
+          "largest": [
+            {
+              "name": "llm.layers.40.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.41.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.42.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.43.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.44.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.45.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.46.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.47.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                18432
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 2038431744
+            },
+            {
+              "name": "llm.layers.0.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.1.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.2.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.3.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.4.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.5.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.6.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            },
+            {
+              "name": "llm.layers.7.mlp.experts._marlin.w13.0",
+              "kind": "unregistered",
+              "shape": [
+                96,
+                288,
+                9216
+              ],
+              "dtype": "torch.int32",
+              "storage_bytes": 1019215872
+            }
+          ]
+        }
+      },
+      "registered_weight_storage_complete": true,
+      "load_torch_allocated_delta_bytes": 98989570048,
+      "unregistered_or_nonparameter_load_bytes": -146757688
+    }
+  ],
+  "result": {
+    "kind": "result",
+    "time": 1794599874.6925485,
+    "healthy": true,
+    "process_exit_code": -9,
+    "requests": [
+      {
+        "requested_prompt_tokens": 1024,
+        "requested_completion_tokens": 8,
+        "prompt_token_id": 100,
+        "success": true,
+        "meta_info": {
+          "id": "cb0ffd45e69f468f89ce0c7d073ac2a2",
+          "finish_reason": {
+            "type": "length",
+            "length": 8
+          },
+          "prompt_tokens": 1024,
+          "weight_version": "default",
+          "num_retractions": 0,
+          "reasoning_tokens": 0,
+          "completion_tokens": 8,
+          "cached_tokens": 0,
+          "weight_versions": [
+            {
+              "version": "default",
+              "start": 0,
+              "end": 8
+            }
+          ],
+          "cached_tokens_details": null,
+          "dp_rank": null,
+          "e2e_latency": 0.26710490707773715,
+          "response_sent_to_client_ts": 1794599839.3629549
+        },
+        "output_text": "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd",
+        "elapsed_seconds": 0.26909970201086253
+      },
+      {
+        "requested_prompt_tokens": 32768,
+        "requested_completion_tokens": 8,
+        "prompt_token_id": 101,
+        "success": true,
+        "meta_info": {
+          "id": "804a1f3f257b435da4ebce1d29470835",
+          "finish_reason": {
+            "type": "length",
+            "length": 8
+          },
+          "prompt_tokens": 32768,
+          "weight_version": "default",
+          "num_retractions": 0,
+          "reasoning_tokens": 0,
+          "completion_tokens": 8,
+          "cached_tokens": 0,
+          "weight_versions": [
+            {
+              "version": "default",
+              "start": 0,
+              "end": 8
+            }
+          ],
+          "cached_tokens_details": null,
+          "dp_rank": null,
+          "e2e_latency": 2.083598605939187,
+          "response_sent_to_client_ts": 1794599844.4546442
+        },
+        "output_text": "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd",
+        "elapsed_seconds": 2.0902200000127777
+      },
+      {
+        "requested_prompt_tokens": 258048,
+        "requested_completion_tokens": 8,
+        "prompt_token_id": 102,
+        "success": true,
+        "meta_info": {
+          "id": "429a431511aa413e861f674d62ab3b24",
+          "finish_reason": {
+            "type": "length",
+            "length": 8
+          },
+          "prompt_tokens": 258048,
+          "weight_version": "default",
+          "num_retractions": 0,
+          "reasoning_tokens": 0,
+          "completion_tokens": 8,
+          "cached_tokens": 0,
+          "weight_versions": [
+            {
+              "version": "default",
+              "start": 0,
+              "end": 8
+            }
+          ],
+          "cached_tokens_details": null,
+          "dp_rank": null,
+          "e2e_latency": 18.584189738030545,
+          "response_sent_to_client_ts": 1794599866.0834424
+        },
+        "output_text": "\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd\ufffd",
+        "elapsed_seconds": 18.617737415945157
+      }
+    ],
+    "phase_summary": {
+      "startup": {
+        "peak_used": 460982321152,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 115270746112,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 114615648256
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 115321077760,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 114665979904
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 115321077760,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 114665979904
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 115069419520,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 114414321664
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599482.6695416
+      },
+      "ready": {
+        "peak_used": 455978516480,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 114066980864,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 113411883008
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 114138284032,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 113483186176
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 114138284032,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 113483186176
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 113634967552,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 112979869696
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599836.0903432
+      },
+      "request_0_1024_tokens": {
+        "peak_used": 456041431040,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 114066980864,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 113411883008
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 114159255552,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 113504157696
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 114159255552,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 113504157696
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 113655939072,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 113000841216
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599839.224078
+      },
+      "after_request_0": {
+        "peak_used": 456041431040,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 114066980864,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 113411883008
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 114159255552,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 113504157696
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 114159255552,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 113504157696
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 113655939072,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 113000841216
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599839.3713984
+      },
+      "request_1_32768_tokens": {
+        "peak_used": 456645410816,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 114217975808,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 113562877952
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 114310250496,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 113655152640
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 114310250496,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 113655152640
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 113806934016,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 113151836160
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599842.3794487
+      },
+      "after_request_1": {
+        "peak_used": 456645410816,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 114217975808,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 113562877952
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 114310250496,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 113655152640
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 114310250496,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 113655152640
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 113806934016,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 113151836160
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599844.45801
+      },
+      "request_2_258048_tokens": {
+        "peak_used": 456737685504,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 114241044480,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 113585946624
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 114333319168,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 113678221312
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 114333319168,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 113678221312
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 113830002688,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 113174904832
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599856.236569
+      },
+      "after_request_2": {
+        "peak_used": 456737685504,
+        "devices_at_peak": [
+          {
+            "index": 0,
+            "used": 114241044480,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 754,
+                "used": 113585946624
+              }
+            ]
+          },
+          {
+            "index": 1,
+            "used": 114333319168,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 819,
+                "used": 113678221312
+              }
+            ]
+          },
+          {
+            "index": 2,
+            "used": 114333319168,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 884,
+                "used": 113678221312
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "used": 113830002688,
+            "total": 150754820096,
+            "processes": [
+              {
+                "pid": 949,
+                "used": 113174904832
+              }
+            ]
+          }
+        ],
+        "sample_time": 1794599866.0986578
+      }
+    },
+    "sample_count": 72168,
+    "baseline": {
+      "used": 2579759104,
+      "total": 603019280384,
+      "devices": [
+        {
+          "index": 0,
+          "used": 644939776,
+          "total": 150754820096,
+          "processes": []
+        },
+        {
+          "index": 1,
+          "used": 644939776,
+          "total": 150754820096,
+          "processes": []
+        },
+        {
+          "index": 2,
+          "used": 644939776,
+          "total": 150754820096,
+          "processes": []
+        },
+        {
+          "index": 3,
+          "used": 644939776,
+          "total": 150754820096,
+          "processes": []
+        }
+      ]
+    }
+  },
+  "baseline_bytes": 2579759104,
+  "startup_peak_bytes": 458402562048,
+  "runtime_peak_bytes": 454157926400,
+  "native_reported_cache_bytes": 11496587264,
+  "registered_parameter_bytes": 16473539840,
+  "registered_buffer_bytes": 864,
+  "native_parameter_bytes": 16473539840,
+  "native_model_storage_bytes": 396545310944,
+  "native_buffer_bytes": 864,
+  "unattributed_runtime_residual_bytes": 46116028192
+}

@@ -1,0 +1,10 @@
+{
+  "invalid_records": 0,
+  "duplicate_transport_records": 1,
+  "environment_records": 1,
+  "start_records": 1,
+  "missing_cases": [],
+  "unexpected_cases": [],
+  "complete": false,
+  "scope": "Matched engine matrix with actual TP ranks. Simultaneous aggregate sums sequential device reads in each NVML iteration. Peaks are sampled lower bounds; baseline is empty; stage peaks are not additive. Residual subtracts registered parameters and physical native pools, not broad weight-load deltas."
+}

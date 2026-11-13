@@ -1,0 +1,66 @@
+[
+  {
+    "model": "unsloth/Llama-3.2-3B-Instruct-GGUF",
+    "revision": "e7d0997e49c9cb00d88b4c1a6a16aa894b0bbc31",
+    "file": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+    "file_size": 2019377600,
+    "lfs_sha256": "6c99cc00ae910f6a532a80022cb4bc1939094527a089c29294b841c0bd87f74d",
+    "name": "llama32-3b-full",
+    "context_length": 131072,
+    "parallel": 1,
+    "extra": [
+      "--fit",
+      "off"
+    ]
+  },
+  {
+    "model": "unsloth/Llama-3.2-3B-Instruct-GGUF",
+    "revision": "e7d0997e49c9cb00d88b4c1a6a16aa894b0bbc31",
+    "file": "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+    "file_size": 2019377600,
+    "lfs_sha256": "6c99cc00ae910f6a532a80022cb4bc1939094527a089c29294b841c0bd87f74d",
+    "name": "llama32-3b-q4-parallel",
+    "context_length": 49152,
+    "parallel": 2,
+    "extra": [
+      "--fit",
+      "off",
+      "--cache-type-k",
+      "q4_0",
+      "--cache-type-v",
+      "q4_0"
+    ]
+  },
+  {
+    "model": "LiquidAI/LFM3-1.7B-GGUF",
+    "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+    "file": "LFM3-1.7B-Q4_K_M.gguf",
+    "file_size": 1099627808,
+    "lfs_sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+    "name": "lfm3-17b-c65536-q4",
+    "context_length": 65536,
+    "parallel": 1,
+    "extra": [
+      "--fit",
+      "off",
+      "--cache-type-k",
+      "q4_0",
+      "--cache-type-v",
+      "q4_0"
+    ]
+  },
+  {
+    "model": "unsloth/Qwen3-8B-GGUF",
+    "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+    "file": "Qwen3-8B-Q4_K_M.gguf",
+    "file_size": 5027784512,
+    "lfs_sha256": "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4",
+    "name": "qwen3-8b-c24576",
+    "context_length": 24576,
+    "parallel": 1,
+    "extra": [
+      "--fit",
+      "off"
+    ]
+  }
+]

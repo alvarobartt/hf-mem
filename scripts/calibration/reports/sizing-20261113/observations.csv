@@ -1,0 +1,51 @@
+directory,case,engine,cohort,outcome,measurement_complete,runtime_bytes,startup_bytes,total_error_pct,non_kv_error_pct,fit_matches_native,unhinted_fit_matches_native,recommendation_covers_measured_peak,frozen_allocation_replay_matches,failure_reason
+batch-v3-vllm-l40sx1,two-sequences-c16384-p4096-s32,vllm,prospective,completed,True,22540386304,21986738176,-0.01928043708473437,,True,True,True,True,
+batch-v3-vllm-t4-medium,two-sequences-c16384-p4096-s32,vllm,prospective,completed,True,7861043200,7626162176,0.509288131122343,,True,True,True,True,
+bounded-gguf-v1-h200,full-swa-recommended-budget,llama.cpp,bounded_sufficiency,completed,True,3405316096,3390636032,-1.4709984209348437,,,,True,True,
+bounded-gguf-v1-h200,full-swa-previous-budget-control,llama.cpp,diagnostic,memory_or_context_limit,False,,3323527168,,,,,,True,0.00.746.640 E CUDA error: out of memory
+capacity-v1-llamacpp-l4x1,lfm3-17b-default-context,llama.cpp,development,completed,True,4896849920,4890558464,0.5278566715804178,,True,True,True,False,
+capacity-v1-llamacpp-l4x1,lfm3-17b-q8-parallel,llama.cpp,development,completed,True,1526726656,1520435200,1.4923785414014512,,True,True,True,False,
+capacity-v1-llamacpp-l4x1,qwen3-8b-default-context,llama.cpp,development,completed,True,11112808448,11102322688,0.0006015131126746454,,True,True,True,False,
+capacity-v1-llamacpp-l4x1,qwen3-8b-q8-parallel,llama.cpp,development,completed,True,6329204736,6318718976,-0.09834744268256701,,True,True,True,False,
+capacity-v1-llamacpp-t4-medium,lfm3-17b-default-context,llama.cpp,development,completed,True,4790812672,4784521216,0.28750856990302776,,True,True,True,False,
+capacity-v1-llamacpp-t4-medium,lfm3-17b-q8-parallel,llama.cpp,development,completed,True,1420689408,1414397952,0.7538726578582233,,True,True,True,False,
+capacity-v1-llamacpp-t4-medium,qwen3-8b-default-context,llama.cpp,development,completed,True,11004674048,10996285440,-0.09005587041264196,,True,True,True,False,
+capacity-v1-llamacpp-t4-medium,qwen3-8b-q8-parallel,llama.cpp,development,completed,True,6223167488,6214778880,-0.2940458060189721,,True,True,True,False,
+capacity-v1-sglang-l4x1,qwen3-4b-native-defaults,sglang,development,completed,True,18346409984,18533056512,,-1.40869766721613,True,True,,True,
+capacity-v1-sglang-l4x1,qwen3-8b-native-defaults,sglang,development,inconclusive_failure,False,,16685465600,,,,,,True,
+capacity-v1-sglang-l4x1,qwen3-4b-c8192-p2048-s8,sglang,development,completed,True,10924589056,10991697920,-1.069062180749547,,True,True,True,True,
+capacity-v1-sglang-t4-medium,qwen3-06b-native-defaults,sglang,development,completed,True,13089243136,13047300096,,-1.415859720535484,True,True,,True,
+capacity-v1-sglang-t4-medium,qwen3-4b-native-defaults,sglang,development,memory_or_context_limit,False,13192003584,13328318464,,,True,True,,True,"[2026-11-13 20:07:51] Input length (40928 tokens) exceeds the maximum allowed length (23009 tokens). Use a shorter input or enable --allow-auto-truncate., self.rid='3d4eca42d2134d4cacafa86eb3d70986'"
+capacity-v1-sglang-t4-medium,qwen3-06b-c8192-p2048-s8,sglang,development,completed,True,3469606912,3427663872,-1.778714637285117,,True,True,True,True,
+capacity-v1-vllm-l4x1,qwen3-4b-native-defaults,vllm,development,completed,True,21623799808,21713977344,,-0.6301508857145088,True,True,,True,
+capacity-v1-vllm-l4x1,qwen3-8b-native-defaults,vllm,development,memory_or_context_limit,False,,18977128448,,,True,True,,True,(Worker pid=457) INFO 11-13 20:02:26 [gpu_worker.py:772] Available KV cache memory: 3.2 GiB
+capacity-v1-vllm-l4x1,qwen3-4b-c8192-p2048-s8,vllm,development,completed,True,9971957760,9693036544,-1.1066403173372485,,True,True,True,True,
+capacity-v1-vllm-t4-medium,qwen3-06b-native-defaults,vllm,development,inconclusive_failure,False,14632747008,14603386880,,,,,,True,HTTP observation timeout
+capacity-v1-vllm-t4-medium,qwen3-4b-native-defaults,vllm,development,memory_or_context_limit,False,,9628942336,,,True,True,,True,(Worker pid=438) INFO 11-13 20:05:34 [gpu_worker.py:772] Available KV cache memory: 4.66 GiB
+capacity-v1-vllm-t4-medium,qwen3-06b-c8192-p2048-s8,vllm,development,completed,True,2567831552,2477654016,-5.113233377700932,,True,True,True,True,
+capacity-v2-sglang-l40sx1,default-context,sglang,prospective,completed,True,42400940032,42711318528,,-0.2911167696107331,True,True,,True,
+capacity-v2-sglang-l40sx1,two-sequences-c16384-p4096-s32,sglang,prospective,completed,True,23641915392,23952293888,-0.4541482752972392,,True,True,True,True,
+capacity-v2-sglang-t4-medium,default-context,sglang,prospective,completed,True,13177323520,13192003584,,-1.4964213962697093,True,True,,True,
+capacity-v2-sglang-t4-medium,two-sequences-c16384-p4096-s32,sglang,prospective,completed,True,8783790080,8938979328,-1.0049208165958334,,True,True,True,True,
+capacity-v2-vllm-l40sx1,default-context,vllm,prospective,completed,True,43532877824,43604180992,,0.3184635918340284,True,True,,True,
+capacity-v2-vllm-l40sx1,two-sequences-c16384-p4096-s32,vllm,diagnostic,instrumentation_failure,False,,21963669504,,,,,,True,The old hook rejected a valid multi-request cache override.
+capacity-v2-vllm-t4-medium,default-context,vllm,prospective,completed,True,14303494144,14259453952,,-0.042603055548373625,True,True,,True,
+capacity-v2-vllm-t4-medium,two-sequences-c16384-p4096-s32,vllm,diagnostic,instrumentation_failure,False,,7605190656,,,,,,True,The old hook rejected a valid multi-request cache override.
+capacity-v2-vllm-t4-medium,qwen3-06b-default-long-timeout,vllm,diagnostic,completed,True,14632747008,14603386880,,-3.5414445879474954,True,True,,True,
+gguf-v2-l4x1,llama32-3b-full,llama.cpp,prospective,completed,True,17498636288,17490247680,0.1262809091880701,,True,True,True,True,
+gguf-v2-l4x1,llama32-3b-q4-parallel,llama.cpp,prospective,completed,True,4108320768,4099932160,-3.4947994352908296,,True,True,True,True,
+gguf-v2-l4x1,lfm3-17b-c65536-q4,llama.cpp,prospective,completed,True,1795162112,1788870656,-4.131992899368853,,True,True,True,True,
+gguf-v2-l4x1,qwen3-8b-c24576,llama.cpp,prospective,completed,True,8680112128,8669626368,0.0007700937385779483,,True,True,True,True,
+gguf-v2-t4-medium,llama32-3b-full,llama.cpp,prospective,memory_or_context_limit,False,,2123235328,,,True,True,,True,0.00.972.586 E ggml_backend_cuda_buffer_type_alloc_buffer: allocating 14336.00 MiB on device 0: cudaMalloc failed: out of memory
+gguf-v2-t4-medium,llama32-3b-q4-parallel,llama.cpp,prospective,completed,True,4000186368,3993894912,-3.8386904227358243,,True,True,True,True,
+gguf-v2-t4-medium,lfm3-17b-c65536-q4,llama.cpp,prospective,completed,True,1691222016,1684930560,-5.2238839232329415,,True,True,True,True,
+gguf-v2-t4-medium,qwen3-8b-c24576,llama.cpp,prospective,completed,True,8571977728,8563589120,-0.11561340118311225,,True,True,True,True,
+gguf-v3-h200,lfm3-17b-full-swa,llama.cpp,prospective,completed,True,3408723968,3394043904,-1.5695027964200303,,True,True,True,True,
+gguf-v3-h200,llama32-3b-full-h200,llama.cpp,prospective,completed,True,17895849984,17881169920,0.06387401554115435,,True,True,True,True,
+gguf-v3-h200,qwen3-8b-q8-parallel-h200,llama.cpp,prospective,completed,True,9433841664,9421258752,-1.490625166379722,,True,True,True,True,
+inkling-layout-v1-h200x4,native,sglang,prospective,completed,True,441048629248,440675336192,-0.696063543204839,,True,,True,True,
+inkling-layout-v1-h200x8,native,sglang,prospective,completed,True,524833259520,525527416832,-0.19583963884834965,,True,,True,True,
+lm-only-sglang-l4x1,qwen35-2b-language-model-only,sglang,diagnostic,unsupported_option,False,,3014656,,,,,,,"ValueError: --language-model-only does not support ['Qwen3_5ForConditionalGeneration']. Supported: ['DeepseekV4ForCausalLM', 'MuseGlimmerForConditionalGeneration', 'Cosmos3ForConditionalGeneration', 'Cosmos3EdgeForConditionalGeneration']."
+lm-only-vllm-l4x1,qwen35-2b-language-model-only,vllm,prospective,completed,True,4607442944,5184159744,-2.236760286618533,,True,True,True,True,
+startup-v1-vllm-l4x1,qwen35-4b-language-model-only,vllm,diagnostic,canceled_before_start,False,,,,,,,,,Job canceled while waiting for hardware; no engine execution or memory outcome.
+startup-v2-vllm-h200,qwen35-4b-language-model-only,vllm,prospective,completed,True,10130096128,10622926848,-3.259883339973768,,True,True,True,True,

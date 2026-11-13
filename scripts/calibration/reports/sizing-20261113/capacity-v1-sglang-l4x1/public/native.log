@@ -1,0 +1,20 @@
+Diagnostic excerpts only; full traces/logs retained locally.
+HFMEM_LOG_START qwen3-8b-native-defaults
+[2026-11-13 20:01:58] Fail to set RLIMIT_STACK: current limit exceeds maximum limit
+[2026-11-13 20:02:09] Memory baseline taken. mem usage=0.00 GB
+HFMEM_NATIVE {"kind": "runner_memory", "pid": 441, "time": 1794600129.609096, "phase": "init_torch_distributed", "rank": 0, "tensor_parallel_size": 1, "gpu_id": 0, "cuda_device_index": 0, "torch_allocated_bytes": 2048, "torch_reserved_bytes": 2097152, "torch_peak_allocated_bytes": 2048, "torch_peak_reserved_bytes": 2097152, "cuda_free_bytes": 23421648896, "cuda_total_bytes": 23659151360, "page_size": 1, "graph_memory_usage": {}, "context_length": 40960, "attention_backend_types": {"wrapper": "NoneType", "full": "NoneType", "linear": "NoneType"}, "gdn_kernel_types": {"prefill": "NoneType", "decode": "NoneType"}, "controls": {"context_length": null, "max_running_requests": null, "chunked_prefill_size": 4096, "tp_size": 1, "max_total_tokens": null}, "cache": null}
+[2026-11-13 20:03:26] Scheduler hit an exception: Traceback (most recent call last):
+    self.init_memory_pools()
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1100, in init_memory_pools
+    self.init_target_memory_pool()
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/scheduler.py", line 1090, in init_target_memory_pool
+    self.tp_worker.alloc_memory_pool(
+  File "/sgl-workspace/sglang/python/sglang/srt/managers/tp_worker.py", line 409, in alloc_memory_pool
+    self.model_runner.alloc_memory_pool(
+  File "/sgl-workspace/sglang/python/sglang/srt/model_executor/model_runner.py", line 982, in alloc_memory_pool
+    config = self._resolve_memory_pool_config(pre_model_load_memory)
+  File "/sgl-workspace/sglang/python/sglang/srt/mem_cache/kv_cache_configurator.py", line 3182, in _resolve_memory_pool_config
+    available_bytes = self._profile_available_bytes(pre_model_load_memory)
+    raise ValueError(
+ValueError: Loaded weights leave no GPU memory for the KV cache under --mem-fraction-static=0.684. Raise --mem-fraction-static above 0.702 (minimum viable = 1 - available/pre = 0.7014). If using speculative decoding, draft weights are now counted.
+HFMEM_LOG_END

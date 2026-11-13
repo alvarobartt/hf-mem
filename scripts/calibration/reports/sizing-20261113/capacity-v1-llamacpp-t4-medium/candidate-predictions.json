@@ -1,0 +1,544 @@
+[
+  {
+    "case": "lfm3-17b-default-context",
+    "arguments": {
+      "model_id": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 4986829178,
+      "recommended_gpu_memory": 4986829178,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1091380480,
+        "params": 1728801600,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 715659264,
+            "params": 1272283136
+          },
+          "Q6_K": {
+            "bytes": 374169600,
+            "params": 456130560
+          },
+          "F32": {
+            "bytes": 1551616,
+            "params": 387904
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 215040000,
+        "params": 262144000,
+        "dtypes": {
+          "Q6_K": {
+            "bytes": 215040000,
+            "params": 262144000
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 3229728768,
+        "dtype": "F16",
+        "max_model_len": 262144,
+        "batch_size": 1,
+        "layers": {
+          "full": 6,
+          "sliding": 5,
+          "state": 13
+        }
+      },
+      "overhead": {
+        "bytes": 665719930,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 504658657
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 4621756958,
+      "recommended_gpu_memory": 4980189468,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1091380480,
+        "params": 1728801600,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 715659264,
+            "params": 1272283136
+          },
+          "Q6_K": {
+            "bytes": 374169600,
+            "params": 456130560
+          },
+          "F32": {
+            "bytes": 1551616,
+            "params": 387904
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 215040000,
+        "params": 262144000,
+        "dtypes": {
+          "Q6_K": {
+            "bytes": 215040000,
+            "params": 262144000
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 3229728768,
+        "dtype": "F16",
+        "max_model_len": 262144,
+        "batch_size": 1,
+        "layers": {
+          "full": 6,
+          "sliding": 5,
+          "state": 13
+        }
+      },
+      "overhead": {
+        "bytes": 300647710,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 139586437
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14229226650,
+        "required": 4621756958,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 262144
+      },
+      "warnings": []
+    }
+  },
+  {
+    "case": "lfm3-17b-q8-parallel",
+    "arguments": {
+      "model_id": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "max_model_len": 8192,
+      "batch_size": 2,
+      "kv_cache_dtype": "q8_0"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 1873688954,
+      "recommended_gpu_memory": 1873688954,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1091380480,
+        "params": 1728801600,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 715659264,
+            "params": 1272283136
+          },
+          "Q6_K": {
+            "bytes": 374169600,
+            "params": 456130560
+          },
+          "F32": {
+            "bytes": 1551616,
+            "params": 387904
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 215040000,
+        "params": 262144000,
+        "dtypes": {
+          "Q6_K": {
+            "bytes": 215040000,
+            "params": 262144000
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 116588544,
+        "dtype": "Q8_0",
+        "max_model_len": 8192,
+        "batch_size": 2,
+        "layers": {
+          "full": 6,
+          "sliding": 5,
+          "state": 13
+        }
+      },
+      "overhead": {
+        "bytes": 665719930,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 504658657
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 1508616734,
+      "recommended_gpu_memory": 1521144775,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1091380480,
+        "params": 1728801600,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 715659264,
+            "params": 1272283136
+          },
+          "Q6_K": {
+            "bytes": 374169600,
+            "params": 456130560
+          },
+          "F32": {
+            "bytes": 1551616,
+            "params": 387904
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 215040000,
+        "params": 262144000,
+        "dtypes": {
+          "Q6_K": {
+            "bytes": 215040000,
+            "params": 262144000
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 116588544,
+        "dtype": "Q8_0",
+        "max_model_len": 8192,
+        "batch_size": 2,
+        "layers": {
+          "full": 6,
+          "sliding": 5,
+          "state": 13
+        }
+      },
+      "overhead": {
+        "bytes": 300647710,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 139586437
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14229226650,
+        "required": 1508616734,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 262144
+      },
+      "warnings": []
+    }
+  },
+  {
+    "case": "qwen3-8b-default-context",
+    "arguments": {
+      "model_id": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file": "Qwen3-8B-Q4_K_M.gguf"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 11377284218,
+      "recommended_gpu_memory": 12080695068,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 4671766528,
+        "params": 7568405504,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 3354918912,
+            "params": 5964300288
+          },
+          "Q6_K": {
+            "bytes": 1315614720,
+            "params": 1603796992
+          },
+          "F32": {
+            "bytes": 1232896,
+            "params": 308224
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 350060544,
+        "params": 622329856,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 350060544,
+            "params": 622329856
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "F16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 665719930,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 504658657
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 11012211998,
+      "recommended_gpu_memory": 12080695068,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 4671766528,
+        "params": 7568405504,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 3354918912,
+            "params": 5964300288
+          },
+          "Q6_K": {
+            "bytes": 1315614720,
+            "params": 1603796992
+          },
+          "F32": {
+            "bytes": 1232896,
+            "params": 308224
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 350060544,
+        "params": 622329856,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 350060544,
+            "params": 622329856
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "F16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 300647710,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 139586437
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14229226650,
+        "required": 11012211998,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960
+      },
+      "warnings": []
+    }
+  },
+  {
+    "case": "qwen3-8b-q8-parallel",
+    "arguments": {
+      "model_id": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "max_model_len": 8192,
+      "batch_size": 2,
+      "kv_cache_dtype": "q8_0"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 6620943482,
+      "recommended_gpu_memory": 6795872028,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 4671766528,
+        "params": 7568405504,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 3354918912,
+            "params": 5964300288
+          },
+          "Q6_K": {
+            "bytes": 1315614720,
+            "params": 1603796992
+          },
+          "F32": {
+            "bytes": 1232896,
+            "params": 308224
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 350060544,
+        "params": 622329856,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 350060544,
+            "params": 622329856
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 1283457024,
+        "dtype": "Q8_0",
+        "max_model_len": 8192,
+        "batch_size": 2,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 665719930,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 504658657
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 6255871262,
+      "recommended_gpu_memory": 6795872028,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 4671766528,
+        "params": 7568405504,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 3354918912,
+            "params": 5964300288
+          },
+          "Q6_K": {
+            "bytes": 1315614720,
+            "params": 1603796992
+          },
+          "F32": {
+            "bytes": 1232896,
+            "params": 308224
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 350060544,
+        "params": 622329856,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 350060544,
+            "params": 622329856
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 1283457024,
+        "dtype": "Q8_0",
+        "max_model_len": 8192,
+        "batch_size": 2,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 300647710,
+        "activations": 161061273,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 139586437
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14229226650,
+        "required": 6255871262,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960
+      },
+      "warnings": []
+    }
+  }
+]
