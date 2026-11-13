@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from helpers import estimate, kimi_config, llama_config, llama_tensors, some, write_json, write_safetensors
@@ -30,7 +31,7 @@ def test_inkling2_config_estimates_the_decoder_and_local_layers(tmp_path: Path) 
     write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
     write_json(str(tmp_path / "config.json"), config)
 
-    result = estimate(str(tmp_path))
+    result = estimate(str(tmp_path), max_num_batched_tokens=8192, engine="vllm")
 
     cache = some(result.kv_cache)
     assert cache.max_model_len == 1048576 and cache.dtype == "BF16"
@@ -39,7 +40,7 @@ def test_inkling2_config_estimates_the_decoder_and_local_layers(tmp_path: Path) 
     assert cache.bytes == (8 * 1048576 + 40 * window_tokens) * 2 * 8 * 128 * 2
     assert not any("KV cache estimation skipped" in warning for warning in result.warnings)
 
-    override = some(estimate(str(tmp_path), max_model_len=128, batch_size=2).kv_cache)
+    override = some(estimate(str(tmp_path), max_model_len=128, batch_size=2, engine="vllm").kv_cache)
     assert override.bytes == 48 * 128 * 2 * 8 * 128 * 2 * 2
 
 
@@ -356,8 +357,11 @@ def test_max_num_batched_tokens_selects_the_vllm_profile(tmp_path: Path) -> None
     default = some(estimate(str(tmp_path)).overhead)
     small = some(estimate(str(tmp_path), max_num_batched_tokens=2048).overhead)
 
-    assert default.activations > small.activations
-    assert default.runtime > small.runtime
+    large = some(estimate(str(tmp_path), max_num_batched_tokens=8192).overhead)
+    assert default == small
+    assert large.activations > small.activations
+    assert large.bytes > small.bytes
+    assert small.runtime > small.context
 
 
 def test_vision_encoder_overhead(tmp_path: Path) -> None:
@@ -373,7 +377,7 @@ def test_vision_encoder_overhead(tmp_path: Path) -> None:
 
     overhead = some(estimate(str(tmp_path)).overhead)
 
-    assert overhead.encoder == 1024 * 2 * (4 * 64 + 2 * 128)
+    assert overhead.encoder == 1024 * 3 * (4 * 64 + 2 * 128)
 
 
 def test_video_models_warn_about_the_vllm_video_profile(tmp_path: Path) -> None:
@@ -498,13 +502,13 @@ def test_engram_and_ngram_tables_are_offloaded_to_cpu(tmp_path: Path) -> None:
 def test_suggested_context_fits_the_actual_cache_pages(tmp_path: Path) -> None:
     write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
     write_json(str(tmp_path / "config.json"), llama_config(max_position_embeddings=1000000))
-    result = estimate(str(tmp_path), gpu_memory="2")
+    result = estimate(str(tmp_path), gpu_memory="0.8")
     length = some(result.fit).max_model_len
     assert 0 < length < 1000000
-    suggested = estimate(str(tmp_path), gpu_memory="2", max_model_len=length)
+    suggested = estimate(str(tmp_path), gpu_memory="0.8", max_model_len=length)
     assert some(suggested.fit).fits
     assert some(suggested.fit).required <= some(suggested.fit).usable
-    longer = estimate(str(tmp_path), gpu_memory="2", max_model_len=length + 1)
+    longer = estimate(str(tmp_path), gpu_memory="0.8", max_model_len=length + 1)
     assert some(longer.fit).required > some(longer.fit).usable
 
 
@@ -523,7 +527,7 @@ def test_suggested_context_for_saturated_sliding_cache(tmp_path: Path) -> None:
     assert some(result.fit).max_model_len == 100000
 
 
-@pytest.mark.parametrize("gpu_memory", ["4", "2x4", "8x4"])
+@pytest.mark.parametrize("gpu_memory", ["4", "2x3", "8x3"])
 def test_kimi_fit_uses_the_cache_rows_for_each_tensor_parallel_rank(tmp_path: Path, gpu_memory: str) -> None:
     write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
     config = kimi_config()
@@ -533,7 +537,7 @@ def test_kimi_fit_uses_the_cache_rows_for_each_tensor_parallel_rank(tmp_path: Pa
     fit = some(result.fit)
     ranks = fit.gpus or 1
     expected = _config.kv_cache(config, cache.dtype, cache.max_model_len, 1, tensor_parallel_size=ranks)[0]
-    assert fit.required == result.weights.bytes + expected + ranks * some(result.overhead).bytes
+    assert fit.required == result.weights.bytes + expected + ranks * some(fit.overhead_per_gpu)
     assert cache.dtype == "FP8_DS_MLA"
     assert 0 < fit.max_model_len < cache.max_model_len
     suggested = estimate(str(tmp_path), gpu_memory=gpu_memory, max_model_len=fit.max_model_len)
@@ -541,6 +545,28 @@ def test_kimi_fit_uses_the_cache_rows_for_each_tensor_parallel_rank(tmp_path: Pa
     longer = estimate(str(tmp_path), gpu_memory=gpu_memory, max_model_len=fit.max_model_len + 1)
     assert not some(longer.fit).fits
     if ranks == 8:
-        assert some(longer.fit).needed == 4
+        # Replicated state rows and communication reserves can make more ranks less efficient.
+        needed = some(longer.fit).needed
+        assert needed is not None and needed < ranks
         assert "DOES NOT FIT" in table(longer)
-        assert "fits on 4 GPUs" in markdown(longer)
+        assert f"fits on {needed} GPU" in markdown(longer)
+
+
+def test_sm90_packing_preserves_nvfp4_scales_and_expands_mxfp8_scales() -> None:
+    from hf_mem._safetensors import inkling_weight_adjustment
+
+    def tensor(dtype: str, shape: list[int], size: int) -> dict[str, Any]:
+        return {"dtype": dtype, "shape": shape, "data_offsets": [0, size]}
+
+    tensors = {
+        "model.llm.layers.0.mlp.experts.w13_weight": tensor("U8", [4, 32, 16], 2048),
+        "model.llm.layers.0.mlp.experts.w13_weight_scale": tensor("F8_E4M3", [4, 32, 2], 256),
+        "model.llm.layers.1.mlp.experts.w2_weight": tensor("F8_E4M3", [4, 32, 64], 8192),
+        "model.llm.layers.1.mlp.experts.w2_weight_scale": tensor("U8", [4, 32, 2], 256),
+        "model.visual.weight": tensor("BF16", [8, 8], 128),
+        "model.llm.layers.0.mlp.gate.weight": tensor("BF16", [4, 8], 64),
+    }
+    assert inkling_weight_adjustment(tensors, 4, ("model.visual.",)) == 256 + 3 * (128 + 64)
+    assert inkling_weight_adjustment(tensors, 4, ("model.visual.",), marlin=False) == 3 * (128 + 64)
+    del tensors["model.llm.layers.1.mlp.experts.w2_weight"]
+    assert inkling_weight_adjustment(tensors, 4, ("model.visual.",)) == 3 * (128 + 64)

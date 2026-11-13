@@ -1,0 +1,45 @@
+{
+  "source": [
+    "h200-tp12-20261112",
+    "h200-tp48-20261112"
+  ],
+  "scope": "Pinned vLLM 0.33.0, H200, Llama3.1-8B immutable SHA0e9e39f; native per-rank audits and 32760+8 inference, context32768 prefill8192 scheduler1",
+  "config": {
+    "vocab_size": 128256,
+    "intermediate_size": 14336,
+    "hidden_size": 4096,
+    "num_hidden_layers": 32
+  },
+  "estimated_weights_bytes": 16060522496,
+  "estimated_cache_bytes": 4294967296,
+  "observations": [
+    {
+      "tensor_parallel_size": 2,
+      "native_runtime_footprint_bytes": 26572750848,
+      "native_parameter_sum_bytes": 16061054976,
+      "native_cache_sum_bytes": 4297064448,
+      "native_residual_bytes": 6214631424
+    },
+    {
+      "tensor_parallel_size": 1,
+      "native_runtime_footprint_bytes": 22543138816,
+      "native_parameter_sum_bytes": 16060522496,
+      "native_cache_sum_bytes": 4297064448,
+      "native_residual_bytes": 2185551872
+    },
+    {
+      "tensor_parallel_size": 4,
+      "native_runtime_footprint_bytes": 32803389440,
+      "native_parameter_sum_bytes": 16062119936,
+      "native_cache_sum_bytes": 4297064448,
+      "native_residual_bytes": 12444205056
+    },
+    {
+      "tensor_parallel_size": 8,
+      "native_runtime_footprint_bytes": 44166021120,
+      "native_parameter_sum_bytes": 16064249856,
+      "native_cache_sum_bytes": 4297064448,
+      "native_residual_bytes": 23804706816
+    }
+  ]
+}

@@ -226,7 +226,8 @@ def layer_kinds(config: dict[str, Any]) -> list[str]:
             else:
                 kinds.append("full")
     elif isinstance(local := config.get("local_layer_ids"), list):
-        kinds = ["sliding" if i in local else "full" for i in range(layers)]
+        selected = set(local) if all(type(i) is int and 0 <= i < layers for i in local) else set()
+        kinds = ["sliding" if i in selected else "full" for i in range(layers)]
     elif isinstance(pattern := config.get("sliding_window_pattern"), int) and pattern > 0:
         kinds = ["full" if (i + 1) % pattern == 0 else "sliding" for i in range(layers)]
     elif isinstance(pattern := config.get("hybrid_override_pattern"), str):
@@ -365,6 +366,7 @@ def kv_cache(
     batch_size: int,
     batched_tokens: int = MAX_NUM_BATCHED_TOKENS,
     tensor_parallel_size: int = 1,
+    full_sliding_window_cache: bool = False,
 ) -> tuple[int, dict[str, int]]:
     config = normalize(config)
     if packed := _packed_mla(config, dtype, max_model_len, batch_size, tensor_parallel_size):
@@ -389,7 +391,15 @@ def kv_cache(
             layer.update(num_hidden_layers=1, layer_types=["dummy" if kind == "none" else f"{kind}_attention"])
             if isinstance(indexer_types := config.get("indexer_types"), list):
                 layer["indexer_types"] = indexer_types[i : i + 1]
-            size += kv_cache(layer, dtype, max_model_len, batch_size, batched_tokens, tensor_parallel_size)[0]
+            size += kv_cache(
+                layer,
+                dtype,
+                max_model_len,
+                batch_size,
+                batched_tokens,
+                tensor_parallel_size,
+                full_sliding_window_cache,
+            )[0]
         return size, counts
     if tensor_parallel_size > 1:
         if config.get("linear_attn_config"):
@@ -398,9 +408,23 @@ def kv_cache(
                 "linear_num_value_heads": _cdiv(config["linear_num_value_heads"], tensor_parallel_size),
                 "linear_num_key_heads": _cdiv(config["linear_num_key_heads"], tensor_parallel_size),
             }
-            size, layers = kv_cache(sharded, dtype, max_model_len, batch_size, batched_tokens)
+            size, layers = kv_cache(
+                sharded,
+                dtype,
+                max_model_len,
+                batch_size,
+                batched_tokens,
+                full_sliding_window_cache=full_sliding_window_cache,
+            )
             return size * tensor_parallel_size, layers
-        size, layers = kv_cache(config, dtype, max_model_len, batch_size, batched_tokens)
+        size, layers = kv_cache(
+            config,
+            dtype,
+            max_model_len,
+            batch_size,
+            batched_tokens,
+            full_sliding_window_cache=full_sliding_window_cache,
+        )
         return int(size * max(1.0, tensor_parallel_size / kv_heads(config))), layers
     if config.get("compress_ratios") and config.get("kv_source_layer_ids") is not None:
         size, counts = _compressed(config, max_model_len, batched_tokens)
@@ -434,7 +458,9 @@ def kv_cache(
     full, sliding, state = kinds.count("full"), kinds.count("sliding"), kinds.count("state")
     layers = {"full": full, "sliding": sliding, "state": state, "none": len(kinds) - full - sliding - state}
     window = config.get("sliding_window") or config.get("attention_chunk_size") or max_model_len
-    sliding_tokens = min(window - 1 + 2 * batched_tokens, max_model_len)
+    sliding_tokens = (
+        max_model_len if full_sliding_window_cache else min(window - 1 + 2 * batched_tokens, max_model_len)
+    )
     sliding_pages = _cdiv(sliding_tokens, BLOCK_SIZE) + (sliding_tokens < max_model_len)
     dtype_bytes = _BYTES.get(dtype, 2)
     token, full_token = int(width * dtype_bytes), int(full_width * dtype_bytes)
@@ -452,3 +478,59 @@ def kv_cache(
     size += _cdiv(sliding, group) * (_cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len)) * token
     size += _cdiv(state, group) * state_pages * token
     return group * size * block * batch_size + indexer, layers
+
+
+def sglang_kv_cache(
+    config: dict[str, Any],
+    dtype: str,
+    max_model_len: int,
+    batch_size: int,
+    batched_tokens: int,
+    tensor_parallel_size: int = 1,
+    full_sliding_window_cache: bool = False,
+    state_capacity: int = 1,
+) -> tuple[int, dict[str, int]]:
+    """Dedicated GDN state slots plus the independent attention pool.
+
+    This is minimum/dedicated storage, not SGLang's automatic whole-device
+    radix/state cache reservation. A declared scheduler capacity describes the
+    dedicated state pool used with radix caching disabled in the native audits.
+    """
+    config = normalize(config)
+    kinds = layer_kinds(config)
+    if not config.get("linear_num_value_heads") or "state" not in kinds:
+        return kv_cache(
+            config,
+            dtype,
+            max_model_len,
+            batch_size,
+            batched_tokens,
+            tensor_parallel_size,
+            full_sliding_window_cache,
+        )
+    attention_config = {
+        **config,
+        "layer_types": ["mlp" if kind in {"state", "none"} else kind for kind in kinds],
+    }
+    attention, layers = kv_cache(
+        attention_config,
+        dtype,
+        max_model_len,
+        batch_size,
+        batched_tokens,
+        tensor_parallel_size,
+        full_sliding_window_cache,
+    )
+    # State heads shard independently from KV heads. Replicating KV heads at
+    # TP > num_key_value_heads must not replicate all recurrent states as well.
+    sharded = {
+        **config,
+        "linear_num_value_heads": _cdiv(config["linear_num_value_heads"], tensor_parallel_size),
+        "linear_num_key_heads": _cdiv(
+            config.get("linear_num_key_heads") or config["linear_num_value_heads"], tensor_parallel_size
+        ),
+    }
+    state_bytes, _ = _state(sharded, _BYTES.get(dtype, 2))
+    states = kinds.count("state")
+    layers["state"], layers["none"] = states, kinds.count("none")
+    return attention + states * state_bytes * tensor_parallel_size * (state_capacity + 1), layers

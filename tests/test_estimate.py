@@ -12,6 +12,9 @@ from hf_mem import arun, run
     [
         ({"batch_size": 0}, "must be positive"),
         ({"batch_size": -1}, "must be positive"),
+        ({"max_num_seqs": 0}, "must be positive"),
+        ({"max_num_seqs": -1}, "must be positive"),
+        ({"batch_size": 2, "max_num_seqs": 1}, "at least"),
         ({"max_model_len": 0}, "must be positive"),
         ({"max_model_len": -1}, "must be positive"),
         ({"max_num_batched_tokens": 0}, "must be positive"),

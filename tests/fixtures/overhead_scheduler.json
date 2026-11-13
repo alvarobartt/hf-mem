@@ -1,0 +1,214 @@
+{
+  "source": "https://huggingface.co/buckets/alvarobartt/hf-mem-validation/tree/controlled-vllm-20261109",
+  "source_results_sha256": "96b6b56071c5aa8eea3cee9ae8be33022309f61ac0acc3f96e8a475026749637",
+  "scope": "Pinned vLLM 0.33.0, A100 80GB, context32768, prefill8192, scheduler limit1, one successful request per model; rounded percentages must not replace native bytes.",
+  "rows": [
+    {
+      "case": {
+        "name": "llama31-8b",
+        "model": "meta-llama/Llama-3.1-8B-Instruct",
+        "revision": "0e9e39f249a16976918f6564b8830bc894c89659",
+        "extra": [],
+        "automatic_cache_pair": true
+      },
+      "config": {
+        "hidden_size": 4096,
+        "intermediate_size": 14336,
+        "num_hidden_layers": 32,
+        "vocab_size": 128256
+      },
+      "tokens": 8192,
+      "moe": false,
+      "hybrid": false,
+      "encoder_bytes": 0,
+      "estimated_weights_bytes": 16060522496,
+      "estimated_kv_bytes": 4294967296,
+      "original_overhead_bytes": 5873908836,
+      "native_runtime_footprint_bytes": 22295674880,
+      "native_parameter_bytes": 16060522496,
+      "native_cache_bytes": 4297064448
+    },
+    {
+      "case": {
+        "name": "qwen3-8b",
+        "model": "Qwen/Qwen3-8B",
+        "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+        "extra": [],
+        "automatic_cache_pair": false
+      },
+      "config": {
+        "hidden_size": 4096,
+        "intermediate_size": 12288,
+        "num_hidden_layers": 36,
+        "vocab_size": 151936
+      },
+      "tokens": 8192,
+      "moe": false,
+      "hybrid": false,
+      "encoder_bytes": 0,
+      "estimated_weights_bytes": 16381470720,
+      "estimated_kv_bytes": 4831838208,
+      "original_overhead_bytes": 6129804951,
+      "native_runtime_footprint_bytes": 22985637888,
+      "native_parameter_bytes": 16381470720,
+      "native_cache_bytes": 4834197504
+    },
+    {
+      "case": {
+        "name": "mistral-7b",
+        "model": "mistralai/Mistral-7B-Instruct-v0.3",
+        "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+        "extra": [],
+        "automatic_cache_pair": false
+      },
+      "config": {
+        "hidden_size": 4096,
+        "intermediate_size": 14336,
+        "num_hidden_layers": 32,
+        "vocab_size": 32768
+      },
+      "tokens": 8192,
+      "moe": false,
+      "hybrid": false,
+      "encoder_bytes": 0,
+      "estimated_weights_bytes": 14496047104,
+      "estimated_kv_bytes": 4294967296,
+      "original_overhead_bytes": 4661020260,
+      "native_runtime_footprint_bytes": 20680867840,
+      "native_parameter_bytes": 14496047104,
+      "native_cache_bytes": 4297064448
+    },
+    {
+      "case": {
+        "name": "gemma3-4b",
+        "model": "google/gemma-3-4b-it",
+        "revision": "093f9f388b31de276ce2de164bdc2081324b9767",
+        "extra": [],
+        "automatic_cache_pair": false
+      },
+      "config": {
+        "vocab_size": 262208,
+        "hidden_size": 2560,
+        "intermediate_size": 10240,
+        "num_hidden_layers": 34
+      },
+      "tokens": 8192,
+      "moe": false,
+      "hybrid": false,
+      "encoder_bytes": 108265472,
+      "estimated_weights_bytes": 8600158944,
+      "estimated_kv_bytes": 2740781056,
+      "original_overhead_bytes": 7371933156,
+      "native_runtime_footprint_bytes": 13598785536,
+      "native_parameter_bytes": 8600158944,
+      "native_cache_bytes": 2812477440
+    },
+    {
+      "case": {
+        "name": "deepseek-v2-lite",
+        "model": "deepseek-ai/DeepSeek-V2-Lite-Chat",
+        "revision": "85864749cd611b4353ce1decdb286193298f64c7",
+        "extra": [
+          "--trust-remote-code"
+        ],
+        "automatic_cache_pair": false
+      },
+      "config": {
+        "hidden_size": 2048,
+        "intermediate_size": 10944,
+        "moe_intermediate_size": 1408,
+        "num_experts_per_tok": 6,
+        "num_hidden_layers": 27,
+        "vocab_size": 102400
+      },
+      "tokens": 8192,
+      "moe": true,
+      "hybrid": false,
+      "encoder_bytes": 0,
+      "estimated_weights_bytes": 31412968448,
+      "estimated_kv_bytes": 1019215872,
+      "original_overhead_bytes": 5480658737,
+      "native_runtime_footprint_bytes": 34803089408,
+      "native_parameter_bytes": 31412968448,
+      "native_cache_bytes": 1019713536
+    },
+    {
+      "case": {
+        "name": "qwen3-30b-a3b",
+        "model": "Qwen/Qwen3-30B-A3B",
+        "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+        "extra": [],
+        "automatic_cache_pair": false
+      },
+      "config": {
+        "hidden_size": 2048,
+        "intermediate_size": 6144,
+        "moe_intermediate_size": 768,
+        "num_experts_per_tok": 8,
+        "num_hidden_layers": 48,
+        "vocab_size": 151936
+      },
+      "tokens": 8192,
+      "moe": true,
+      "hybrid": false,
+      "encoder_bytes": 0,
+      "estimated_weights_bytes": 61064245248,
+      "estimated_kv_bytes": 3221225472,
+      "original_overhead_bytes": 6349540606,
+      "native_runtime_footprint_bytes": 65895464960,
+      "native_parameter_bytes": 61064245248,
+      "native_cache_bytes": 3222798336
+    },
+    {
+      "case": {
+        "name": "qwen35-4b",
+        "model": "Qwen/Qwen3.5-4B",
+        "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+        "extra": [],
+        "automatic_cache_pair": true
+      },
+      "config": {
+        "hidden_size": 2560,
+        "intermediate_size": 9216,
+        "num_hidden_layers": 32,
+        "vocab_size": 248320
+      },
+      "tokens": 8192,
+      "moe": false,
+      "hybrid": true,
+      "encoder_bytes": 1610612736,
+      "estimated_weights_bytes": 9319737856,
+      "estimated_kv_bytes": 1193803776,
+      "original_overhead_bytes": 8927133080,
+      "native_runtime_footprint_bytes": 12787187712,
+      "native_parameter_bytes": 9078532608,
+      "native_cache_bytes": 1211105280
+    },
+    {
+      "case": {
+        "name": "gpt-oss-20b",
+        "model": "openai/gpt-oss-20b",
+        "revision": "6cee5e81ee83917806bbde320786a8fb61efebee",
+        "extra": [],
+        "automatic_cache_pair": false
+      },
+      "config": {
+        "hidden_size": 2880,
+        "intermediate_size": 2880,
+        "num_experts_per_tok": 4,
+        "num_hidden_layers": 24,
+        "vocab_size": 201088
+      },
+      "tokens": 8192,
+      "moe": false,
+      "hybrid": false,
+      "encoder_bytes": 0,
+      "estimated_weights_bytes": 13761264768,
+      "estimated_kv_bytes": 1211498496,
+      "original_overhead_bytes": 6349153636,
+      "native_runtime_footprint_bytes": 18378194944,
+      "native_parameter_bytes": 14679227520,
+      "native_cache_bytes": 1211891712
+    }
+  ]
+}

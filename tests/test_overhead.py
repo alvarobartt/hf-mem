@@ -11,10 +11,12 @@ def test_vllm_overhead_follows_the_gpu_class() -> None:
     config = {"vocab_size": 128256, "intermediate_size": 14336, "hidden_size": 4096, "num_hidden_layers": 32}
     small = _overhead.vllm(config, moe=False, hybrid=False, tokens=2048)
     large = _overhead.vllm(config, moe=False, hybrid=False, tokens=8192)
-    assert 1.2 * GIB < small.activations < 1.6 * GIB
-    assert 2.6 * GIB < large.activations < 3.0 * GIB
-    assert 0.35 * GIB < small.graphs < 0.5 * GIB
-    assert (small.runtime, large.runtime) == (int(0.27 * GIB) + small.context, int(0.87 * GIB) + large.context)
+    assert 0.4 * GIB < small.activations < 0.6 * GIB
+    assert 1.1 * GIB < large.activations < 1.4 * GIB
+    assert 0.2 * GIB < small.graphs < 0.4 * GIB
+    assert small.context == large.context
+    assert small.runtime > small.context and large.runtime > large.context
+    assert small.max_num_seqs == large.max_num_seqs == 256
     moe = _overhead.vllm(
         {**config, "moe_intermediate_size": 768, "num_experts_per_tok": 8}, moe=True, hybrid=False, tokens=2048
     )
@@ -34,23 +36,23 @@ def test_encoder_patches() -> None:
             "hidden_act": "gelu",
         }
     }
-    assert _overhead.encoder(qwen, {"size": {"longest_edge": 16777216}}) == 65536 * 2 * (4 * 1152 + 2 * 4304)
+    assert _overhead.encoder(qwen, {"size": {"longest_edge": 16777216}}) == 65536 * 3 * (4 * 1152 + 2 * 4304)
     gated = {"vision_config": {**qwen["vision_config"], "patch_size": 14, "hidden_act": "silu"}}
-    assert _overhead.encoder(gated, {"max_pixels": 12845056}) == 65536 * 2 * (4 * 1152 + 3 * 4304)
+    assert _overhead.encoder(gated, {"max_pixels": 12845056}) == 65536 * 3 * (4 * 1152 + 3 * 4304)
     siglip = {"vision_config": {**qwen["vision_config"], "patch_size": 14, "image_size": 896}}
-    assert _overhead.encoder(siglip, {}) == 4096 * 2 * (4 * 1152 + 2 * 4304)
+    assert _overhead.encoder(siglip, {}) == 4096 * 3 * (4 * 1152 + 2 * 4304)
     tiles = {
         **siglip,
         "max_dynamic_patch": 12,
         "use_thumbnail": True,
         "vision_config": {**siglip["vision_config"], "image_size": 448},
     }
-    assert _overhead.encoder(tiles, {}) == 13 * 1024 * 2 * (4 * 1152 + 2 * 4304)
+    assert _overhead.encoder(tiles, {}) == 13 * 1024 * 3 * (4 * 1152 + 2 * 4304)
     pooled = {
         "vision_config": {**qwen["vision_config"], "pooling_kernel_size": 3},
         "vision_soft_tokens_per_image": 280,
     }
-    assert _overhead.encoder(pooled, {}) == 2520 * 2 * (4 * 1152 + 2 * 4304)
+    assert _overhead.encoder(pooled, {}) == 2520 * 3 * (4 * 1152 + 2 * 4304)
     audio = {"audio_config": {"d_model": 1280, "encoder_ffn_dim": 5120, "max_source_positions": 1500}}
     assert _overhead.encoder(audio, {}) == 1500 * 2 * (4 * 1280 + 2 * 5120)
     assert _overhead.encoder({}, {}) == 0
@@ -95,16 +97,14 @@ def test_fit() -> None:
     assert _overhead.fit(weights=10**15, gpu_memory="20", utilization=0.9, **args).needed is None
 
 
-def test_fit_keeps_the_cuda_context_outside_the_utilization() -> None:
+def test_fit_budgets_the_entire_runtime_including_cuda_context() -> None:
     args: dict[str, Any] = dict(
         weights=0, kv_fixed=0, kv_per_token=1024, max_model_len=1000, context_length=10**9, gpu_memory="20"
     )
-    with_context = _overhead.fit(overhead=2 * GIB, utilization=0.9, context=GIB, **args)
+    with_context = _overhead.fit(overhead=2 * GIB, utilization=0.9, **args)
     without = _overhead.fit(overhead=GIB, utilization=0.9, **args)
-    assert with_context.max_model_len == without.max_model_len
-    assert _overhead.fit(overhead=2 * GIB, utilization=1.0, context=GIB, **args).max_model_len == int(
-        18 * GIB / 1024
-    )
+    assert with_context.max_model_len == without.max_model_len - GIB // 1024
+    assert _overhead.fit(overhead=2 * GIB, utilization=1.0, **args).max_model_len == int(18 * GIB / 1024)
 
 
 def test_fit_replicates_kv_heads_across_gpus() -> None:
@@ -232,3 +232,194 @@ def test_fit_checks_the_requested_gpu_count_between_power_of_two_sizes() -> None
         utilization=1.0,
     )
     assert result.fits and result.needed == 3
+
+
+def test_scheduler_capacity_scales_overhead_without_removing_fixed_memory() -> None:
+    config = {"vocab_size": 128256, "intermediate_size": 14336, "hidden_size": 4096, "num_hidden_layers": 32}
+    default = _overhead.vllm(config, False, False, 8192, encoder_bytes=GIB)
+    reference = _overhead.vllm(config, False, False, 8192, encoder_bytes=GIB, max_num_seqs=1024)
+    one = _overhead.vllm(config, False, False, 8192, encoder_bytes=GIB, max_num_seqs=1)
+    many = _overhead.vllm(config, False, False, 8192, encoder_bytes=GIB, max_num_seqs=256)
+    assert reference.bytes == default.bytes
+    assert one.activations < many.activations == default.activations
+    assert 0 < one.graphs < many.graphs == default.graphs
+    assert one.runtime >= one.context == many.context == default.context
+    assert one.encoder == many.encoder == default.encoder == GIB
+    assert default.to_dict()["max_num_seqs"] == 256
+    assert one.to_dict()["max_num_seqs"] == 1
+
+
+def test_scheduler_calibration_reduces_error_against_independent_eight_model_reference() -> None:
+    import json
+    from pathlib import Path
+    from statistics import median
+
+    fixture = json.loads((Path(__file__).parent / "fixtures/overhead_scheduler.json").read_text())
+    total_errors = []
+    overhead_errors = []
+    for row in fixture["rows"]:
+        overhead = _overhead.vllm(
+            row["config"],
+            row["moe"],
+            row["hybrid"],
+            row["tokens"],
+            encoder_bytes=row["encoder_bytes"],
+            max_num_seqs=1,
+        )
+        measured = row["native_runtime_footprint_bytes"]
+        base = row["estimated_weights_bytes"] + row["estimated_kv_bytes"]
+        before = abs((base + row["original_overhead_bytes"]) / measured - 1)
+        after = abs((base + overhead.bytes) / measured - 1)
+        assert after < before, row["case"]["name"]
+        total_errors.append(after)
+        measured_overhead = measured - row["native_parameter_bytes"] - row["native_cache_bytes"]
+        overhead_errors.append(abs(overhead.bytes / measured_overhead - 1))
+    assert len(total_errors) == 8
+    assert median(total_errors) < 0.05
+    assert median(overhead_errors) < 0.5
+
+
+def test_fit_recomputes_overhead_for_gpu_search_and_context_fit() -> None:
+    result = _overhead.fit(
+        weights=10 * GIB,
+        kv_fixed=0,
+        kv_per_token=1024,
+        max_model_len=1000,
+        context_length=10**9,
+        overhead=lambda n: (9 if n == 2 else 1) * GIB,
+        gpu_memory="2x10",
+        utilization=1.0,
+    )
+    assert result.needed == 4 and not result.fits
+    assert result.max_model_len == 0
+    assert result.required == 28 * GIB + 1024 * 1000
+    assert result.to_dict()["overhead_per_gpu"] == 9 * GIB
+
+
+def test_tp_calibration_reduces_error_on_all_measured_multi_rank_topologies() -> None:
+    import json
+    from pathlib import Path
+
+    fixture = json.loads((Path(__file__).parent / "fixtures/overhead_tensor_parallel.json").read_text())
+    base = fixture["estimated_weights_bytes"] + fixture["estimated_cache_bytes"]
+    single = _overhead.vllm(
+        fixture["config"], False, False, 8192, max_num_seqs=1, gpu_memory="140", gpu_type="h200"
+    )
+    for observation in fixture["observations"]:
+        n = observation["tensor_parallel_size"]
+        overhead = _overhead.vllm(
+            fixture["config"],
+            False,
+            False,
+            8192,
+            max_num_seqs=1,
+            tensor_parallel_size=n,
+            gpu_memory="140",
+            gpu_type="h200",
+        )
+        assert overhead.context == single.context and overhead.encoder == single.encoder
+        actual = observation["native_runtime_footprint_bytes"]
+        error = abs((base + n * overhead.bytes) / actual - 1)
+        if n > 1:
+            assert error < abs((base + n * single.bytes) / actual - 1)
+            assert GIB <= overhead.runtime - single.runtime < 1.01 * GIB
+            assert overhead.activations < single.activations
+            assert error < 0.04
+        else:
+            assert overhead.bytes == single.bytes
+
+
+def test_llamacpp_hardware_runtime_profiles_match_pinned_t4_h200_observations() -> None:
+    import json
+    from pathlib import Path
+
+    fixture = json.loads((Path(__file__).parent / "fixtures/overhead_llamacpp_hardware.json").read_text())
+    for row in fixture["observations"]:
+        estimate = _overhead.llama_cpp(gpu_memory=row["gpu_memory"])
+        actual = row["native_runtime_footprint_bytes"]
+        base = row["estimated_weights_bytes"] + row["estimated_cache_bytes"]
+        assert abs((base + estimate.bytes) / actual - 1) < abs(
+            (base + row["original_overhead_bytes"]) / actual - 1
+        )
+        assert abs((base + estimate.bytes) / actual - 1) < 0.04
+    assert _overhead.llama_cpp().bytes == _overhead.llama_cpp(gpu_memory="80").bytes
+    assert _overhead.llama_cpp(gpu_memory="2x15").context == int(0.13 * GIB)
+
+
+def test_context_dependent_scheduler_metadata_is_recomputed_during_fit_search() -> None:
+    # The cache and request-index map both grow with context. A frozen overhead
+    # would return a context that exceeds this independently computed budget.
+    result = _overhead.fit(
+        weights=0,
+        kv_fixed=0,
+        kv_per_token=0,
+        max_model_len=1000,
+        context_length=100000,
+        overhead=0,
+        gpu_memory="0.001",
+        utilization=1,
+        kv_bytes=lambda length, ranks: length * 8,
+        overhead_at_context=lambda ranks, length: length * 4,
+    )
+    budget = int(0.001 * _overhead.GIB)
+    assert result.max_model_len == budget // 12
+    assert result.required == 12000
+
+
+def test_spatially_merged_image_reserve_cannot_exceed_entire_context() -> None:
+    config = {
+        "vision_config": {
+            "hidden_size": 896,
+            "intermediate_size": 3584,
+            "hidden_act": "silu",
+            "patch_size": 16,
+            "spatial_merge_size": 2,
+        }
+    }
+    processor = {"max_pixels": 16777216}
+    original = _overhead.encoder(config, processor)
+    assert _overhead.encoder(config, processor, 8192) == original // 2
+    assert _overhead.encoder(config, processor, 32768) == original
+
+
+@pytest.mark.parametrize(
+    "gpu_type,memory",
+    [
+        ("nvidia-t4", "14.74127"),
+        ("nvidia-a10g", "2x22.30127"),
+        ("nvidia-l4", "22.0343"),
+        ("nvidia-l40s", "44.39215"),
+        ("nvidia-a100", "79.24975"),
+        ("nvidia-a100", "40"),
+        ("nvidia-h100", "94"),
+        ("nvidia-h100", "96"),
+        ("nvidia-h200", "8x141"),
+        ("nvidia-h200", "8x139.80072GiB"),
+        ("nvidia-h200", "8x150.10988032GB"),
+        ("nvidia-rtx-pro-6000", "94.97052"),
+    ],
+)
+def test_named_gpu_accepts_board_variants_and_measured_driver_totals(gpu_type: str, memory: str) -> None:
+    _overhead.validate_gpu_memory(memory, gpu_type)
+
+
+@pytest.mark.parametrize(
+    "gpu_type,memory",
+    [
+        ("nvidia-h200", "8x80"),
+        ("nvidia-a100", "48"),
+        ("nvidia-t4", "24"),
+        ("nvidia-h100", "141"),
+        ("nvidia-h200", "141.01"),
+    ],
+)
+def test_named_gpu_rejects_incompatible_capacity(gpu_type: str, memory: str) -> None:
+    with pytest.raises(RuntimeError, match="does not match"):
+        _overhead.validate_gpu_memory(memory, gpu_type)
+
+
+def test_gpu_capacity_units_are_explicit() -> None:
+    assert _overhead.parse_gpu_memory("8x141GB") == (8, 141_000_000_000)
+    assert _overhead.parse_gpu_memory("8x141GiB") == (8, 141 * GIB)
+    assert _overhead.GPU_TYPES["h200"][0] == 141
+    assert _overhead.hardware("8x141", "NVIDIA-H200") == _overhead.hardware("8x141", "h200")
