@@ -1,0 +1,336 @@
+{
+  "frozen_at_utc": "2026-11-13T20:59:14.853844+00:00",
+  "experiments": [
+    {
+      "directory": "batch-v3-vllm-t4-medium",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "t4-medium",
+        "timeout": "30m",
+        "trials": [
+          {
+            "case": {
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "extra": [
+                "--dtype",
+                "float16"
+              ],
+              "startup_timeout": 900,
+              "request_timeout": 600,
+              "repeats": 1,
+              "name": "two-sequences-c16384-p4096-s32",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "batch_size": 2,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "Targeted prospective concurrent-request validation after removing an instrumentation assertion that only accepted a one-request-sized pool. Original failures retained as harness diagnostics. Native cache controls and two distinct prompts unchanged.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "f02d6e1c836d7838317ec53e066116290ebe02a2044eee1b07a42fc9aa53f9cf",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "65baff736a09117500d9e4cd46bf47153c181b7b1add89fbacfebbad81b8d415",
+          "src/hf_mem/estimate.py": "5bf95472a6ca49a08f0a73ec311d4b14ca0d123ab5e0a8c5f1d13511a8f48c32",
+          "src/hf_mem/_onnx.py": "be14c336571a1a87b76570d78422d004b337076aa42cdf10f6e5d8ddf029522f",
+          "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+          "src/hf_mem/_render.py": "1137f59e7e0f50a581ca6aeca8d869497989e8c17ebd915a4b948d09de7f90c6",
+          "src/hf_mem/cli.py": "6c876035d7d052d785dd74a555d36f4a1466263d4f04d7dbf54770939acb048c",
+          "src/hf_mem/_safetensors.py": "dd320c4b4e60b1f60ccd5f324ee44976ef17c14034cad1cbb46a41ebadf80c34",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "a67725f0b483a67ddd207d5a5f7ea395bfe32efd4b0500211022b1772b1d9925",
+          "sitecustomize.py": "9b1ca6fedc516186012c19794005c49f8095f90522c1edb4e0d87a80ed151f21",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "trials.json": "27f72759d6dda613993f5f89d6e8cc422f7c48e6d90b7400a3c2808c4a425634",
+          "cases-0.json": "5841a0cd10d582b53e6d5bd06d63f78ffaa27cb7b117be9d6ad5526f41fd19a3"
+        }
+      },
+      "forecast": {
+        "case": "two-sequences-c16384-p4096-s32",
+        "arguments": {
+          "model_id": "Qwen/Qwen3-1.7B",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "engine": "vllm",
+          "max_model_len": 16384,
+          "max_num_batched_tokens": 4096,
+          "max_num_seqs": 32,
+          "batch_size": 2
+        },
+        "unhinted": {
+          "version": "hf-mem@1.0.0",
+          "model": "Qwen/Qwen3-1.7B",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "file": null,
+          "format": "safetensors",
+          "total": 7901078560,
+          "recommended_gpu_memory": 8611949673,
+          "gpu_memory_utilization": 0.9,
+          "weights": {
+            "bytes": 3441149952,
+            "params": 1720574976,
+            "dtypes": {
+              "BF16": {
+                "bytes": 3441149952,
+                "params": 1720574976
+              }
+            }
+          },
+          "offloaded": null,
+          "components": null,
+          "kv_cache": {
+            "bytes": 3758096384,
+            "dtype": "BF16",
+            "max_model_len": 16384,
+            "batch_size": 2,
+            "layers": {
+              "full": 28
+            }
+          },
+          "overhead": {
+            "bytes": 701832224,
+            "activations": 473439272,
+            "encoder": 0,
+            "graphs": 44179121,
+            "runtime": 184213831,
+            "max_num_seqs": 32,
+            "reference_engine": "vllm"
+          },
+          "moe": null,
+          "fit": null,
+          "warnings": [
+            "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.58 GiB checkpoint table is counted once."
+          ]
+        },
+        "hardware": {
+          "version": "hf-mem@1.0.0",
+          "model": "Qwen/Qwen3-1.7B",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "file": null,
+          "format": "safetensors",
+          "total": 7901078560,
+          "recommended_gpu_memory": 8611949673,
+          "gpu_memory_utilization": 0.9,
+          "weights": {
+            "bytes": 3441149952,
+            "params": 1720574976,
+            "dtypes": {
+              "BF16": {
+                "bytes": 3441149952,
+                "params": 1720574976
+              }
+            }
+          },
+          "offloaded": null,
+          "components": null,
+          "kv_cache": {
+            "bytes": 3758096384,
+            "dtype": "BF16",
+            "max_model_len": 16384,
+            "batch_size": 2,
+            "layers": {
+              "full": 28
+            }
+          },
+          "overhead": {
+            "bytes": 701832224,
+            "activations": 473439272,
+            "encoder": 0,
+            "graphs": 44179121,
+            "runtime": 184213831,
+            "max_num_seqs": 32,
+            "reference_engine": "vllm",
+            "gpu_type": "nvidia-t4"
+          },
+          "moe": null,
+          "fit": {
+            "gpu_memory": 15655155793,
+            "usable": 14239964068,
+            "required": 7901078560,
+            "gpus": null,
+            "needed": 1,
+            "fits": true,
+            "max_model_len": 40960,
+            "overhead_per_gpu": 701832224,
+            "cache_bytes": 3758096384
+          },
+          "warnings": [
+            "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.58 GiB checkpoint table is counted once."
+          ]
+        }
+      }
+    },
+    {
+      "directory": "batch-v3-vllm-l40sx1",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "l40sx1",
+        "timeout": "30m",
+        "trials": [
+          {
+            "case": {
+              "model": "Qwen/Qwen3-8B",
+              "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+              "extra": [],
+              "startup_timeout": 900,
+              "request_timeout": 600,
+              "repeats": 1,
+              "name": "two-sequences-c16384-p4096-s32",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "batch_size": 2,
+              "max_num_batched_tokens": 4096,
+              "num_gpu_blocks_override": 2049,
+              "pool_tokens": 33024,
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "Targeted prospective concurrent-request validation after removing an instrumentation assertion that only accepted a one-request-sized pool. Original failures retained as harness diagnostics. Native cache controls and two distinct prompts unchanged.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "f02d6e1c836d7838317ec53e066116290ebe02a2044eee1b07a42fc9aa53f9cf",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "65baff736a09117500d9e4cd46bf47153c181b7b1add89fbacfebbad81b8d415",
+          "src/hf_mem/estimate.py": "5bf95472a6ca49a08f0a73ec311d4b14ca0d123ab5e0a8c5f1d13511a8f48c32",
+          "src/hf_mem/_onnx.py": "be14c336571a1a87b76570d78422d004b337076aa42cdf10f6e5d8ddf029522f",
+          "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+          "src/hf_mem/_render.py": "1137f59e7e0f50a581ca6aeca8d869497989e8c17ebd915a4b948d09de7f90c6",
+          "src/hf_mem/cli.py": "6c876035d7d052d785dd74a555d36f4a1466263d4f04d7dbf54770939acb048c",
+          "src/hf_mem/_safetensors.py": "dd320c4b4e60b1f60ccd5f324ee44976ef17c14034cad1cbb46a41ebadf80c34",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "driver.py": "a67725f0b483a67ddd207d5a5f7ea395bfe32efd4b0500211022b1772b1d9925",
+          "sitecustomize.py": "9b1ca6fedc516186012c19794005c49f8095f90522c1edb4e0d87a80ed151f21",
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "trials.json": "05b1f85c3fc41cd4bc9a2c12d9d2d4c8b0391fe325146293dc3e406f3e229c9a",
+          "cases-0.json": "0898f31685a7af5a44c6b9a438f9333f80aa4ee3d5b5b69af872fbd8288f2085"
+        }
+      },
+      "forecast": {
+        "case": "two-sequences-c16384-p4096-s32",
+        "arguments": {
+          "model_id": "Qwen/Qwen3-8B",
+          "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+          "engine": "vllm",
+          "max_model_len": 16384,
+          "max_num_batched_tokens": 4096,
+          "max_num_seqs": 32,
+          "batch_size": 2
+        },
+        "unhinted": {
+          "version": "hf-mem@1.0.0",
+          "model": "Qwen/Qwen3-8B",
+          "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+          "file": null,
+          "format": "safetensors",
+          "total": 22536040419,
+          "recommended_gpu_memory": 24419660746,
+          "gpu_memory_utilization": 0.9,
+          "weights": {
+            "bytes": 16381470720,
+            "params": 8190735360,
+            "dtypes": {
+              "BF16": {
+                "bytes": 16381470720,
+                "params": 8190735360
+              }
+            }
+          },
+          "offloaded": null,
+          "components": null,
+          "kv_cache": {
+            "bytes": 4831838208,
+            "dtype": "BF16",
+            "max_model_len": 16384,
+            "batch_size": 2,
+            "layers": {
+              "full": 36
+            }
+          },
+          "overhead": {
+            "bytes": 1322731491,
+            "activations": 669732700,
+            "encoder": 0,
+            "graphs": 60763067,
+            "runtime": 592235724,
+            "max_num_seqs": 32,
+            "reference_engine": "vllm"
+          },
+          "moe": null,
+          "fit": null,
+          "warnings": []
+        },
+        "hardware": {
+          "version": "hf-mem@1.0.0",
+          "model": "Qwen/Qwen3-8B",
+          "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+          "file": null,
+          "format": "safetensors",
+          "total": 22536040419,
+          "recommended_gpu_memory": 24419660746,
+          "gpu_memory_utilization": 0.9,
+          "weights": {
+            "bytes": 16381470720,
+            "params": 8190735360,
+            "dtypes": {
+              "BF16": {
+                "bytes": 16381470720,
+                "params": 8190735360
+              }
+            }
+          },
+          "offloaded": null,
+          "components": null,
+          "kv_cache": {
+            "bytes": 4831838208,
+            "dtype": "BF16",
+            "max_model_len": 16384,
+            "batch_size": 2,
+            "layers": {
+              "full": 36
+            }
+          },
+          "overhead": {
+            "bytes": 1322731491,
+            "activations": 669732700,
+            "encoder": 0,
+            "graphs": 60763067,
+            "runtime": 592235724,
+            "max_num_seqs": 32,
+            "reference_engine": "vllm",
+            "gpu_type": "nvidia-l40s"
+          },
+          "moe": null,
+          "fit": {
+            "gpu_memory": 47781511168,
+            "usable": 43561705799,
+            "required": 22536040419,
+            "gpus": null,
+            "needed": 1,
+            "fits": true,
+            "max_model_len": 40960,
+            "overhead_per_gpu": 1322731491,
+            "cache_bytes": 4831838208
+          },
+          "warnings": []
+        }
+      }
+    }
+  ]
+}

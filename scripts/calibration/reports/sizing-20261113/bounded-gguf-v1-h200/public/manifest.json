@@ -1,0 +1,16 @@
+{
+  "job_stage": "COMPLETED",
+  "mode": "full_context_inference",
+  "expected_cases": [
+    "full-swa-previous-budget-control",
+    "full-swa-recommended-budget"
+  ],
+  "observed_cases": [
+    "full-swa-previous-budget-control",
+    "full-swa-recommended-budget"
+  ],
+  "complete": false,
+  "invalid_records": 0,
+  "duplicate_transport_records": 2,
+  "scope": "One T4. Runtime and load-only component audits are separate processes/jobs. All models use immutable revisions and full GGUF SHA-256 checks. Sampled peaks are lower bounds; CPU-mapped model bytes are not GPU memory. The native context-boundary flag is retained; completion validity requires every requested prompt and decode token."
+}

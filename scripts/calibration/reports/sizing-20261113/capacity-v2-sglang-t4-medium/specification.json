@@ -1,0 +1,76 @@
+{
+  "engine": "sglang",
+  "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+  "flavor": "t4-medium",
+  "timeout": "50m",
+  "trials": [
+    {
+      "case": {
+        "model": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "extra": [
+          "--dtype",
+          "float16"
+        ],
+        "startup_timeout": 900,
+        "request_timeout": 600,
+        "repeats": 1,
+        "name": "default-context",
+        "max_model_len": 40960,
+        "prompt_tokens": 40928,
+        "native_context_defaults": true,
+        "native_cache_defaults": true,
+        "native_scheduler_defaults": true,
+        "native_prefill_defaults": true
+      },
+      "max_num_seqs": 0,
+      "tensor_parallel_size": 1
+    },
+    {
+      "case": {
+        "model": "Qwen/Qwen3-1.7B",
+        "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+        "extra": [
+          "--dtype",
+          "float16"
+        ],
+        "startup_timeout": 900,
+        "request_timeout": 600,
+        "repeats": 1,
+        "name": "two-sequences-c16384-p4096-s32",
+        "max_model_len": 16384,
+        "prompt_tokens": 16352,
+        "batch_size": 2,
+        "max_num_batched_tokens": 4096,
+        "num_gpu_blocks_override": 2049,
+        "pool_tokens": 33024,
+        "native_graph_defaults": true
+      },
+      "max_num_seqs": 32,
+      "tensor_parallel_size": 1
+    }
+  ],
+  "purpose": "Prospective validation of automatic model-only capacity profile selection and physical memory recommendations. Native defaults at full model context, and two simultaneous distinct-token sequences with explicit prefill/context/scheduler. One isolated 0.6B diagnostic allows 600s after prior 120s HTTP timeout; prior miss retained. No optimizer overrides.",
+  "candidate_source_sha256": {
+    "src/hf_mem/_overhead.py": "782b69125670a13d1918d31f93b648d95b544a0ac153ad320c7e28e36b3a90a8",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "65baff736a09117500d9e4cd46bf47153c181b7b1add89fbacfebbad81b8d415",
+    "src/hf_mem/estimate.py": "0050c6e05263ac3a97fdc6c8908e6ec5d656904216aa51b2d283ca2515f7f4d3",
+    "src/hf_mem/_onnx.py": "be14c336571a1a87b76570d78422d004b337076aa42cdf10f6e5d8ddf029522f",
+    "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+    "src/hf_mem/_render.py": "75097209e44c47588282ce471e228a4c92c2dd66be51ea1bc869041f7df7710b",
+    "src/hf_mem/cli.py": "6c876035d7d052d785dd74a555d36f4a1466263d4f04d7dbf54770939acb048c",
+    "src/hf_mem/_safetensors.py": "2216fe99d34829ac4d4e18d4a83d80936b1d8ddfa4acba3e947042bf385d0e0c",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "source_sha256": {
+    "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+    "driver.py": "a01650cee2ae85f76379b44ac29ad41b8e6649e2d020c3211b0b3f14447af944",
+    "sitecustomize.py": "5eea6dc72bd9b7e191179d521264388104d9da553804a17b49bd26d6e753e119",
+    "trials.json": "b4d0c55a87cb3e00d98d97bf1c14043527016dc18d970e86f543cd523fecd87b",
+    "cases-0.json": "0c6a0243e8b4792664493e90d63a3dcf0bfbefcf8fa1bdc3d572f1303f14c4cd",
+    "cases-1.json": "5841a0cd10d582b53e6d5bd06d63f78ffaa27cb7b117be9d6ad5526f41fd19a3"
+  }
+}

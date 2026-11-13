@@ -1,0 +1,36 @@
+{
+  "observations": [
+    {
+      "job_id": "6af746dd29dd05ff036543e3",
+      "url": "https://huggingface.co/jobs/alvarobartt/6af746dd29dd05ff036543e3",
+      "stage": "COMPLETED",
+      "image_and_executed_payload_verified": true,
+      "source_and_forecasts_frozen_before_submission": true,
+      "native_evidence_checksums_verified": true,
+      "sample_count": 72568,
+      "native_peaks_recomputed_from_raw_trace": true,
+      "median_sampling_interval_seconds": 0.012637853622436523,
+      "created_at": "2026-11-13T17:20:29.648000+00:00",
+      "started_at": "2026-11-13T17:21:20.631000+00:00",
+      "finished_at": "2026-11-13T17:37:10.838000+00:00",
+      "runtime_measurement_complete": true
+    },
+    {
+      "job_id": "6af7471029dd05ff03654438",
+      "url": "https://huggingface.co/jobs/alvarobartt/6af7471029dd05ff03654438",
+      "stage": "COMPLETED",
+      "image_and_executed_payload_verified": true,
+      "source_and_forecasts_frozen_before_submission": true,
+      "native_evidence_checksums_verified": true,
+      "sample_count": 52316,
+      "native_peaks_recomputed_from_raw_trace": true,
+      "median_sampling_interval_seconds": 0.018665313720703125,
+      "created_at": "2026-11-13T17:21:20.093000+00:00",
+      "started_at": "2026-11-13T17:24:38.760000+00:00",
+      "finished_at": "2026-11-13T17:41:36.393000+00:00",
+      "runtime_measurement_complete": true
+    }
+  ],
+  "old_source_snapshot_verified": true,
+  "publication": "Local only; no new public upload authorized."
+}

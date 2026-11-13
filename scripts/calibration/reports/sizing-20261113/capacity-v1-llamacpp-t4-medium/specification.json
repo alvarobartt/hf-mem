@@ -1,0 +1,69 @@
+{
+  "engine": "llama.cpp",
+  "image": "ghcr.io/ggml-org/llama.cpp@sha256:fbb788797f42202faa8b2d59792fa64d227884f753304f411fa067425d3ca3fc",
+  "nvml_python_version": "13.615.71",
+  "flavor": "t4-medium",
+  "timeout": "40m",
+  "cases": [
+    {
+      "name": "lfm3-17b-default-context",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file_size": 1099627808,
+      "lfs_sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+      "context_length": 262144,
+      "parallel": 1,
+      "extra": []
+    },
+    {
+      "name": "lfm3-17b-q8-parallel",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file_size": 1099627808,
+      "lfs_sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+      "context_length": 16384,
+      "parallel": 2,
+      "extra": [
+        "--cache-type-k",
+        "q8_0",
+        "--cache-type-v",
+        "q8_0"
+      ]
+    },
+    {
+      "name": "qwen3-8b-default-context",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file_size": 5027784512,
+      "lfs_sha256": "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4",
+      "context_length": 40960,
+      "parallel": 1,
+      "extra": []
+    },
+    {
+      "name": "qwen3-8b-q8-parallel",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "file": "Qwen3-8B-Q4_K_M.gguf",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "file_size": 5027784512,
+      "lfs_sha256": "120307ba529eb2439d6c430d94104dabd578497bc7bfe7e322b5d9933b449bd4",
+      "context_length": 16384,
+      "parallel": 2,
+      "extra": [
+        "--cache-type-k",
+        "q8_0",
+        "--cache-type-v",
+        "q8_0"
+      ]
+    }
+  ],
+  "source_sha256": {
+    "driver.py": "e23110c9efe7419ce741f17357a6495820670f015d15e42ddb8853a10e634837",
+    "cases.json": "7e17f45022193d65e9cf74e9db19f8c05dc9cd6fb0bc6497ee5c8dbec86e3c00"
+  },
+  "frozen_at_utc": "2026-11-13T19:56:34.185560+00:00",
+  "scope": "Native all-GPU deployment at model metadata context, plus q8_0 K/V cache with two parallel sequence slots and 8192 tokens per slot. Full near-context requests must complete. No allocation patches."
+}

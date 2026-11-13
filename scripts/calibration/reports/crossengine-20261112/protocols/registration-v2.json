@@ -1,0 +1,1166 @@
+{
+  "registration_sha256": "bfbe46c9e43c3f8e48bc89367a2516802f44b6b748c0413af8d6d63671dc881b",
+  "protocol": {
+    "created_at_utc": "2026-11-12T21:51:37.295057+00:00",
+    "candidate_source_sha256": {
+      "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+      "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+      "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+      "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+      "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+      "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+      "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+      "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+      "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+      "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+      "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+      "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+    },
+    "tests_passed": 268,
+    "scope": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+    "targets": {
+      "median_absolute_total_error_pct": 3,
+      "median_absolute_overhead_error_pct": 10,
+      "p90_absolute_overhead_error_pct": 25
+    },
+    "sampling": "Two exact long prompts with different token IDs and eight decode tokens, warmed server. Actual all-rank native storage/pools/control readback and empty NVML baseline required. These repeats are not independent deployment replicates."
+  },
+  "experiments": [
+    {
+      "directory": "validation-v2-vllm-a100x4",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "a100x4",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp2-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "trial2-tp4-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 4
+          },
+          {
+            "case": {
+              "name": "trial3-tp2-p6144-s32",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 24576,
+              "prompt_tokens": 24544,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 1537,
+              "pool_tokens": 24832,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 2
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "f017088489f88be2fe37452bf8029318f9abff835f82b26f5dc639fabeaa30de",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "2a01a172d8d1ad0e3b4386c07fbcee1ec7e0fe48a1b120cf645c9feda79354fd",
+          "cases-0.json": "37a14627936332244c8086d2f4bd25eb4c609cf76e376c45946839c22d415982",
+          "cases-1.json": "d65ff2a58743f2c3c88d68ed92a81d8bfd1e31c2e93b315baf6c4dfd1a9ec1e1",
+          "cases-2.json": "5847e2ad8bbb0c560c97bd7d222fefda60792af637a529c62963c4b8e542d95d",
+          "cases-3.json": "01c9294c9ecd6fe7f742a3912277fba130cb560e508af6ec4be26aa227bec998"
+        }
+      },
+      "forecast_sha256": "4cbebc8a8ec0cd3c2f0acc5573538b472c88bb94ba3f45770556c95952b01dad",
+      "job": {
+        "job_id": "6af635245f2f1b7284b8d455",
+        "stage": "SCHEDULING",
+        "flavor": "a100x4"
+      }
+    },
+    {
+      "directory": "validation-v2-sglang-a100x4",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "a100x4",
+        "timeout": "18m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp2-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "trial2-tp4-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 4
+          },
+          {
+            "case": {
+              "name": "trial3-tp2-p6144-s32",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 24576,
+              "prompt_tokens": 24544,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 1537,
+              "pool_tokens": 24832,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 2
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "7b8188cd55496ef878a1e3dbb4eac31f0c2eee13c80cfa8015d100b5ac4d45ee",
+          "sitecustomize.py": "25bdf7f65178e45b48cd3fc79174fac6ee8f49a887154a1dcc5183fcbe1cdf06",
+          "trials.json": "2a01a172d8d1ad0e3b4386c07fbcee1ec7e0fe48a1b120cf645c9feda79354fd",
+          "cases-0.json": "37a14627936332244c8086d2f4bd25eb4c609cf76e376c45946839c22d415982",
+          "cases-1.json": "d65ff2a58743f2c3c88d68ed92a81d8bfd1e31c2e93b315baf6c4dfd1a9ec1e1",
+          "cases-2.json": "5847e2ad8bbb0c560c97bd7d222fefda60792af637a529c62963c4b8e542d95d",
+          "cases-3.json": "01c9294c9ecd6fe7f742a3912277fba130cb560e508af6ec4be26aa227bec998"
+        }
+      },
+      "forecast_sha256": "0052aa316a501f0ce286163ef14cc817b816809eb8bac32d9b4b079945851b18",
+      "job": {
+        "job_id": "6af635250f431c4f7b566bdb",
+        "stage": "SCHEDULING",
+        "flavor": "a100x4"
+      }
+    },
+    {
+      "directory": "validation-v2-vllm-h200x8",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "h200x8",
+        "timeout": "20m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp2-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "trial2-tp8-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 8
+          },
+          {
+            "case": {
+              "name": "trial3-tp2-p6144-s8",
+              "model": "Qwen/Qwen3-30B-A3B",
+              "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "trial4-tp4-p6144-s8",
+              "model": "Qwen/Qwen3-30B-A3B",
+              "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "f017088489f88be2fe37452bf8029318f9abff835f82b26f5dc639fabeaa30de",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "8dd73511c0d4a24a868508756201af9d5afdece39def42c594c33cbf02a20603",
+          "cases-0.json": "a16b901afacfa4edef5c682ab6d3b909c58ae571f1bc20a48a3ded788ee1b0a9",
+          "cases-1.json": "4b5cfa4455d2053c66fbb94770aba285c880ba510d966dd1d96a491df474badc",
+          "cases-2.json": "505d46b9319911bc77393de996ea03e8ea3f4a60c3535c861ae922be3d6b2786",
+          "cases-3.json": "3c58abd6ee83885666991c0aedae2c8b678b48595849efe17f9a9bd86ae77c14",
+          "cases-4.json": "304555a5dca084328d2b7612c8f4bbee9f0e7eb448330cfaa4a16e755d5b10b6"
+        }
+      },
+      "forecast_sha256": "2f13a59a24f0750478625add819fcca9599f5d83eed43baa11cedc5910ea5ffa",
+      "job": {
+        "job_id": "6af635250f431c4f7b566bdd",
+        "stage": "SCHEDULING",
+        "flavor": "h200x8"
+      }
+    },
+    {
+      "directory": "validation-v2-sglang-h200x8",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "h200x8",
+        "timeout": "20m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp2-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "trial2-tp8-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 8
+          },
+          {
+            "case": {
+              "name": "trial3-tp2-p6144-s8",
+              "model": "Qwen/Qwen3-30B-A3B",
+              "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 2
+          },
+          {
+            "case": {
+              "name": "trial4-tp4-p6144-s8",
+              "model": "Qwen/Qwen3-30B-A3B",
+              "revision": "ad44e777bcd18fa416d9da3bd8f70d33ebb85d39",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "7b8188cd55496ef878a1e3dbb4eac31f0c2eee13c80cfa8015d100b5ac4d45ee",
+          "sitecustomize.py": "25bdf7f65178e45b48cd3fc79174fac6ee8f49a887154a1dcc5183fcbe1cdf06",
+          "trials.json": "8dd73511c0d4a24a868508756201af9d5afdece39def42c594c33cbf02a20603",
+          "cases-0.json": "a16b901afacfa4edef5c682ab6d3b909c58ae571f1bc20a48a3ded788ee1b0a9",
+          "cases-1.json": "4b5cfa4455d2053c66fbb94770aba285c880ba510d966dd1d96a491df474badc",
+          "cases-2.json": "505d46b9319911bc77393de996ea03e8ea3f4a60c3535c861ae922be3d6b2786",
+          "cases-3.json": "3c58abd6ee83885666991c0aedae2c8b678b48595849efe17f9a9bd86ae77c14",
+          "cases-4.json": "304555a5dca084328d2b7612c8f4bbee9f0e7eb448330cfaa4a16e755d5b10b6"
+        }
+      },
+      "forecast_sha256": "ab8829b3c5de8e2c1a81e18b194fa296a890530ec8dd34e5b22d811681b2096c",
+      "job": {
+        "job_id": "6af635250f431c4f7b566bdf",
+        "stage": "SCHEDULING",
+        "flavor": "h200x8"
+      }
+    },
+    {
+      "directory": "validation-v2-vllm-rtx-pro-6000",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "rtx-pro-6000",
+        "timeout": "12m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 24576,
+              "prompt_tokens": 24544,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1537,
+              "pool_tokens": 24832,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp1-p6144-s32",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 24576,
+              "prompt_tokens": 24544,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 1537,
+              "pool_tokens": 24832,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "f017088489f88be2fe37452bf8029318f9abff835f82b26f5dc639fabeaa30de",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "4a3e9532bbd4e5ee3aa83154c4facab9c4a158f1e6a0cfcddb48408b9e307c7f",
+          "cases-0.json": "c9fae381b00a92f3aad85963dd381738b6143e73e723d111546cea51e001f751",
+          "cases-1.json": "e3ce337c6d411127697b3f557b1d02ffbedf92b0e88ab27d27d891c753bcdb77"
+        }
+      },
+      "forecast_sha256": "91ef8e23c6a1f17ec41bc043467c8e09d1b70705cd8b73316b6a4ec2ba1078c4",
+      "job": {
+        "job_id": "6af635260f431c4f7b566be2",
+        "stage": "SCHEDULING",
+        "flavor": "rtx-pro-6000"
+      }
+    },
+    {
+      "directory": "validation-v2-sglang-rtx-pro-6000",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "rtx-pro-6000",
+        "timeout": "12m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 24576,
+              "prompt_tokens": 24544,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1537,
+              "pool_tokens": 24832,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp1-p6144-s32",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 24576,
+              "prompt_tokens": 24544,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 1537,
+              "pool_tokens": 24832,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "7b8188cd55496ef878a1e3dbb4eac31f0c2eee13c80cfa8015d100b5ac4d45ee",
+          "sitecustomize.py": "25bdf7f65178e45b48cd3fc79174fac6ee8f49a887154a1dcc5183fcbe1cdf06",
+          "trials.json": "4a3e9532bbd4e5ee3aa83154c4facab9c4a158f1e6a0cfcddb48408b9e307c7f",
+          "cases-0.json": "c9fae381b00a92f3aad85963dd381738b6143e73e723d111546cea51e001f751",
+          "cases-1.json": "e3ce337c6d411127697b3f557b1d02ffbedf92b0e88ab27d27d891c753bcdb77"
+        }
+      },
+      "forecast_sha256": "84ad3b7862e5e977b55a49aca6f32c7d86cfc191967db5d9d54b112d9615a43c",
+      "job": {
+        "job_id": "6af635265f2f1b7284b8d45d",
+        "stage": "SCHEDULING",
+        "flavor": "rtx-pro-6000"
+      }
+    },
+    {
+      "directory": "validation-v2-vllm-l4x1",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "l4x1",
+        "timeout": "14m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp1-p6144-s32",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "f017088489f88be2fe37452bf8029318f9abff835f82b26f5dc639fabeaa30de",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "4acc41239d8dc6d41dcb4b4926c822cc821630ad1566cd5ea03a3104f7cf7353",
+          "cases-0.json": "a16b901afacfa4edef5c682ab6d3b909c58ae571f1bc20a48a3ded788ee1b0a9",
+          "cases-1.json": "5666e85a06a633366892d0c93d0bd2d69ca79158ec311de5b6a7e53f13888382"
+        }
+      },
+      "forecast_sha256": "f6ad118652854ac2b10576aa7fc32419c95d2a6117ed3e50fb90f3bb4c684720",
+      "job": {
+        "job_id": "6af635260f431c4f7b566be6",
+        "stage": "SCHEDULING",
+        "flavor": "l4x1"
+      }
+    },
+    {
+      "directory": "validation-v2-sglang-l4x1",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "l4x1",
+        "timeout": "14m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-native-defaults",
+              "model": "Qwen/Qwen3-1.7B",
+              "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 0,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_scheduler_defaults": true,
+              "native_prefill_defaults": true
+            },
+            "max_num_seqs": 0,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp1-p6144-s32",
+              "model": "meta-llama/Llama-3.2-1B-Instruct",
+              "revision": "9213176726f574b556790deb65791e0c5aa438b6",
+              "max_model_len": 16384,
+              "prompt_tokens": 16352,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 1025,
+              "pool_tokens": 16640,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "7b8188cd55496ef878a1e3dbb4eac31f0c2eee13c80cfa8015d100b5ac4d45ee",
+          "sitecustomize.py": "25bdf7f65178e45b48cd3fc79174fac6ee8f49a887154a1dcc5183fcbe1cdf06",
+          "trials.json": "4acc41239d8dc6d41dcb4b4926c822cc821630ad1566cd5ea03a3104f7cf7353",
+          "cases-0.json": "a16b901afacfa4edef5c682ab6d3b909c58ae571f1bc20a48a3ded788ee1b0a9",
+          "cases-1.json": "5666e85a06a633366892d0c93d0bd2d69ca79158ec311de5b6a7e53f13888382"
+        }
+      },
+      "forecast_sha256": "86ae6342b0735c046ca1daa37e4ef3bfefce1cf147c7279a3914996bda26a2b5",
+      "job": {
+        "job_id": "6af635275f2f1b7284b8d45f",
+        "stage": "SCHEDULING",
+        "flavor": "l4x1"
+      }
+    },
+    {
+      "directory": "validation-v2-vllm-a10g-largex2",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "a10g-largex2",
+        "timeout": "14m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-p6144-s32",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp2-p6144-s32",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 2
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "f017088489f88be2fe37452bf8029318f9abff835f82b26f5dc639fabeaa30de",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "992a907f0f5dc9473b4d05028107a5860121af5851731bf7b80cdfa38c7d6479",
+          "cases-0.json": "e2f2edde92420cdc6162542017749d6a1caa8547992d830b99ff4f981755e357",
+          "cases-1.json": "241de69d06388845f1c41c7aa445b7e4de3171ad398e55027f582024b0938e56"
+        }
+      },
+      "forecast_sha256": "f7f14dc67166234eca975c8ffaed49dc5b5652c70246352b6c240d68cc4ebfbd",
+      "job": {
+        "job_id": "6af635275f2f1b7284b8d461",
+        "stage": "SCHEDULING",
+        "flavor": "a10g-largex2"
+      }
+    },
+    {
+      "directory": "validation-v2-sglang-a10g-largex2",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "a10g-largex2",
+        "timeout": "14m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-p6144-s32",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp2-p6144-s32",
+              "model": "mistralai/Mistral-7B-Instruct-v0.3",
+              "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 420,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 32,
+            "tensor_parallel_size": 2
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "7b8188cd55496ef878a1e3dbb4eac31f0c2eee13c80cfa8015d100b5ac4d45ee",
+          "sitecustomize.py": "25bdf7f65178e45b48cd3fc79174fac6ee8f49a887154a1dcc5183fcbe1cdf06",
+          "trials.json": "992a907f0f5dc9473b4d05028107a5860121af5851731bf7b80cdfa38c7d6479",
+          "cases-0.json": "e2f2edde92420cdc6162542017749d6a1caa8547992d830b99ff4f981755e357",
+          "cases-1.json": "241de69d06388845f1c41c7aa445b7e4de3171ad398e55027f582024b0938e56"
+        }
+      },
+      "forecast_sha256": "31c487fc17bffc2098800771f3f2dd7908caf49636c7b81dfd0c43628fc391db",
+      "job": {
+        "job_id": "6af635270f431c4f7b566bea",
+        "stage": "SCHEDULING",
+        "flavor": "a10g-largex2"
+      }
+    },
+    {
+      "directory": "validation-v2-vllm-hybrid-a100x4",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "a100x4",
+        "timeout": "28m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-p6144-s8",
+              "model": "Qwen/Qwen3.5-2B",
+              "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 540,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_plan": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp4-p6144-s8",
+              "model": "Qwen/Qwen3.5-2B",
+              "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 540,
+              "extra": [],
+              "native_graph_defaults": true,
+              "native_plan": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "f017088489f88be2fe37452bf8029318f9abff835f82b26f5dc639fabeaa30de",
+          "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+          "trials.json": "4173311334fc7c1d6c1eecc3d1f90a7707ac8ab73e42e03ccf74b17825ee40d4",
+          "cases-0.json": "d436fc747488f10d87a24168dd932b5fb79325bd287dcdb942615571e7eb9685",
+          "cases-1.json": "8a73c325e8d3a10b3549f7fb187bce2fd3cab0b3c1f459755ff0f14437966baa"
+        }
+      },
+      "forecast_sha256": "10bbc459acc06dcd258fa07887afb7fab3a5e462e69266862ad2c140b409138a",
+      "job": {
+        "job_id": "6af635285f2f1b7284b8d464",
+        "stage": "SCHEDULING",
+        "flavor": "a100x4"
+      }
+    },
+    {
+      "directory": "validation-v2-sglang-hybrid-a100x4",
+      "specification": {
+        "engine": "sglang",
+        "image": "lmsysorg/sglang@sha256:f7876bef696ccf9cf75a2bf7ccb82970f5fac577f082fb8ca95c9a59d2160eb5",
+        "flavor": "a100x4",
+        "timeout": "28m",
+        "trials": [
+          {
+            "case": {
+              "name": "trial0-tp1-p6144-s8",
+              "model": "Qwen/Qwen3.5-2B",
+              "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 540,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 1
+          },
+          {
+            "case": {
+              "name": "trial1-tp4-p6144-s8",
+              "model": "Qwen/Qwen3.5-2B",
+              "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+              "max_model_len": 12288,
+              "prompt_tokens": 12256,
+              "max_num_batched_tokens": 6144,
+              "num_gpu_blocks_override": 769,
+              "pool_tokens": 12544,
+              "repeats": 2,
+              "startup_timeout": 540,
+              "extra": [],
+              "native_graph_defaults": true
+            },
+            "max_num_seqs": 8,
+            "tensor_parallel_size": 4
+          }
+        ],
+        "purpose": "V2 revised after V1 calibration/validation/default and architecture diagnostics; V1 forecasts and errors preserved. This source and every forecast are frozen locally BEFORE these new Jobs. No source/forecast publication pending explicit approval. Any numerical change after observing this cohort requires another candidate and fresh validation.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "b4d6f28def0c59ce83de07ae41e6d62031c3e3071f5567becc0489d20cb1594f",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+          "src/hf_mem/estimate.py": "9c219c35c7863402c8d4022b9a51659816272c665bdad5f310647019822b99eb",
+          "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+          "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+          "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+          "src/hf_mem/cli.py": "14d92c166cf3cc91c7a44d421aa7053b8190f3ae4036a0bc125fc3e3dbffaa47",
+          "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "7b8188cd55496ef878a1e3dbb4eac31f0c2eee13c80cfa8015d100b5ac4d45ee",
+          "sitecustomize.py": "25bdf7f65178e45b48cd3fc79174fac6ee8f49a887154a1dcc5183fcbe1cdf06",
+          "trials.json": "9f8ed4532257f413868e162b7eb2e03ba85c6a369609db53ed7c4e515c40c3ca",
+          "cases-0.json": "c4d04b8771809e77bbb476e0a0190a17e59e5d9fdf26d04ad67b36e78f1a5850",
+          "cases-1.json": "2130bb0e328af07a378a8024bfbaf8fbe566a78dcab0cee4c93ee3d9a87de26d"
+        }
+      },
+      "forecast_sha256": "4e5741bf493908eabdcd5975c4d1111df2109baa9fcb8055c1d5ec479f487be7",
+      "job": {
+        "job_id": "6af635285f2f1b7284b8d466",
+        "stage": "SCHEDULING",
+        "flavor": "a100x4"
+      }
+    }
+  ]
+}

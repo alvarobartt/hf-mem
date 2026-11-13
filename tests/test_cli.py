@@ -98,6 +98,8 @@ def test_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str
         "file",
         "format",
         "total",
+        "recommended_gpu_memory",
+        "gpu_memory_utilization",
         "weights",
         "offloaded",
         "components",
@@ -118,14 +120,15 @@ def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[
     fit = json.loads(out)["fit"]
     assert code == 0 and fit["gpus"] == 2 and fit["needed"] == 1 and fit["fits"]
     assert fit["max_model_len"] == 1024
+    usable = fit["usable"] / (1 << 30)
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "4")
-    assert code == 0 and "GPU MEMORY" in out and "/ 4.00 GiB [" in out and "│ FITS " in out
+    assert code == 0 and "GPU MEMORY" in out and f"/ {usable:.2f} GiB [" in out and "│ FITS " in out
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4")
-    assert "FITS ON 1 GPU" in out and "/ 8.00 GiB [" in out
+    assert "FITS ON 1 GPU" in out and f"/ {2 * usable:.2f} GiB [" in out
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "--output", "markdown")
     assert "| Overhead (activations, graphs, runtime) |" in out
     assert "Fits on 2 x 4.00 GiB, needs 1 GPU, up to 1024 tokens." in out
-    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "0.5")
+    code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "0.2")
     assert "⚠ NEEDS 2 GPUS" in out or "⚠ DOES NOT FIT" in out
     code, _, err = cli(monkeypatch, capsys, model, "--gpu-memory", "lots")
     assert code == 1 and "--gpu-memory" in err
@@ -214,3 +217,179 @@ def test_bars_show_small_fractions() -> None:
     assert _bar(0.3, 4) == "█▎░░"
     assert _bar(1.0, 4) == "████"
     assert all(len(_bar(f / 100, 7)) == 7 for f in range(101))
+
+
+def test_scheduler_capacity_is_separate_from_requested_cache_batch(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str
+) -> None:
+    code, out, _ = cli(monkeypatch, capsys, model, "-o", "json", "--max-num-batched-tokens", "8192")
+    assert code == 0
+    default = json.loads(out)
+    code, out, _ = cli(
+        monkeypatch, capsys, model, "-o", "json", "--max-num-batched-tokens", "8192", "--max-num-seqs", "1"
+    )
+    one = json.loads(out)
+    assert code == 0 and one["overhead"]["max_num_seqs"] == 1
+    assert one["kv_cache"] == default["kv_cache"]
+    assert one["weights"] == default["weights"]
+    assert one["total"] < default["total"]
+    code, _, err = cli(monkeypatch, capsys, model, "--batch-size", "2", "--max-num-seqs", "1")
+    assert code == 2 and "at least" in err
+
+
+def test_full_window_option_changes_cache_and_fit_without_changing_attention_or_overhead(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str
+) -> None:
+    write_json(
+        str(Path(model) / "config.json"),
+        llama_config(
+            max_position_embeddings=2000000,
+            sliding_window=128,
+            layer_types=["sliding_attention"] * 4,
+        ),
+    )
+    args = (model, "-o", "json", "--gpu-memory", "2", "--max-model-len", "2000000", "--max-num-seqs", "1")
+    code, out, _ = cli(monkeypatch, capsys, *args)
+    assert code == 0
+    windowed = json.loads(out)
+    code, out, _ = cli(monkeypatch, capsys, *args, "--full-sliding-window-cache")
+    assert code == 0
+    full = json.loads(out)
+    assert full["kv_cache"]["full_sliding_window_cache"]
+    assert full["kv_cache"]["bytes"] > windowed["kv_cache"]["bytes"]
+    assert full["kv_cache"]["layers"] == windowed["kv_cache"]["layers"]
+    assert full["overhead"] == windowed["overhead"]
+    assert full["fit"]["max_model_len"] < windowed["fit"]["max_model_len"]
+
+
+@pytest.mark.parametrize("flag", ["--max-model-len", "--context-length", "--context-len"])
+def test_context_aliases(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str, flag: str
+) -> None:
+    code, out, _ = cli(monkeypatch, capsys, model, flag, "128", "-o", "json")
+    assert code == 0 and json.loads(out)["kv_cache"]["max_model_len"] == 128
+
+
+@pytest.mark.parametrize("flag", ["--model", "--model-path", "--hf-repo", "-m", "-hf"])
+def test_model_aliases(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str, flag: str
+) -> None:
+    code, out, _ = cli(monkeypatch, capsys, flag, model, "-o", "json")
+    assert code == 0 and json.loads(out)["format"] == "safetensors"
+
+
+def test_sglang_controls_and_prefixed_gpu(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str
+) -> None:
+    common = (model, "--engine", "sglang", "--gpu-memory", "8x141", "--gpu-type", "nvidia-h200", "-o", "json")
+    code, out, _ = cli(monkeypatch, capsys, *common, "--max-num-batched-tokens", "4096", "--max-num-seqs", "16")
+    assert code == 0
+    canonical = json.loads(out)
+    code, out, _ = cli(
+        monkeypatch, capsys, *common, "--chunked-prefill-size", "4096", "--max-running-requests", "16"
+    )
+    assert code == 0 and json.loads(out) == canonical
+    assert canonical["overhead"]["gpu_type"] == "nvidia-h200"
+    code, _, err = cli(
+        monkeypatch, capsys, "missing/model", "--gpu-type", "nvidia-h200", "--gpu-memory", "8x80"
+    )
+    assert code == 1 and "does not match nvidia-h200" in err
+
+
+@pytest.mark.parametrize(
+    "flag", ["--disable-hybrid-kv-cache-manager", "--disable-hybrid-swa-memory", "--full-sliding-window-cache"]
+)
+def test_engine_full_window_aliases(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str, flag: str
+) -> None:
+    write_json(
+        str(Path(model) / "config.json"), llama_config(sliding_window=32, layer_types=["sliding_attention"] * 4)
+    )
+    code, out, _ = cli(monkeypatch, capsys, model, flag, "-o", "json")
+    assert code == 0 and json.loads(out)["kv_cache"]["full_sliding_window_cache"]
+
+
+def test_llamacpp_context_pool_parallel_cache_and_full_swa(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    path = str(tmp_path / "model.gguf")
+    metadata = {
+        **ARCH,
+        "llama.attention.sliding_window": 32,
+        "llama.attention.sliding_window_pattern": [True] * int(ARCH["llama.block_count"]),
+    }
+    write_gguf(path, metadata, TENSORS)
+    code, out, _ = cli(
+        monkeypatch,
+        capsys,
+        path,
+        "--ctx-size",
+        "4096",
+        "--parallel",
+        "2",
+        "--cache-type-k",
+        "f16",
+        "--cache-type-v",
+        "f16",
+        "--swa-full",
+        "-o",
+        "json",
+    )
+    assert code == 0
+    data = json.loads(out)
+    assert data["kv_cache"]["max_model_len"] == 2048 and data["kv_cache"]["batch_size"] == 2
+    assert data["kv_cache"]["full_sliding_window_cache"]
+    code, out, _ = cli(
+        monkeypatch,
+        capsys,
+        path,
+        "--format",
+        "gguf",
+        "--max-model-len",
+        "2048",
+        "--batch-size",
+        "2",
+        "--kv-cache-dtype",
+        "f16",
+        "--full-sliding-window-cache",
+        "-o",
+        "json",
+    )
+    assert code == 0 and json.loads(out) == data
+    for extra in [
+        ("--ctx-size", "4097", "--parallel", "2"),
+        ("--cache-type-k", "f16", "--cache-type-v", "q8_0"),
+        ("--cache-type-k", "f16"),
+    ]:
+        code, _, err = cli(monkeypatch, capsys, path, *extra)
+        assert code == 2 and "error" in err
+
+
+def test_language_model_only_cli_changes_loaded_weights(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str
+) -> None:
+    write_safetensors(
+        str(Path(model) / "model.safetensors"), {**llama_tensors(), "visual.weight": ("F32", [256])}
+    )
+    write_json(str(Path(model) / "config.json"), {**llama_config(), "vision_config": {"hidden_size": 256}})
+    code, out, _ = cli(monkeypatch, capsys, model, "--language-model-only", "-o", "json")
+    assert code == 0
+    lm = json.loads(out)
+    code, out, _ = cli(monkeypatch, capsys, model, "--text-only", "-o", "json")
+    assert code == 0 and json.loads(out)["weights"]["bytes"] - lm["weights"]["bytes"] == 256 * 4
+    assert lm["workload"] == "language-model-only"
+
+
+@pytest.mark.parametrize("flag", ["--language-model-only", "--no-mmproj", "--no-mmproj-auto"])
+def test_projector_skip_aliases(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path, flag: str
+) -> None:
+    write_gguf(str(tmp_path / "model-F16.gguf"), ARCH, TENSORS)
+    write_gguf(str(tmp_path / "mmproj-model-F16.gguf"), {"clip.vision.embedding_length": 256}, TENSORS)
+    code, out, _ = cli(
+        monkeypatch, capsys, "--hf-repo", str(tmp_path), "--hf-file", "model-F16.gguf", flag, "-o", "json"
+    )
+    assert code == 0
+    data = json.loads(out)
+    assert data["format"] == "gguf" and data["workload"] == "language-model-only"
+    assert data["components"] is None and data["overhead"]["encoder"] == 0

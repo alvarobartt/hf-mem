@@ -1,0 +1,214 @@
+[
+  {
+    "case": "default-context",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "engine": "sglang"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "file": null,
+      "format": "safetensors",
+      "total": 25076051065,
+      "recommended_gpu_memory": 27241894797,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 16381470720,
+        "params": 8190735360,
+        "dtypes": {
+          "BF16": {
+            "bytes": 16381470720,
+            "params": 8190735360
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 2654782585,
+        "activations": 1653548646,
+        "encoder": 0,
+        "graphs": 73290055,
+        "runtime": 927943884,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "file": null,
+      "format": "safetensors",
+      "total": 25076051065,
+      "recommended_gpu_memory": 27241894797,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 16381470720,
+        "params": 8190735360,
+        "dtypes": {
+          "BF16": {
+            "bytes": 16381470720,
+            "params": 8190735360
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 6039797760,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 2654782585,
+        "activations": 1653548646,
+        "encoder": 0,
+        "graphs": 73290055,
+        "runtime": 927943884,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang",
+        "gpu_type": "nvidia-l40s"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 47781511168,
+        "usable": 43561705799,
+        "required": 25076051065,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960,
+        "overhead_per_gpu": 2654782585
+      },
+      "warnings": []
+    }
+  },
+  {
+    "case": "two-sequences-c16384-p4096-s32",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "engine": "sglang",
+      "max_model_len": 16384,
+      "max_num_batched_tokens": 4096,
+      "max_num_seqs": 32,
+      "batch_size": 2
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "file": null,
+      "format": "safetensors",
+      "total": 23534546041,
+      "recommended_gpu_memory": 25529111437,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 16381470720,
+        "params": 8190735360,
+        "dtypes": {
+          "BF16": {
+            "bytes": 16381470720,
+            "params": 8190735360
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 4831838208,
+        "dtype": "BF16",
+        "max_model_len": 16384,
+        "batch_size": 2,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 2321237113,
+        "activations": 1653548646,
+        "encoder": 0,
+        "graphs": 73290055,
+        "runtime": 594398412,
+        "max_num_seqs": 32,
+        "reference_engine": "sglang"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": []
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "file": null,
+      "format": "safetensors",
+      "total": 23534546041,
+      "recommended_gpu_memory": 25529111437,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 16381470720,
+        "params": 8190735360,
+        "dtypes": {
+          "BF16": {
+            "bytes": 16381470720,
+            "params": 8190735360
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 4831838208,
+        "dtype": "BF16",
+        "max_model_len": 16384,
+        "batch_size": 2,
+        "layers": {
+          "full": 36
+        }
+      },
+      "overhead": {
+        "bytes": 2321237113,
+        "activations": 1653548646,
+        "encoder": 0,
+        "graphs": 73290055,
+        "runtime": 594398412,
+        "max_num_seqs": 32,
+        "reference_engine": "sglang",
+        "gpu_type": "nvidia-l40s"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 47781511168,
+        "usable": 43561705799,
+        "required": 23534546041,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960,
+        "overhead_per_gpu": 2321237113
+      },
+      "warnings": []
+    }
+  }
+]

@@ -1,0 +1,143 @@
+{
+  "scope": "RETROSPECTIVE legacy regression, eight original architectures, current API with named A100, engine and text-only workload. SG legacy context-boundary runs returned six of eight requested tokens: not current-protocol gold. SG GPT-OSS residual omitted because registered packed storage audit incomplete; weight header/cache components are references and selected totals may include quantization tile padding.",
+  "metrics": {
+    "vllm": {
+      "total_error_pct": 0.45916263874011265,
+      "overhead_error_pct": 6.789399759026987
+    },
+    "sglang": {
+      "total_error_pct": 1.1041642915952166,
+      "overhead_error_pct": 11.884742277642202
+    }
+  },
+  "rows": [
+    {
+      "engine": "vllm",
+      "case": "llama31-8b",
+      "total_error_pct": -0.5581354799518823,
+      "overhead_error_pct": -6.312557739382163,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -2097152
+    },
+    {
+      "engine": "vllm",
+      "case": "qwen3-8b",
+      "total_error_pct": 0.17935012376368853,
+      "overhead_error_pct": 2.4624188135238034,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -2359296
+    },
+    {
+      "engine": "vllm",
+      "case": "mistral-7b",
+      "total_error_pct": -0.360189797528343,
+      "overhead_error_pct": -3.8348818891604686,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -2097152
+    },
+    {
+      "engine": "vllm",
+      "case": "gemma3-4b",
+      "total_error_pct": -4.523010399507488,
+      "overhead_error_pct": -24.85549073826414,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -71696384
+    },
+    {
+      "engine": "vllm",
+      "case": "deepseek-v2-lite",
+      "total_error_pct": -2.208843651745729,
+      "overhead_error_pct": -32.40996291277225,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -497664
+    },
+    {
+      "engine": "vllm",
+      "case": "qwen3-30b-a3b",
+      "total_error_pct": 0.1749724690006893,
+      "overhead_error_pct": 7.266241778671811,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -1572864
+    },
+    {
+      "engine": "vllm",
+      "case": "qwen35-4b",
+      "total_error_pct": 0.21818320516104883,
+      "overhead_error_pct": 1.8095677437824698,
+      "weight_error_bytes": 6144,
+      "cache_error_bytes": -17301504
+    },
+    {
+      "engine": "vllm",
+      "case": "gpt-oss-20b",
+      "total_error_pct": -4.104538624704668,
+      "overhead_error_pct": -30.294830566058785,
+      "weight_error_bytes": -917962752,
+      "cache_error_bytes": -393216
+    },
+    {
+      "engine": "sglang",
+      "case": "llama31-8b",
+      "total_error_pct": -0.009529501656846406,
+      "overhead_error_pct": 1.079787104921981,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -33685504
+    },
+    {
+      "engine": "sglang",
+      "case": "qwen3-8b",
+      "total_error_pct": -0.3973015639048283,
+      "overhead_error_pct": -1.9705391708408349,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -37896192
+    },
+    {
+      "engine": "sglang",
+      "case": "mistral-7b",
+      "total_error_pct": 0.21037769695098074,
+      "overhead_error_pct": 2.767770131977909,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -33685504
+    },
+    {
+      "engine": "sglang",
+      "case": "gemma3-4b",
+      "total_error_pct": -5.115058117771754,
+      "overhead_error_pct": -24.760532713158725,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -35790848
+    },
+    {
+      "engine": "sglang",
+      "case": "deepseek-v2-lite",
+      "total_error_pct": -1.5839919001773506,
+      "overhead_error_pct": -19.383829176442802,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -7993728
+    },
+    {
+      "engine": "sglang",
+      "case": "qwen3-30b-a3b",
+      "total_error_pct": -0.6243366830130825,
+      "overhead_error_pct": -13.521700192947272,
+      "weight_error_bytes": 0,
+      "cache_error_bytes": -25264128
+    },
+    {
+      "engine": "sglang",
+      "case": "qwen35-4b",
+      "total_error_pct": 3.1507428590548336,
+      "overhead_error_pct": 11.884742277642202,
+      "weight_error_bytes": 6144,
+      "cache_error_bytes": -8421376
+    },
+    {
+      "engine": "sglang",
+      "case": "gpt-oss-20b",
+      "total_error_pct": 1.8272817918031814,
+      "overhead_error_pct": null,
+      "weight_error_bytes": 9541877760,
+      "cache_error_bytes": -9142272
+    }
+  ]
+}

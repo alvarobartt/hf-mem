@@ -1,0 +1,129 @@
+[
+  {
+    "case": "qwen35-2b-language-model-only",
+    "arguments": {
+      "model_id": "Qwen/Qwen3.5-2B",
+      "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+      "engine": "vllm",
+      "language_model_only": true,
+      "max_model_len": 8192,
+      "max_num_batched_tokens": 2048,
+      "max_num_seqs": 8
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3.5-2B",
+      "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+      "workload": "language-model-only",
+      "file": null,
+      "format": "safetensors",
+      "total": 4386273890,
+      "recommended_gpu_memory": 4706611150,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 3763655360,
+        "params": 1881825088,
+        "dtypes": {
+          "BF16": {
+            "bytes": 3763644992,
+            "params": 1881822496
+          },
+          "F32": {
+            "bytes": 10368,
+            "params": 2592
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 147062784,
+        "dtype": "BF16",
+        "max_model_len": 8192,
+        "batch_size": 1,
+        "layers": {
+          "full": 6,
+          "state": 18
+        }
+      },
+      "overhead": {
+        "bytes": 475555746,
+        "activations": 292320051,
+        "encoder": 0,
+        "graphs": 23852143,
+        "runtime": 159383552,
+        "max_num_seqs": 8,
+        "reference_engine": "vllm"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": [
+        "Qwen3.5 ordinary decoding does not load the root `mtp.*` prediction head; 116.02 MiB of checkpoint weights are excluded. Speculative decoding with an MTP draft requires additional memory.",
+        "Language-model-only mode excludes 0.62 GiB of identified encoder/projector weights."
+      ]
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3.5-2B",
+      "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+      "workload": "language-model-only",
+      "file": null,
+      "format": "safetensors",
+      "total": 4504385490,
+      "recommended_gpu_memory": 4706611149,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 3763655360,
+        "params": 1881825088,
+        "dtypes": {
+          "BF16": {
+            "bytes": 3763644992,
+            "params": 1881822496
+          },
+          "F32": {
+            "bytes": 10368,
+            "params": 2592
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 147062784,
+        "dtype": "BF16",
+        "max_model_len": 8192,
+        "batch_size": 1,
+        "layers": {
+          "full": 6,
+          "state": 18
+        }
+      },
+      "overhead": {
+        "bytes": 593667346,
+        "activations": 292320051,
+        "encoder": 0,
+        "graphs": 23852143,
+        "runtime": 277495152,
+        "max_num_seqs": 8,
+        "reference_engine": "vllm",
+        "gpu_type": "nvidia-l4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 24008867184,
+        "usable": 21876415921,
+        "required": 4504385490,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 262144,
+        "overhead_per_gpu": 593667346,
+        "cache_bytes": 147062784
+      },
+      "warnings": [
+        "Qwen3.5 ordinary decoding does not load the root `mtp.*` prediction head; 116.02 MiB of checkpoint weights are excluded. Speculative decoding with an MTP draft requires additional memory.",
+        "Language-model-only mode excludes 0.62 GiB of identified encoder/projector weights."
+      ]
+    }
+  }
+]

@@ -1,0 +1,41 @@
+[
+  {
+    "case": {
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "extra": [],
+      "startup_timeout": 900,
+      "request_timeout": 600,
+      "repeats": 1,
+      "name": "default-context",
+      "max_model_len": 40960,
+      "prompt_tokens": 40928,
+      "native_context_defaults": true,
+      "native_cache_defaults": true,
+      "native_scheduler_defaults": true,
+      "native_prefill_defaults": true
+    },
+    "max_num_seqs": 0,
+    "tensor_parallel_size": 1
+  },
+  {
+    "case": {
+      "model": "Qwen/Qwen3-8B",
+      "revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "extra": [],
+      "startup_timeout": 900,
+      "request_timeout": 600,
+      "repeats": 1,
+      "name": "two-sequences-c16384-p4096-s32",
+      "max_model_len": 16384,
+      "prompt_tokens": 16352,
+      "batch_size": 2,
+      "max_num_batched_tokens": 4096,
+      "num_gpu_blocks_override": 2049,
+      "pool_tokens": 33024,
+      "native_graph_defaults": true
+    },
+    "max_num_seqs": 32,
+    "tensor_parallel_size": 1
+  }
+]

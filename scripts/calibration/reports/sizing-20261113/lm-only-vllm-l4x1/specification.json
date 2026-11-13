@@ -1,0 +1,52 @@
+{
+  "engine": "vllm",
+  "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+  "flavor": "l4x1",
+  "timeout": "30m",
+  "trials": [
+    {
+      "case": {
+        "name": "qwen35-2b-language-model-only",
+        "model": "Qwen/Qwen3.5-2B",
+        "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+        "max_model_len": 8192,
+        "prompt_tokens": 8160,
+        "max_num_batched_tokens": 2048,
+        "num_gpu_blocks_override": 513,
+        "pool_tokens": 8448,
+        "repeats": 1,
+        "startup_timeout": 900,
+        "request_timeout": 300,
+        "extra": [
+          "--language-model-only"
+        ],
+        "native_graph_defaults": true,
+        "native_plan": true
+      },
+      "max_num_seqs": 8,
+      "tensor_parallel_size": 1
+    }
+  ],
+  "purpose": "Prospective standalone --language-model-only validation on a multimodal GDN checkpoint, without retaining encoder/projector weights. Runtime parameter audit, native physical pools, every requested token and full NVML trace required. Native caches controlled to workload; no eager/attention optimizer override.",
+  "candidate_source_sha256": {
+    "src/hf_mem/_overhead.py": "c9ef2b33adae86dbdba1a15dc47453f990382329ccfee0cbc66c8740d9f14c77",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "65baff736a09117500d9e4cd46bf47153c181b7b1add89fbacfebbad81b8d415",
+    "src/hf_mem/estimate.py": "37c44c4b216d37f088ddb53445ad38f7700c17a265ae4583b19646b0a1e69cad",
+    "src/hf_mem/_onnx.py": "be14c336571a1a87b76570d78422d004b337076aa42cdf10f6e5d8ddf029522f",
+    "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+    "src/hf_mem/_render.py": "42994563c7fb1429b241f366e451efbeb039842ca48c6597eb6066957a087b2c",
+    "src/hf_mem/cli.py": "9ab372afafc1fbd7bd7d2e7cad9a526ac95ad2c6770a000e081e9c7086553bea",
+    "src/hf_mem/_safetensors.py": "dd320c4b4e60b1f60ccd5f324ee44976ef17c14034cad1cbb46a41ebadf80c34",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "source_sha256": {
+    "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+    "driver.py": "a67725f0b483a67ddd207d5a5f7ea395bfe32efd4b0500211022b1772b1d9925",
+    "sitecustomize.py": "9b1ca6fedc516186012c19794005c49f8095f90522c1edb4e0d87a80ed151f21",
+    "trials.json": "7c95f7454dea45bfeda09175080202782afc742084cc46fbf479380d58baa0e2",
+    "cases-0.json": "354d5d76062ede91dd5cadfb09ccce9de21f2a314342ba5ff87d0a65a8b24a56"
+  }
+}

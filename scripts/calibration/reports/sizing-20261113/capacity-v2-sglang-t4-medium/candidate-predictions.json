@@ -1,0 +1,222 @@
+[
+  {
+    "case": "default-context",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-1.7B",
+      "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "engine": "sglang"
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-1.7B",
+      "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "file": null,
+      "format": "safetensors",
+      "total": 9802379661,
+      "recommended_gpu_memory": 10724506452,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 3441149952,
+        "params": 1720574976,
+        "dtypes": {
+          "BF16": {
+            "bytes": 3441149952,
+            "params": 1720574976
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 4697620480,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 1663609229,
+        "activations": 1138162892,
+        "encoder": 0,
+        "graphs": 30354625,
+        "runtime": 495091712,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.58 GiB checkpoint table is counted once."
+      ]
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-1.7B",
+      "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "file": null,
+      "format": "safetensors",
+      "total": 9802379661,
+      "recommended_gpu_memory": 10724506452,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 3441149952,
+        "params": 1720574976,
+        "dtypes": {
+          "BF16": {
+            "bytes": 3441149952,
+            "params": 1720574976
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 4697620480,
+        "dtype": "BF16",
+        "max_model_len": 40960,
+        "batch_size": 1,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 1663609229,
+        "activations": 1138162892,
+        "encoder": 0,
+        "graphs": 30354625,
+        "runtime": 495091712,
+        "max_num_seqs": 2048,
+        "reference_engine": "sglang",
+        "gpu_type": "nvidia-t4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14239964068,
+        "required": 9802379661,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40960,
+        "overhead_per_gpu": 1663609229
+      },
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.58 GiB checkpoint table is counted once."
+      ]
+    }
+  },
+  {
+    "case": "two-sequences-c16384-p4096-s32",
+    "arguments": {
+      "model_id": "Qwen/Qwen3-1.7B",
+      "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "engine": "sglang",
+      "max_model_len": 16384,
+      "max_num_batched_tokens": 4096,
+      "max_num_seqs": 32,
+      "batch_size": 2
+    },
+    "unhinted": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-1.7B",
+      "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "file": null,
+      "format": "safetensors",
+      "total": 8695519945,
+      "recommended_gpu_memory": 9494662323,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 3441149952,
+        "params": 1720574976,
+        "dtypes": {
+          "BF16": {
+            "bytes": 3441149952,
+            "params": 1720574976
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 3758096384,
+        "dtype": "BF16",
+        "max_model_len": 16384,
+        "batch_size": 2,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 1496273609,
+        "activations": 1305096192,
+        "encoder": 0,
+        "graphs": 30218380,
+        "runtime": 160959037,
+        "max_num_seqs": 32,
+        "reference_engine": "sglang"
+      },
+      "moe": null,
+      "fit": null,
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.58 GiB checkpoint table is counted once."
+      ]
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "Qwen/Qwen3-1.7B",
+      "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "file": null,
+      "format": "safetensors",
+      "total": 8695519945,
+      "recommended_gpu_memory": 9494662323,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 3441149952,
+        "params": 1720574976,
+        "dtypes": {
+          "BF16": {
+            "bytes": 3441149952,
+            "params": 1720574976
+          }
+        }
+      },
+      "offloaded": null,
+      "components": null,
+      "kv_cache": {
+        "bytes": 3758096384,
+        "dtype": "BF16",
+        "max_model_len": 16384,
+        "batch_size": 2,
+        "layers": {
+          "full": 28
+        }
+      },
+      "overhead": {
+        "bytes": 1496273609,
+        "activations": 1305096192,
+        "encoder": 0,
+        "graphs": 30218380,
+        "runtime": 160959037,
+        "max_num_seqs": 32,
+        "reference_engine": "sglang",
+        "gpu_type": "nvidia-t4"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 15655155793,
+        "usable": 14239964068,
+        "required": 8695519945,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 40528,
+        "overhead_per_gpu": 1496273609
+      },
+      "warnings": [
+        "`tie_word_embeddings=true` shares `lm_head.weight` with `model.embed_tokens.weight` at runtime; the duplicate 0.58 GiB checkpoint table is counted once."
+      ]
+    }
+  }
+]

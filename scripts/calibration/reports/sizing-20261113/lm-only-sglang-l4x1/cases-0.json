@@ -1,0 +1,19 @@
+[
+  {
+    "name": "qwen35-2b-language-model-only",
+    "model": "Qwen/Qwen3.5-2B",
+    "revision": "15852e8c16360a2fea060d615a32b45270f8a8fc",
+    "max_model_len": 8192,
+    "prompt_tokens": 8160,
+    "max_num_batched_tokens": 2048,
+    "num_gpu_blocks_override": 513,
+    "pool_tokens": 8448,
+    "repeats": 1,
+    "startup_timeout": 900,
+    "request_timeout": 300,
+    "extra": [
+      "--language-model-only"
+    ],
+    "native_graph_defaults": true
+  }
+]

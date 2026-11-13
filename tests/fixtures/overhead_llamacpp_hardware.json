@@ -1,0 +1,62 @@
+{
+  "source": [
+    "llamacpp-t4-runtime-20261112",
+    "llamacpp-t4-audit-20261112",
+    "llamacpp-h200-runtime-20261112"
+  ],
+  "scope": "llama.cpp b12316 exact image fbb7887, matched GGUF SHAs and full 32760+8 completion. Native MiB figures are rounded. T4 components use a separate matched load-only process; H200 components come from inference process.",
+  "observations": [
+    {
+      "case": "lfm3-17b",
+      "gpu_memory": "15",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "estimated_weights_bytes": 1091380480,
+      "estimated_cache_bytes": 411156480,
+      "original_overhead_bytes": 665719930,
+      "native_runtime_footprint_bytes": 1737359360,
+      "native_model_bytes_rounded": 1091378872,
+      "native_cache_bytes_rounded": 411157135,
+      "native_compute_bytes_rounded": 98377400
+    },
+    {
+      "case": "qwen3-8b",
+      "gpu_memory": "15",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "estimated_weights_bytes": 4671766528,
+      "estimated_cache_bytes": 4831838208,
+      "original_overhead_bytes": 665719930,
+      "native_runtime_footprint_bytes": 9788325888,
+      "native_model_bytes_rounded": 4671762595,
+      "native_cache_bytes_rounded": 4831838208,
+      "native_compute_bytes_rounded": 142616821
+    },
+    {
+      "case": "lfm3-17b",
+      "gpu_memory": "139.8",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "estimated_weights_bytes": 1091380480,
+      "estimated_cache_bytes": 411156480,
+      "original_overhead_bytes": 665719930,
+      "native_runtime_footprint_bytes": 2242707456,
+      "native_model_bytes_rounded": 1091378872,
+      "native_cache_bytes_rounded": 411157135,
+      "native_compute_bytes_rounded": 98377400
+    },
+    {
+      "case": "qwen3-8b",
+      "gpu_memory": "139.8",
+      "model": "unsloth/Qwen3-8B-GGUF",
+      "revision": "a6adef130ffb23ddaf1a62fec9dced968c9bc482",
+      "estimated_weights_bytes": 4671766528,
+      "estimated_cache_bytes": 4831838208,
+      "original_overhead_bytes": 665719930,
+      "native_runtime_footprint_bytes": 10285285376,
+      "native_model_bytes_rounded": 4671762595,
+      "native_cache_bytes_rounded": 4831838208,
+      "native_compute_bytes_rounded": 142616821
+    }
+  ]
+}

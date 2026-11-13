@@ -1,0 +1,957 @@
+{
+  "scope": "RETROSPECTIVE numeric equivalence against V5 estimates on 150 complete native configurations, using original exact model revisions and API arguments. New language-model-only, GGUF SWA and unit-suffix behavior are covered by separate tests; these are not new native validations. GPU metadata now uses canonical nvidia-* names.",
+  "original_source_sha256": {
+    "src/hf_mem/_overhead.py": "af93632112282b7a1cf1fd6d82b2fe696ef000372eb1bfa98c20c5c7fc9382da",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+    "src/hf_mem/estimate.py": "31fbcb6687572c359fc7b6bad65f92b0e869734ba9937fd20d3536c58921f6ab",
+    "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+    "src/hf_mem/_gguf.py": "5ddd427d5ba326ec7daecac50480c5b5f888fb64351b241c469c2404203017b4",
+    "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+    "src/hf_mem/cli.py": "6b416bb9f6f10cb53b8c31a69670235d67a40bded396144fe272a15a4f19b3bd",
+    "src/hf_mem/_safetensors.py": "dec90e61761707f07761d10718dcc5c757b879815d1f894bec5060e43c1cf886",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "current_source_sha256": {
+    "src/hf_mem/_overhead.py": "5c40d8edac4a179009339b053f9b8f95d677485b5b2605f9eb88df6760b8cf62",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "fc0d960c22bc05247d78b3aa02c33b25399f4345327eb861107714b5613c320f",
+    "src/hf_mem/estimate.py": "9911c722abc22493b632ec605237cf9855f97e9826a54fbcdb3889af69ada5cc",
+    "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+    "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+    "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+    "src/hf_mem/cli.py": "ff01f2fbc9c7e0c0dda246560bdad349fd8b9d8a71f8eaca589bb6ba82c0018d",
+    "src/hf_mem/_safetensors.py": "2216fe99d34829ac4d4e18d4a83d80936b1d8ddfa4acba3e947042bf385d0e0c",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "configurations": 150,
+  "observations": [
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "moe-tp2-p4096-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "moe-tp4-p4096-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "hybrid-tp1-p4096-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "hybrid-tp2-p4096-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-sglang-a100x4",
+      "case": "hybrid-tp4-p4096-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "moe-tp2-p4096-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "moe-tp4-p4096-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "hybrid-tp1-p4096-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "hybrid-tp2-p4096-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "architecture-v1-vllm-a100x4",
+      "case": "hybrid-tp4-p4096-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-sglang-a100x4",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-sglang-a100x4",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-sglang-a100x4",
+      "case": "qwen3-06b-tp4-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-sglang-h200x2",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-sglang-h200x2",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-sglang-rtx-pro-6000",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-sglang-t4-medium",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-vllm-a100x4",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-vllm-a100x4",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-vllm-a100x4",
+      "case": "qwen3-06b-tp4-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-vllm-h200x2",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-vllm-h200x2",
+      "case": "qwen3-06b-tp2-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-vllm-rtx-pro-6000",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "defaults-v1-vllm-t4-medium",
+      "case": "qwen3-06b-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "mistral7b-tp4-c16384-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "mistral7b-tp4-c32768-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "mistral7b-tp4-c32768-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "diagnostic-v1-sglang-a100-tp4",
+      "case": "qwen3-8b-tp4-c32768-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "diagnostic-v2-sglang-image",
+      "case": "hybrid-text-then-image-3520",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "diagnostic-v2-vllm-image",
+      "case": "hybrid-text-then-image-3520",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp2-p2048",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp2-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-a10g-largex2",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-h200x2",
+      "case": "qwen3-8b-tp2-s1-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-h200x2",
+      "case": "qwen3-8b-tp1-s1-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-h200x2",
+      "case": "qwen3-8b-tp2-s16-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-h200x8",
+      "case": "qwen3-8b-tp4-s1-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-h200x8",
+      "case": "qwen3-8b-tp8-s1-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "llama31-8b-tp1-p2048",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-l40sx1",
+      "case": "llama31-8b-tp1-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "sglang-t4-diagnostic",
+      "case": "qwen3-17b-tp1-p2048-fp16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-a100x4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-a100x4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-a100x4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-a10g-largex4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-a10g-largex4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-a10g-largex4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-h200x8",
+      "case": "llama32-3b-tp2-s16-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-h200x8",
+      "case": "llama32-3b-tp4-s16-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-h200x8",
+      "case": "llama32-3b-tp8-s16-p8192",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s1-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s64-p12288",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s1-p4096",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-sglang-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s64-p12288",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-a100x4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-a100x4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-a100x4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-a10g-largex4",
+      "case": "mistral7b-tp1-s16-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-a10g-largex4",
+      "case": "mistral7b-tp2-s16-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-a10g-largex4",
+      "case": "mistral7b-tp4-s16-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-h200x8",
+      "case": "llama32-3b-tp2-s16-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-h200x8",
+      "case": "llama32-3b-tp4-s16-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-h200x8",
+      "case": "llama32-3b-tp8-s16-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s1-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "llama32-3b-tp1-s64-p12288",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s1-p4096",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v1-vllm-rtx-pro-6000",
+      "case": "qwen3-4b-tp1-s64-p12288",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial2-tp4-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-a100x4",
+      "case": "trial3-tp2-p6144-s32",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-a10g-largex2",
+      "case": "trial0-tp1-p6144-s32",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-a10g-largex2",
+      "case": "trial1-tp2-p6144-s32",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial2-tp8-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial3-tp2-p6144-s8",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-h200x8",
+      "case": "trial4-tp4-p6144-s8",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-hybrid-a100x4",
+      "case": "trial0-tp1-p6144-s8",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-hybrid-a100x4",
+      "case": "trial1-tp4-p6144-s8",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-l4x1",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-l4x1",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-rtx-pro-6000",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-sglang-rtx-pro-6000",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial2-tp4-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-a100x4",
+      "case": "trial3-tp2-p6144-s32",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-a10g-largex2",
+      "case": "trial0-tp1-p6144-s32",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-a10g-largex2",
+      "case": "trial1-tp2-p6144-s32",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial1-tp2-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial2-tp8-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial3-tp2-p6144-s8",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-h200x8",
+      "case": "trial4-tp4-p6144-s8",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-l4x1",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-l4x1",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-rtx-pro-6000",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v2-vllm-rtx-pro-6000",
+      "case": "trial1-tp1-p6144-s32",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial0-tp2-p8192-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial1-tp4-p8192-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial2-tp1-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-a100x4",
+      "case": "trial3-tp4-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial0-tp2-p8192-s32",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial1-tp8-p4096-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial2-tp4-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-h200x8",
+      "case": "trial3-tp1-image",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-t4-medium",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-sglang-t4-medium",
+      "case": "trial1-tp1-p4096-s16",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial0-tp2-p8192-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial1-tp4-p8192-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial2-tp1-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-a100x4",
+      "case": "trial3-tp4-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial0-tp2-p8192-s32",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial1-tp8-p4096-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial2-tp4-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-h200x8",
+      "case": "trial3-tp1-image",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-t4-medium",
+      "case": "trial0-tp1-native-defaults",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v3-vllm-t4-medium",
+      "case": "trial1-tp1-p4096-s16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial0-tp1-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial1-tp2-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial2-tp4-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-sglang-a100x4",
+      "case": "trial3-tp1-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-sglang-h200x8",
+      "case": "trial0-tp2-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-sglang-h200x8",
+      "case": "trial1-tp8-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-sglang-h200x8",
+      "case": "trial2-tp1-image",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial0-tp1-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial1-tp2-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial2-tp4-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-vllm-a100x4",
+      "case": "trial3-tp1-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-vllm-h200x8",
+      "case": "trial0-tp2-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-vllm-h200x8",
+      "case": "trial1-tp8-text-only",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v4-vllm-h200x8",
+      "case": "trial2-tp1-image",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v5-sglang-h200x2",
+      "case": "trial0-tp2-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v5-sglang-h200x2",
+      "case": "trial1-tp1-text-only",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "validation-v5-sglang-h200x2",
+      "case": "trial2-tp1-image",
+      "engine": "sglang",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp2-p2048",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp2-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-a10g-largex2",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-h200x8",
+      "case": "qwen3-8b-tp4-s1-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-h200x8",
+      "case": "qwen3-8b-tp8-s1-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "qwen3-8b-tp1-p2048",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "qwen3-8b-tp1-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "llama31-8b-tp1-p2048",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-l40sx1",
+      "case": "llama31-8b-tp1-p8192",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    },
+    {
+      "dataset": "vllm-t4-canary",
+      "case": "qwen3-17b-tp1-p2048-fp16",
+      "engine": "vllm",
+      "numerical_prediction_unchanged": true
+    }
+  ],
+  "changes": [
+    "Canonical nvidia-* GPU names with legacy input aliases; H200 nominal 141; H100/A100 capacity variants.",
+    "Capacity compatibility validation before Hub access, including measured ECC/driver ranges. Bare/GiB values use binary units; GB is decimal.",
+    "Engine CLI aliases for model selection, context, scheduler, prefill, and full sliding-window storage.",
+    "llama.cpp total context conversion by parallel slots, full SWA cache estimates, projector omission, and matching K/V dtype spellings.",
+    "Distinct language_model_only API/CLI excludes identified encoder/projector weights and activations; unknown namespaces remain included. Legacy text_only still retains encoder weights."
+  ],
+  "checks": {
+    "pytest_passed": 317,
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "ty": "passed",
+    "git_diff_check": "passed",
+    "existing_complete_native_configurations_numerically_unchanged": 150
+  },
+  "new_behavior_validation": "Exact synthetic tensor-header and GGUF tests, including actual encoder removal and API/CLI propagation. No new native language-model-only deployments were measured for this CLI follow-up.",
+  "reference_urls": [
+    "https://docs.vllm.ai/en/stable/configuration/engine_args/",
+    "https://docs.sglang.io/docs/advanced_features/server_arguments",
+    "https://github.com/ggml-org/llama.cpp/blob/master/common/arg.cpp",
+    "https://www.nvidia.com/en-gb/data-center/h200/",
+    "https://docs.nvidia.com/datacenter/tesla/mig-user-guide/latest/supported-gpus.html"
+  ]
+}

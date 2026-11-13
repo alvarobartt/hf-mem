@@ -1,0 +1,167 @@
+{
+  "summary": {
+    "w13_weight_amax/F32": 61440,
+    "w13_weight_outer_scale_denominator/F32": 160,
+    "w2_weight_amax/F32": 61440,
+    "w2_weight_outer_scale_denominator/F32": 160,
+    "w13_weight_scale/F8_E4M3": 20384317440,
+    "w2_weight_scale/F8_E4M3": 10192158720,
+    "w13_weight/U8": 163074539520,
+    "w2_weight/U8": 81537269760,
+    "w13_weight/F8_E4M3": 65229815808,
+    "w2_weight/F8_E4M3": 32614907904,
+    "w13_weight_scale/U8": 2038431744,
+    "w2_weight_scale/U8": 1019215872
+  },
+  "examples": {
+    "w13_weight_amax/F32": {
+      "name": "model.llm.layers.0.mlp.experts.w13_weight_amax",
+      "dtype": "F32",
+      "shape": [
+        384
+      ],
+      "data_offsets": [
+        2064384,
+        2065920
+      ]
+    },
+    "w13_weight_outer_scale_denominator/F32": {
+      "name": "model.llm.layers.0.mlp.experts.w13_weight_outer_scale_denominator",
+      "dtype": "F32",
+      "shape": [
+        1
+      ],
+      "data_offsets": [
+        2065920,
+        2065924
+      ]
+    },
+    "w2_weight_amax/F32": {
+      "name": "model.llm.layers.0.mlp.experts.w2_weight_amax",
+      "dtype": "F32",
+      "shape": [
+        384
+      ],
+      "data_offsets": [
+        2065924,
+        2067460
+      ]
+    },
+    "w2_weight_outer_scale_denominator/F32": {
+      "name": "model.llm.layers.0.mlp.experts.w2_weight_outer_scale_denominator",
+      "dtype": "F32",
+      "shape": [
+        1
+      ],
+      "data_offsets": [
+        2067460,
+        2067464
+      ]
+    },
+    "w13_weight_scale/F8_E4M3": {
+      "name": "model.llm.layers.0.mlp.experts.w13_weight_scale",
+      "dtype": "F8_E4M3",
+      "shape": [
+        384,
+        4608,
+        288
+      ],
+      "data_offsets": [
+        2451009040,
+        2960616976
+      ]
+    },
+    "w2_weight_scale/F8_E4M3": {
+      "name": "model.llm.layers.0.mlp.experts.w2_weight_scale",
+      "dtype": "F8_E4M3",
+      "shape": [
+        384,
+        4608,
+        144
+      ],
+      "data_offsets": [
+        2960616976,
+        3215420944
+      ]
+    },
+    "w13_weight/U8": {
+      "name": "model.llm.layers.0.mlp.experts.w13_weight",
+      "dtype": "U8",
+      "shape": [
+        384,
+        4608,
+        2304
+      ],
+      "data_offsets": [
+        3979832848,
+        8056696336
+      ]
+    },
+    "w2_weight/U8": {
+      "name": "model.llm.layers.0.mlp.experts.w2_weight",
+      "dtype": "U8",
+      "shape": [
+        384,
+        4608,
+        1152
+      ],
+      "data_offsets": [
+        8056696336,
+        10095128080
+      ]
+    },
+    "w13_weight/F8_E4M3": {
+      "name": "model.llm.layers.40.mlp.experts.w13_weight",
+      "dtype": "F8_E4M3",
+      "shape": [
+        384,
+        4608,
+        4608
+      ],
+      "data_offsets": [
+        655314436,
+        8809041412
+      ]
+    },
+    "w2_weight/F8_E4M3": {
+      "name": "model.llm.layers.40.mlp.experts.w2_weight",
+      "dtype": "F8_E4M3",
+      "shape": [
+        384,
+        4608,
+        2304
+      ],
+      "data_offsets": [
+        8809041412,
+        12885904900
+      ]
+    },
+    "w13_weight_scale/U8": {
+      "name": "model.llm.layers.40.mlp.experts.w13_weight_scale",
+      "dtype": "U8",
+      "shape": [
+        384,
+        4608,
+        144
+      ],
+      "data_offsets": [
+        14924336644,
+        15179140612
+      ]
+    },
+    "w2_weight_scale/U8": {
+      "name": "model.llm.layers.40.mlp.experts.w2_weight_scale",
+      "dtype": "U8",
+      "shape": [
+        384,
+        4608,
+        72
+      ],
+      "data_offsets": [
+        15179140612,
+        15306542596
+      ]
+    }
+  },
+  "encoder_bytes": 655386624
+}

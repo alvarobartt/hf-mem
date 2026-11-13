@@ -26,6 +26,29 @@ POOL_MIN_FILES: int | None = None
 AUXILIARY = ("audio_tokenizer", "speech_tokenizer", "audio_decoder", "vocoder", "codec")
 
 
+def language_model_prefixes(config: dict[str, Any]) -> tuple[str, ...]:
+    """Recognized encoder/projector namespaces; never match decoder substrings."""
+    root = config.get("thinker_config") or config
+    names = []
+    if isinstance(root.get("vision_config"), dict):
+        names.extend(
+            (
+                "visual",
+                "vision_tower",
+                "vision_model",
+                "vision_encoder",
+                "multi_modal_projector",
+                "mm_projector",
+                "vision_projector",
+            )
+        )
+    if isinstance(root.get("audio_config"), dict):
+        names.extend(("audio_tower", "audio_model", "audio_encoder", "audio_projector", "audio_projection"))
+    return tuple(
+        prefix + name + "." for prefix in ("", "model.", "thinker.", "model.thinker.") for name in names
+    )
+
+
 @dataclass
 class MoE:
     experts: int
@@ -192,10 +215,19 @@ async def read_components(
     components: dict[str, list[str]],
     warnings: list[str] | None = None,
     quantization: dict[str, Any] | None = None,
+    tie_word_embeddings: bool = False,
+    skip_mtp: bool = False,
+    skip_prefixes: tuple[str, ...] = (),
+    tensor_metadata: dict[str, Any] | None = None,
+    skipped_weights: dict[str, int] | None = None,
 ) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]], Weights]:
     paths = sorted({p for ps in components.values() for p in ps})
     semaphore, probe = asyncio.Semaphore(32), [PROBE_SIZE]
     summaries: dict[str, Summary] = {}
+    embedding_tables: dict[str, dict[str, Any]] = {}
+    skipped_mtp: dict[str, int] = {}
+    skipped_encoder: dict[str, int] = {}
+    headers: dict[str, dict[str, Any]] = {}
     pool = _pool() if POOL_MIN_FILES and len(paths) >= POOL_MIN_FILES else None
     loop = asyncio.get_running_loop()
 
@@ -203,11 +235,38 @@ async def read_components(
         async with semaphore:
             raw = await read_header(source, path, probe[0])
         try:
+            if skip_prefixes:
+                tensors = json.loads(raw)
+                excluded = {name: info for name, info in tensors.items() if name.startswith(skip_prefixes)}
+                skipped_encoder[path] = sum(
+                    info["data_offsets"][1] - info["data_offsets"][0] for info in excluded.values()
+                )
+                raw = json.dumps(
+                    {name: info for name, info in tensors.items() if name not in excluded}
+                ).encode()
+            if skip_mtp and not os.path.dirname(path):
+                tensors = json.loads(raw)
+                excluded = {name: info for name, info in tensors.items() if name.startswith("mtp.")}
+                if excluded:
+                    skipped_mtp[path] = sum(
+                        info["data_offsets"][1] - info["data_offsets"][0] for info in excluded.values()
+                    )
+                    raw = json.dumps(
+                        {name: info for name, info in tensors.items() if name not in excluded}
+                    ).encode()
+            if tie_word_embeddings:
+                embedding_tables[path] = {
+                    name: info
+                    for name, info in json.loads(raw).items()
+                    if name.endswith(("lm_head.weight", "model.embed_tokens.weight"))
+                }
             summaries[path] = (
                 await loop.run_in_executor(pool, summarize, raw, quantization)
                 if pool
                 else summarize(raw, quantization)
             )
+            if tensor_metadata is not None:
+                headers[path] = {k: v for k, v in json.loads(raw).items() if k != "__metadata__"}
         except (ValueError, KeyError, TypeError, AttributeError) as e:
             raise RuntimeError(f"`{path}` is not a valid Safetensors file.") from e
         probe[0] = max(probe[0], len(raw) + 8)
@@ -232,6 +291,8 @@ async def read_components(
     for name, component_paths in components.items():
         component, merged = Weights(), dict[int, Weights]()
         for path in component_paths:
+            if tensor_metadata is not None:
+                tensor_metadata.update(headers.get(path, {}))
             dtypes, by_expert, cpu = summaries[path]
             for dtype, (params, nbytes) in dtypes.items():
                 component.add(dtype, params, nbytes)
@@ -239,8 +300,100 @@ async def read_components(
                 merged.setdefault(expert, Weights()).add(dtype, params, nbytes)
             for dtype, (params, nbytes) in cpu.items():
                 offloaded.add(dtype, params, nbytes)
+        if tie_word_embeddings and all(not os.path.dirname(path) for path in component_paths):
+            # Configured tying is a runtime alias even when both copies are serialized.
+            # Match actual dense tables across shards; do not guess for packed heads,
+            # missing inputs, incompatible geometry or separately configured submodels.
+            tables: dict[str, Any] = {}
+            duplicated = set()
+            for path in component_paths:
+                for tensor, info in embedding_tables.get(path, {}).items():
+                    if tensor in tables:
+                        duplicated.add(tensor)
+                    tables[tensor] = info
+            for tensor, output in tables.items():
+                if not tensor.endswith("lm_head.weight"):
+                    continue
+                input_name = tensor.removesuffix("lm_head.weight") + "model.embed_tokens.weight"
+                embedding = tables.get(input_name)
+                dtype = output["dtype"]
+                shape = output["shape"]
+                if (
+                    embedding is None
+                    or tensor in duplicated
+                    or input_name in duplicated
+                    or len(shape) != 2
+                    or embedding["shape"] != shape
+                    or embedding["dtype"] != dtype
+                    or dtype not in {"F16", "BF16", "F32"}
+                ):
+                    continue
+                params = math.prod(shape)
+                nbytes = params * (4 if dtype == "F32" else 2)
+                if any(
+                    info["data_offsets"][1] - info["data_offsets"][0] != nbytes for info in [output, embedding]
+                ):
+                    continue
+                component.add(dtype, -params, -nbytes)
+                if warnings is not None:
+                    warnings.append(
+                        f"`tie_word_embeddings=true` shares `{tensor}` with `{input_name}` at runtime; "
+                        f"the duplicate {nbytes / (1 << 30):.2f} GiB checkpoint table is counted once."
+                    )
+        excluded_bytes = sum(skipped_mtp.get(path, 0) for path in component_paths)
+        if excluded_bytes and warnings is not None:
+            warnings.append(
+                f"Qwen3.5 ordinary decoding does not load the root `mtp.*` prediction head; "
+                f"{excluded_bytes / (1 << 20):.2f} MiB of checkpoint weights are excluded. "
+                "Speculative decoding with an MTP draft requires additional memory."
+            )
         weights[name], experts[name] = component, merged
+    if skip_prefixes and warnings is not None:
+        skipped = sum(skipped_encoder.values())
+        if skipped:
+            warnings.append(
+                f"Language-model-only mode excludes {skipped / (1 << 30):.2f} GiB of identified encoder/projector weights."
+            )
+        else:
+            warnings.append(
+                "Language-model-only mode could not identify encoder/projector tensor names; "
+                "unrecognized weights remain included."
+            )
+    if skipped_weights is not None:
+        selected_paths = {p for ps in components.values() for p in ps}
+        skipped_weights["encoder"] = sum(skipped_encoder.get(p, 0) for p in selected_paths)
     return weights, experts, offloaded
+
+
+def inkling_weight_adjustment(
+    tensors: dict[str, Any], ranks: int, encoder_prefixes: tuple[str, ...], marlin: bool = True
+) -> int:
+    """Additional storage in the pinned SGLang SM90 Inkling loader.
+
+    Marlin keeps MXFP8 scales in BF16, but its final NVFP4 scales remain FP8.
+    Encoder and router tensors are replicated rather than expert/TP sharded.
+    Only charge a scale conversion when its corresponding packed weight proves
+    the MXFP8 layout; tensor headers can span different checkpoint shards.
+    """
+    extra, replicated = 0, 0
+    for name, info in tensors.items():
+        size = info["data_offsets"][1] - info["data_offsets"][0]
+        if name.startswith(encoder_prefixes) or name.endswith(".mlp.gate.weight"):
+            replicated += size
+        if not name.endswith((".experts.w13_weight_scale", ".experts.w2_weight_scale")):
+            continue
+        weight = tensors.get(name.removesuffix("_scale"), {})
+        shape, scale = weight.get("shape", []), info["shape"]
+        if (
+            marlin
+            and info["dtype"] == "U8"
+            and weight.get("dtype") == "F8_E4M3"
+            and len(shape) == len(scale) == 3
+            and shape[:2] == scale[:2]
+            and shape[2] == 32 * scale[2]
+        ):
+            extra += size
+    return extra + (ranks - 1) * replicated
 
 
 def _pool() -> Any:

@@ -1,0 +1,9 @@
+Diagnostic excerpts only; full traces/logs retained locally.
+HFMEM_LOG_START full-swa-previous-budget-control
+0.00.648.317 I llama_memory_recurrent:      CUDA0 RS buffer size =     0.61 MiB
+0.00.648.327 I llama_memory_recurrent: size =    0.61 MiB (     1 cells,  24 layers,  1 seqs  0 rs_seq), R (f32):    0.61 MiB, S (f32):    0.00 MiB, P (f32):    0.00 MiB
+0.00.746.640 E CUDA error: out of memory
+/app/ggml/src/ggml-cuda/ggml-cuda.cu:113: CUDA error
+/app/libggml-cuda.so(_Z15ggml_cuda_errorPKcS0_S0_iS0_+0xb5)[0x7f4824777775]
+libllama.so.0(_ZN13llama_context14process_ubatchERK12llama_ubatch14llm_graph_typeP22llama_memory_context_iR11ggml_status+0x134)[0x7f4838a1bf64]
+HFMEM_LOG_END

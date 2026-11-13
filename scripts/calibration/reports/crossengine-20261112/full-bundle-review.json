@@ -1,0 +1,23 @@
+{
+  "directory": "/tmp/hf-mem-crossengine-v2-20261112/full-review-bundle",
+  "datasets": 54,
+  "complete_datasets": 52,
+  "files": 1412,
+  "bytes": 191852812,
+  "credential_scan_passed_files": 1411,
+  "manifest_sha256": "efc0e9465316f93311c5aebc7c25a2100a2f676c3770aedbf56e67d1cb4f5f8c",
+  "publication": "not_uploaded",
+  "verification": {
+    "manifest_verified": true,
+    "unmanifested_files": 0,
+    "packaged_tests_passed": 278,
+    "executed_matrix_sources_verified": 54,
+    "stored_forecast_validation_reports_reproduced": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  }
+}

@@ -52,6 +52,9 @@ unused-ignore-comment = "error"
 
 [tool.ruff]
 line-length = 112
+# Calibration artifacts preserve the exact executed and frozen source bytes.
+extend-exclude = ["scripts/calibration/reports"]
+force-exclude = true
 
 [tool.ruff.lint]
 select = ["I", "ANN"]

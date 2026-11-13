@@ -1,0 +1,36 @@
+[
+  {
+    "model": "LiquidAI/LFM3-1.7B-GGUF",
+    "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+    "file": "LFM3-1.7B-Q4_K_M.gguf",
+    "file_size": 1099627808,
+    "lfs_sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+    "name": "full-swa-recommended-budget",
+    "context_length": 65536,
+    "parallel": 1,
+    "extra": [
+      "--fit",
+      "off",
+      "--swa-full"
+    ],
+    "memory_budget_bytes": 3728026612,
+    "expected_budget_sufficient": true
+  },
+  {
+    "model": "LiquidAI/LFM3-1.7B-GGUF",
+    "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+    "file": "LFM3-1.7B-Q4_K_M.gguf",
+    "file_size": 1099627808,
+    "lfs_sha256": "3793e1e6e2266919d6e015287221b41100175a98eddaba92e111aed3b05c93c4",
+    "name": "full-swa-previous-budget-control",
+    "context_length": 65536,
+    "parallel": 1,
+    "extra": [
+      "--fit",
+      "off",
+      "--swa-full"
+    ],
+    "memory_budget_bytes": 3355223950,
+    "expected_budget_sufficient": null
+  }
+]

@@ -1,0 +1,3 @@
+case,model,revision,engine,tensor_parallel_size,max_num_seqs,max_model_len,prefill_tokens,resolved_max_num_seqs,resolved_prefill_tokens,native_scheduler_defaults,native_prefill_defaults,request_count,workload,request_completed,native_parameter_bytes,native_buffer_bytes,native_physical_cache_bytes,sampled_runtime_bytes,native_residual_bytes,missing_evidence,usable_for_accuracy
+default-context,Qwen/Qwen3-1.7B,70d244cc86ccca08cf5af4e1e306ecf908b1ad5e,sglang,1,0,40960,0,2048,2048,True,True,1,text,True,3441149952,21102592,7995015168,13177323520,1741158400,[],True
+two-sequences-c16384-p4096-s32,Qwen/Qwen3-1.7B,70d244cc86ccca08cf5af4e1e306ecf908b1ad5e,sglang,1,32,16384,4096,32,4096,False,False,1,text,True,3441149952,20971520,3787571200,8783790080,1555068928,[],True

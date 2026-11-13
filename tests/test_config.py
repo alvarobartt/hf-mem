@@ -391,3 +391,107 @@ def test_kimi_dense_cache_keeps_the_prefill_checkpoint() -> None:
     config = kimi_config(sparse=False)
     assert _config.kv_cache(config, "BF16", 131072, 1)[0] == 637009920
     assert _config.kv_cache(config, "BF16", 1048576, 1)[0] == 3822059520
+
+
+def test_full_sliding_window_cache_matches_observed_sglang_gemma_pool_geometry() -> None:
+    # SGLang's pinned Gemma3-4B A100 run stores all 34 layers in an MHA pool.
+    config = {
+        "model_type": "gemma3_text",
+        "hidden_size": 2560,
+        "num_hidden_layers": 34,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 4,
+        "head_dim": 256,
+        "sliding_window": 1024,
+        "sliding_window_pattern": 6,
+    }
+    bounded, kinds = _config.kv_cache(config, "BF16", 32768, 1, batched_tokens=8192)
+    full, same_kinds = _config.kv_cache(
+        config, "BF16", 32768, 1, batched_tokens=8192, full_sliding_window_cache=True
+    )
+    assert full == 34 * 32768 * 2 * 4 * 256 * 2
+    assert full > bounded and same_kinds == kinds and kinds["sliding"] == 29
+    # Native pool has 33024 admission slots plus one guard slot; page-size is one.
+    assert 4599193600 == 34 * 33025 * 2 * 4 * 256 * 2
+    assert abs(full / 4599193600 - 1) < 0.01
+    assert (
+        _config.kv_cache(config, "BF16", 32768, 2, tensor_parallel_size=8, full_sliding_window_cache=True)[0]
+        == full * 4
+    )
+
+
+def test_full_window_extent_does_not_change_pure_full_attention_or_state_caches() -> None:
+    for config in [llama_config(), llama_config(layer_types=["mamba"] * 4, ssm_state_size=16)]:
+        assert _config.kv_cache(config, "BF16", 10000, 1) == _config.kv_cache(
+            config, "BF16", 10000, 1, full_sliding_window_cache=True
+        )
+
+
+def test_sglang_gdn_state_slots_shard_independently_from_attention_heads() -> None:
+    # Qwen3.5-2B native pool audit: TP1/2/4, 16 live slots plus one guard,
+    # 18 state layers and six full-attention layers. Physical attention pools
+    # additionally include 256 admission slots and one token guard.
+    config = {
+        "model_type": "qwen3_5_text",
+        "num_hidden_layers": 24,
+        "hidden_size": 2048,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 2,
+        "head_dim": 256,
+        "linear_num_key_heads": 16,
+        "linear_num_value_heads": 16,
+        "linear_key_head_dim": 128,
+        "linear_value_head_dim": 128,
+        "linear_conv_kernel_dim": 4,
+        "mamba_ssm_dtype": "float32",
+        "layer_types": ["linear_attention"] * 18 + ["full_attention"] * 6,
+    }
+    for ranks, native_pool in [(1, 435965952), (2, 435965952), (4, 539787264)]:
+        total, kinds = _config.sglang_kv_cache(config, "BF16", 8192, 1, 4096, ranks, state_capacity=16)
+        extra_attention = 257 * 6 * 2 * 2 * 256 * 2 * max(1, ranks // 2)
+        assert total == native_pool - extra_attention
+        assert kinds == {"full": 6, "sliding": 0, "state": 18, "none": 0}
+
+
+def test_explicit_local_layer_ids_and_model_context_aliases() -> None:
+    config = llama_config()
+    del config["max_position_embeddings"]
+    config.update(model_max_length=1048576, local_layer_ids=[0, 1, 3], sliding_window_size=1024)
+    normalized = _config.normalize(config)
+    assert normalized["max_position_embeddings"] == 1048576 and normalized["sliding_window"] == 1024
+    assert _config.layer_kinds(normalized) == ["sliding", "sliding", "full", "sliding"]
+    size, layers = _config.kv_cache(config, "BF16", 262144, 1)
+    assert layers == {"full": 1, "sliding": 3, "state": 0, "none": 0}
+    assert size < _config.kv_cache(config, "BF16", 262144, 1, full_sliding_window_cache=True)[0]
+    assert (
+        _config.layer_kinds(_config.normalize({**config, "layer_types": ["full_attention"] * 4}))
+        == ["full"] * 4
+    )
+    for invalid in [[-1], [4], [True], ["0"]]:
+        assert _config.layer_kinds(_config.normalize({**config, "local_layer_ids": invalid})) == ["full"] * 4
+
+
+def test_inkling_cache_layers_match_native_tp4_tp8_geometry() -> None:
+    import json
+    from pathlib import Path
+
+    fixture = json.loads((Path(__file__).parent / "fixtures/inkling2_native_geometry.json").read_text())
+    config = _config.text_config(fixture["config"])
+    assert config is not None and config["max_position_embeddings"] == 1048576
+    kinds = _config.layer_kinds(config)
+    for row in fixture["native"]:
+        pool = row["rank0_pool"]
+        assert kinds.count("full") == pool["full_layer_nums"] == 8
+        assert kinds.count("sliding") == pool["swa_layer_nums"] == 40
+        assert _config.kv_heads(config) == pool["head_num"] * row["gpus"]
+        # Both native pools have a complete guard page, measured independently.
+        expected = sum(
+            child["layer_num"]
+            * (child["size"] + child["page_size"])
+            * child["head_num"]
+            * child["head_dim"]
+            * 4
+            for child in [pool["full_kv_pool"], pool["swa_kv_pool"]]
+        )
+        assert expected == pool["allocated_cache_bytes"]
+        assert expected * row["gpus"] == row["native_aggregate_pool_bytes"]

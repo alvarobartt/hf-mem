@@ -1,0 +1,36 @@
+Diagnostic excerpts only; full traces/logs retained locally.
+HFMEM_LOG_START two-sequences-c16384-p4096-s32
+HFMEM_NATIVE {"kind": "worker_memory", "pid": 465, "rank": 0, "time": 1794602968.4816175, "phase": "init_device", "local_rank": 0, "cuda_device_index": 0, "tensor_parallel_size": 1, "max_num_seqs": 32, "runner_type": "GPUModelRunner", "cudagraph_capture_sizes": [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64], "cudagraph_mode": "FULL_AND_PIECEWISE", "torch_allocated_bytes": 8576512, "torch_reserved_bytes": 23068672, "torch_peak_allocated_bytes": 8576512, "torch_peak_reserved_bytes": 23068672, "cuda_free_bytes": 47078309888, "cuda_total_bytes": 47665709056, "model_memory_usage_bytes": 0, "requested_memory_bytes": 43852452332}
+(Worker pid=465) INFO 11-13 20:49:33 [model_runner.py:428] Model loading took 15.27 GiB memory and 4.732101 seconds
+HFMEM_NATIVE {"kind": "worker_memory", "pid": 465, "rank": 0, "time": 1794602973.2362819, "phase": "load_model", "local_rank": 0, "cuda_device_index": 0, "tensor_parallel_size": 1, "max_num_seqs": 32, "runner_type": "GPUModelRunner", "cudagraph_capture_sizes": [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64], "cudagraph_mode": "FULL_AND_PIECEWISE", "torch_allocated_bytes": 16423961088, "torch_reserved_bytes": 16439574528, "torch_peak_allocated_bytes": 16423961088, "torch_peak_reserved_bytes": 16439574528, "cuda_free_bytes": 30661804032, "cuda_total_bytes": 47665709056, "model_memory_usage_bytes": 16394146816, "requested_memory_bytes": 43852452332}
+(Worker pid=465) INFO 11-13 20:50:02 [gpu_worker.py:772] Available KV cache memory: 24.18 GiB
+(Worker pid=465) INFO 11-13 20:50:02 [gpu_worker.py:787] CUDA graph memory profiling is enabled (default since v0.21.0). The current --gpu-memory-utilization=0.9200 is equivalent to --gpu-memory-utilization=0.9172 without CUDA graph memory profiling. To maintain the same effective KV cache size as before, increase --gpu-memory-utilization to 0.9228. To disable, set VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0.
+HFMEM_NATIVE {"kind": "worker_memory", "pid": 465, "rank": 0, "time": 1794603002.7964766, "phase": "determine_available_memory", "local_rank": 0, "cuda_device_index": 0, "tensor_parallel_size": 1, "max_num_seqs": 32, "runner_type": "GPUModelRunner", "cudagraph_capture_sizes": [1, 2, 4, 8, 16, 24, 32, 40, 48, 56, 64], "cudagraph_mode": "FULL_AND_PIECEWISE", "torch_allocated_bytes": 16425308160, "torch_reserved_bytes": 16439574528, "torch_peak_allocated_bytes": 21274841088, "torch_peak_reserved_bytes": 21328035840, "cuda_free_bytes": 30586306560, "cuda_total_bytes": 47665709056, "model_memory_usage_bytes": 16394146816, "total_consumed_bytes": 16439574528, "peak_activation_memory_bytes": 1446012928, "cudagraph_memory_estimate_bytes": 134217728, "available_kv_cache_memory_bytes_bytes": 25966864876, "requested_memory_bytes": 43852452332}
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584] EngineCore failed to start.
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584] Traceback (most recent call last):
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 1555, in run_engine_core
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]     engine_core = EngineCoreProc(*args, engine_index=dp_rank, **kwargs)
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/tracing/otel.py", line 175, in sync_wrapper
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]     return func(*args, **kwargs)
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]            ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 1232, in __init__
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]     super().__init__(
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 163, in __init__
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]     kv_cache_config = self._initialize_kv_caches(vllm_config)
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]   File "/usr/local/lib/python3.12/dist-packages/vllm/v1/engine/core.py", line 321, in _initialize_kv_caches
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]     kv_cache_configs = get_kv_cache_configs(
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]                        ^^^^^^^^^^^^^^^^^^^^^
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]   File "/tmp/hfmem-hooks/sitecustomize.py", line 102, in plan
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]     assert override == blocks, (override, blocks)
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584]            ^^^^^^^^^^^^^^^^^^
+(EngineCore pid=434) ERROR 11-13 20:50:02 [core.py:1584] AssertionError: (2049, 1025)
+(EngineCore pid=434) ERROR 11-13 20:50:05 [multiproc_executor.py:380] Worker proc VllmWorker-0 died unexpectedly (exit code: None), shutting down executor.
+Traceback (most recent call last):
+    assert override == blocks, (override, blocks)
+AssertionError: (2049, 1025)
+    raise RuntimeError(
+RuntimeError: Engine core initialization failed. See root cause above. Failed core proc(s): {}
+/usr/lib/python3.12/multiprocessing/resource_tracker.py:254: UserWarning: resource_tracker: There appear to be 1 leaked shared_memory objects to clean up at shutdown
+HFMEM_LOG_END

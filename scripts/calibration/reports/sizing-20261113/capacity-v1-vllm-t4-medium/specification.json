@@ -1,0 +1,95 @@
+{
+  "engine": "vllm",
+  "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+  "flavor": "t4-medium",
+  "timeout": "40m",
+  "trials": [
+    {
+      "case": {
+        "name": "qwen3-06b-native-defaults",
+        "model": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 40960,
+        "prompt_tokens": 40928,
+        "repeats": 1,
+        "startup_timeout": 700,
+        "extra": [
+          "--dtype",
+          "float16"
+        ],
+        "native_context_defaults": true,
+        "native_cache_defaults": true,
+        "native_scheduler_defaults": true,
+        "native_prefill_defaults": true
+      },
+      "max_num_seqs": 0,
+      "tensor_parallel_size": 1
+    },
+    {
+      "case": {
+        "name": "qwen3-4b-native-defaults",
+        "model": "Qwen/Qwen3-4B",
+        "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+        "max_model_len": 40960,
+        "prompt_tokens": 40928,
+        "repeats": 1,
+        "startup_timeout": 700,
+        "extra": [
+          "--dtype",
+          "float16"
+        ],
+        "native_context_defaults": true,
+        "native_cache_defaults": true,
+        "native_scheduler_defaults": true,
+        "native_prefill_defaults": true
+      },
+      "max_num_seqs": 0,
+      "tensor_parallel_size": 1
+    },
+    {
+      "case": {
+        "name": "qwen3-06b-c8192-p2048-s8",
+        "model": "Qwen/Qwen3-0.6B",
+        "revision": "c1899de289a04d12100db370d81485cdf75e47ca",
+        "max_model_len": 8192,
+        "prompt_tokens": 8160,
+        "max_num_batched_tokens": 2048,
+        "num_gpu_blocks_override": 513,
+        "pool_tokens": 8448,
+        "repeats": 1,
+        "startup_timeout": 700,
+        "extra": [
+          "--dtype",
+          "float16"
+        ],
+        "native_graph_defaults": true
+      },
+      "max_num_seqs": 8,
+      "tensor_parallel_size": 1
+    }
+  ],
+  "purpose": "Deployment sizing validation: untouched native context, cache, scheduler, prefill defaults versus explicit workload controls. T4 uses FP16 because BF16 kernels are unsupported. Forecasts and source frozen before submission. Negative fit outcomes retained.",
+  "candidate_source_sha256": {
+    "src/hf_mem/_overhead.py": "782b69125670a13d1918d31f93b648d95b544a0ac153ad320c7e28e36b3a90a8",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "65baff736a09117500d9e4cd46bf47153c181b7b1add89fbacfebbad81b8d415",
+    "src/hf_mem/estimate.py": "ffdb4a0ea5bb152e3af41e85edbad79eac7e3e69bea80133bb8c6867408b7c5a",
+    "src/hf_mem/_onnx.py": "be14c336571a1a87b76570d78422d004b337076aa42cdf10f6e5d8ddf029522f",
+    "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+    "src/hf_mem/_render.py": "5a806a5e88708e5d38a1e1261edd7bdb0c0c3e8e56a250c83354630ff8602e78",
+    "src/hf_mem/cli.py": "6c876035d7d052d785dd74a555d36f4a1466263d4f04d7dbf54770939acb048c",
+    "src/hf_mem/_safetensors.py": "2216fe99d34829ac4d4e18d4a83d80936b1d8ddfa4acba3e947042bf385d0e0c",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "source_sha256": {
+    "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+    "driver.py": "bc7ee6cb2ac00adacbd92043db817596fbc8ed5ec038ab278ecdcac733ba95ac",
+    "sitecustomize.py": "19c2e62316d7acf5b83db01e97e4617c8686724d4fd96e5f5339d402f5de8858",
+    "trials.json": "432a56d4bcc6806925606c05f4c8181e81c2a33113a689f3abc68fd682539707",
+    "cases-0.json": "83077b99745c9ece3f048849c08475fa3fa5a7564123577055dd7f4d759fb847",
+    "cases-1.json": "da1ad6373b2151f67244a549d7282ed99f4271145000263e6fdd1c851eab3ae9",
+    "cases-2.json": "4e77b3cff7d5280a66cea55b33eb5f1a0d00d6838c9c725c3fca02930b4999d0"
+  }
+}

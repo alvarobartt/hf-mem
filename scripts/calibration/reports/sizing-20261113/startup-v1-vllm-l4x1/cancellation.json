@@ -1,0 +1,5 @@
+{
+  "reason": "H200 substitution after more than20minutes of unavailable L4 hardware, without execution or model outcome.",
+  "stage_before_cancellation": "SCHEDULING",
+  "started_at_before_cancellation": null
+}

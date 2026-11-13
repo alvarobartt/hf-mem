@@ -1,0 +1,2 @@
+case,model,revision,engine,tensor_parallel_size,max_num_seqs,max_model_len,prefill_tokens,resolved_max_num_seqs,resolved_prefill_tokens,native_scheduler_defaults,native_prefill_defaults,request_count,workload,request_completed,native_parameter_bytes,native_buffer_bytes,native_physical_cache_bytes,sampled_runtime_bytes,native_residual_bytes,missing_evidence,usable_for_accuracy
+two-sequences-c16384-p4096-s32,Qwen/Qwen3-1.7B,70d244cc86ccca08cf5af4e1e306ecf908b1ad5e,vllm,1,32,16384,4096,32,4096,False,False,1,text,True,3441149952,10486208,3759931392,7861043200,659961856,[],True

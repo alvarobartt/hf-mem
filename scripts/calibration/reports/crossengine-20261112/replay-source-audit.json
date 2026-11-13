@@ -1,0 +1,218 @@
+[
+  {
+    "dataset": "architecture-v1-sglang-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "architecture-v1-vllm-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-sglang-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-sglang-h200x2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-sglang-rtx-pro-6000",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-sglang-t4-medium",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-vllm-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-vllm-h200x2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-vllm-rtx-pro-6000",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "defaults-v1-vllm-t4-medium",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "diagnostic-v1-sglang-a100-tp4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "diagnostic-v2-sglang-image",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "diagnostic-v2-vllm-image",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "sglang-a10g-largex2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "sglang-h200x2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "sglang-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "sglang-l40sx1",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "sglang-t4-canary",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "sglang-t4-diagnostic",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-sglang-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-sglang-a10g-largex4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-sglang-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-sglang-rtx-pro-6000",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-vllm-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-vllm-a10g-largex4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-vllm-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v1-vllm-rtx-pro-6000",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-sglang-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-sglang-a10g-largex2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-sglang-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-sglang-hybrid-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-sglang-l4x1",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-sglang-rtx-pro-6000",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-vllm-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-vllm-a10g-largex2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-vllm-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-vllm-hybrid-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-vllm-l4x1",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v2-vllm-rtx-pro-6000",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v3-sglang-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v3-sglang-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v3-sglang-t4-medium",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v3-vllm-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v3-vllm-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v3-vllm-t4-medium",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v4-sglang-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v4-sglang-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v4-vllm-a100x4",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v4-vllm-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "validation-v5-sglang-h200x2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "vllm-a10g-largex2",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "vllm-h200x8",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "vllm-l40sx1",
+    "replay_source_verified": true
+  },
+  {
+    "dataset": "vllm-t4-canary",
+    "replay_source_verified": true
+  }
+]

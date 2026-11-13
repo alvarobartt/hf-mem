@@ -1,0 +1,174 @@
+[
+  {
+    "case": "full-swa-recommended-budget",
+    "arguments": {
+      "model_id": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "max_model_len": 65536,
+      "batch_size": 1,
+      "kv_cache_dtype": "auto",
+      "full_sliding_window_cache": true
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 3355223950,
+      "recommended_gpu_memory": 3728026612,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1091380480,
+        "params": 1728801600,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 715659264,
+            "params": 1272283136
+          },
+          "Q6_K": {
+            "bytes": 374169600,
+            "params": 456130560
+          },
+          "F32": {
+            "bytes": 1551616,
+            "params": 387904
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 215040000,
+        "params": 262144000,
+        "dtypes": {
+          "Q6_K": {
+            "bytes": 215040000,
+            "params": 262144000
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 1477033984,
+        "dtype": "F16",
+        "max_model_len": 65536,
+        "batch_size": 1,
+        "layers": {
+          "full": 6,
+          "sliding": 5,
+          "state": 13
+        },
+        "full_sliding_window_cache": true
+      },
+      "overhead": {
+        "bytes": 786809486,
+        "activations": 142564392,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 644245094,
+        "reference_engine": "llama.cpp"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 150109880320,
+        "usable": 135098892288,
+        "required": 3355223950,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 262144,
+        "overhead_per_gpu": 786809486,
+        "cache_bytes": 1477033984
+      },
+      "warnings": []
+    },
+    "bounded_budget_bytes": 3728026612,
+    "expected_budget_sufficient": true
+  },
+  {
+    "case": "full-swa-previous-budget-control",
+    "arguments": {
+      "model_id": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "max_model_len": 65536,
+      "batch_size": 1,
+      "kv_cache_dtype": "auto",
+      "full_sliding_window_cache": true
+    },
+    "hardware": {
+      "version": "hf-mem@1.0.0",
+      "model": "LiquidAI/LFM3-1.7B-GGUF",
+      "revision": "cd0c74c575b5c416f3011b5b4c298077f26ca8c2",
+      "file": "LFM3-1.7B-Q4_K_M.gguf",
+      "format": "gguf",
+      "total": 3355223950,
+      "recommended_gpu_memory": 3728026612,
+      "gpu_memory_utilization": 0.9,
+      "weights": {
+        "bytes": 1091380480,
+        "params": 1728801600,
+        "dtypes": {
+          "Q4_K": {
+            "bytes": 715659264,
+            "params": 1272283136
+          },
+          "Q6_K": {
+            "bytes": 374169600,
+            "params": 456130560
+          },
+          "F32": {
+            "bytes": 1551616,
+            "params": 387904
+          }
+        }
+      },
+      "offloaded": {
+        "bytes": 215040000,
+        "params": 262144000,
+        "dtypes": {
+          "Q6_K": {
+            "bytes": 215040000,
+            "params": 262144000
+          }
+        }
+      },
+      "components": null,
+      "kv_cache": {
+        "bytes": 1477033984,
+        "dtype": "F16",
+        "max_model_len": 65536,
+        "batch_size": 1,
+        "layers": {
+          "full": 6,
+          "sliding": 5,
+          "state": 13
+        },
+        "full_sliding_window_cache": true
+      },
+      "overhead": {
+        "bytes": 786809486,
+        "activations": 142564392,
+        "encoder": 0,
+        "graphs": 0,
+        "runtime": 644245094,
+        "reference_engine": "llama.cpp"
+      },
+      "moe": null,
+      "fit": {
+        "gpu_memory": 150109880320,
+        "usable": 135098892288,
+        "required": 3355223950,
+        "gpus": null,
+        "needed": 1,
+        "fits": true,
+        "max_model_len": 262144,
+        "overhead_per_gpu": 786809486,
+        "cache_bytes": 1477033984
+      },
+      "warnings": []
+    },
+    "bounded_budget_bytes": 3355223950,
+    "expected_budget_sufficient": null
+  }
+]

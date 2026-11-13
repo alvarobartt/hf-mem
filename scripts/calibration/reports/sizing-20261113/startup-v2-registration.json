@@ -1,0 +1,192 @@
+{
+  "frozen_at_utc": "2026-11-13T22:13:33.312768+00:00",
+  "experiments": [
+    {
+      "directory": "startup-v2-vllm-h200",
+      "specification": {
+        "engine": "vllm",
+        "image": "vllm/vllm-openai@sha256:91ee972ab751fb7180bc71c175865e36b091686600dca783d52b2511399810b3",
+        "flavor": "h200",
+        "timeout": "30m",
+        "trials": [
+          {
+            "case": {
+              "name": "qwen35-4b-language-model-only",
+              "model": "Qwen/Qwen3.5-4B",
+              "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+              "max_model_len": 6144,
+              "prompt_tokens": 6112,
+              "max_num_batched_tokens": 1024,
+              "num_gpu_blocks_override": 385,
+              "pool_tokens": 6400,
+              "repeats": 1,
+              "startup_timeout": 900,
+              "request_timeout": 300,
+              "extra": [
+                "--language-model-only"
+              ],
+              "native_graph_defaults": true,
+              "native_plan": true
+            },
+            "max_num_seqs": 16,
+            "tensor_parallel_size": 1
+          }
+        ],
+        "purpose": "Prospective vLLM language-only startup allowance holdout on another model, context and prefill size. Full startup/runtime NVML trace, native weights and controlled cache, and every requested prompt/decode token required. No eager or attention backend override. Moved to H200 after more than20minutes of L4 hardware unavailability; no L4 execution or outcome observed. Native Hopper attention/backend defaults retained.",
+        "candidate_source_sha256": {
+          "src/hf_mem/_overhead.py": "264de2ddb0261765aea1e1b80bd029de6c3492d20c19ada148aa5d13cb29d06b",
+          "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+          "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+          "src/hf_mem/_config.py": "65baff736a09117500d9e4cd46bf47153c181b7b1add89fbacfebbad81b8d415",
+          "src/hf_mem/estimate.py": "886d42dfad3c16b1922d8129a54c6e57f161428b2747773b216692888f700911",
+          "src/hf_mem/_onnx.py": "be14c336571a1a87b76570d78422d004b337076aa42cdf10f6e5d8ddf029522f",
+          "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+          "src/hf_mem/_render.py": "a959d001451db0e6e759d1f9492c0a632e13daa15481f6f48661cd63c6b20e7d",
+          "src/hf_mem/cli.py": "9ab372afafc1fbd7bd7d2e7cad9a526ac95ad2c6770a000e081e9c7086553bea",
+          "src/hf_mem/_safetensors.py": "b6ee917bb89038c778526e4e1e324d4247e8c96ca717bd42890c375360b72a72",
+          "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+          "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+        },
+        "source_sha256": {
+          "matrix.py": "bfe138544c31a82eb04d447126ae766b6215514a53521ea2267ed2396ac5342d",
+          "driver.py": "a67725f0b483a67ddd207d5a5f7ea395bfe32efd4b0500211022b1772b1d9925",
+          "sitecustomize.py": "9b1ca6fedc516186012c19794005c49f8095f90522c1edb4e0d87a80ed151f21",
+          "trials.json": "dd00ba0ab021c3829a919be2d259fc0b21253f3dd62704688fd0b7790a7de7b0",
+          "cases-0.json": "a7ba15c93a6b16af5195330e9c9be116e085372512eaf2f621bb4e22ee38d8d8"
+        }
+      },
+      "forecasts": [
+        {
+          "case": "qwen35-4b-language-model-only",
+          "arguments": {
+            "model_id": "Qwen/Qwen3.5-4B",
+            "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+            "engine": "vllm",
+            "language_model_only": true,
+            "max_model_len": 6144,
+            "max_num_batched_tokens": 1024,
+            "max_num_seqs": 16
+          },
+          "unhinted": {
+            "version": "hf-mem@1.0.0",
+            "model": "Qwen/Qwen3.5-4B",
+            "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+            "workload": "language-model-only",
+            "file": null,
+            "format": "safetensors",
+            "total": 9189176149,
+            "recommended_gpu_memory": 10951338477,
+            "gpu_memory_utilization": 0.9,
+            "startup_reserve_per_gpu": 667028480,
+            "weights": {
+              "bytes": 8411510272,
+              "params": 4205751296,
+              "dtypes": {
+                "BF16": {
+                  "bytes": 8411494912,
+                  "params": 4205747456
+                },
+                "F32": {
+                  "bytes": 15360,
+                  "params": 3840
+                }
+              }
+            },
+            "offloaded": null,
+            "components": null,
+            "kv_cache": {
+              "bytes": 311427072,
+              "dtype": "BF16",
+              "max_model_len": 6144,
+              "batch_size": 1,
+              "layers": {
+                "full": 8,
+                "state": 24
+              }
+            },
+            "overhead": {
+              "bytes": 466238805,
+              "activations": 260630118,
+              "encoder": 0,
+              "graphs": 37165439,
+              "runtime": 168443248,
+              "max_num_seqs": 16,
+              "reference_engine": "vllm"
+            },
+            "moe": null,
+            "fit": null,
+            "warnings": [
+              "Qwen3.5 ordinary decoding does not load the root `mtp.*` prediction head; 230.03 MiB of checkpoint weights are excluded. Speculative decoding with an MTP draft requires additional memory.",
+              "Language-model-only mode excludes 0.62 GiB of identified encoder/projector weights."
+            ]
+          },
+          "hardware": {
+            "version": "hf-mem@1.0.0",
+            "model": "Qwen/Qwen3.5-4B",
+            "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+            "workload": "language-model-only",
+            "file": null,
+            "format": "safetensors",
+            "total": 9799866812,
+            "recommended_gpu_memory": 11629883658,
+            "gpu_memory_utilization": 0.9,
+            "startup_reserve_per_gpu": 667028480,
+            "weights": {
+              "bytes": 8411510272,
+              "params": 4205751296,
+              "dtypes": {
+                "BF16": {
+                  "bytes": 8411494912,
+                  "params": 4205747456
+                },
+                "F32": {
+                  "bytes": 15360,
+                  "params": 3840
+                }
+              }
+            },
+            "offloaded": null,
+            "components": null,
+            "kv_cache": {
+              "bytes": 311427072,
+              "dtype": "BF16",
+              "max_model_len": 6144,
+              "batch_size": 1,
+              "layers": {
+                "full": 8,
+                "state": 24
+              }
+            },
+            "overhead": {
+              "bytes": 1076929468,
+              "activations": 260630118,
+              "encoder": 0,
+              "graphs": 46560680,
+              "runtime": 769738670,
+              "max_num_seqs": 16,
+              "reference_engine": "vllm",
+              "gpu_type": "nvidia-h200"
+            },
+            "moe": null,
+            "fit": {
+              "gpu_memory": 150109880320,
+              "usable": 135098892288,
+              "required": 9799866812,
+              "gpus": null,
+              "needed": 1,
+              "fits": true,
+              "max_model_len": 262144,
+              "overhead_per_gpu": 1076929468,
+              "cache_bytes": 311427072,
+              "startup_required": 10466895292
+            },
+            "warnings": [
+              "Qwen3.5 ordinary decoding does not load the root `mtp.*` prediction head; 230.03 MiB of checkpoint weights are excluded. Speculative decoding with an MTP draft requires additional memory.",
+              "Language-model-only mode excludes 0.62 GiB of identified encoder/projector weights."
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

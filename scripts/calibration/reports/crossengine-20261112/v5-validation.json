@@ -1,0 +1,191 @@
+{
+  "scope": "Candidate predictions were frozen locally before Job submission; publication was held pending explicit approval. Native complete-rank/token gates are independent of the forecasts. This evaluator uses stored forecasts, not current coefficients. Unsuccessful or partial datasets cannot establish complete coverage. Stage peaks are not additive; NVML peaks are sampled lower bounds; repeated requests share a warmed server. Logical versus physical cache and checkpoint versus runtime weight storage are reported separately.",
+  "complete": true,
+  "metrics": {
+    "all": {
+      "configurations": 3,
+      "total_error_pct": {
+        "median_absolute": 1.2128221190231603,
+        "p90_absolute": 2.674619971045522,
+        "max_absolute": 2.674619971045522
+      },
+      "overhead_error_pct": {
+        "median_absolute": 4.417213130493581,
+        "p90_absolute": 8.110459800880609,
+        "max_absolute": 8.110459800880609
+      },
+      "capacity_only_total_error_pct": {
+        "median_absolute": 1.2062807088111471,
+        "p90_absolute": 2.6703830772740744,
+        "max_absolute": 2.6703830772740744
+      },
+      "capacity_only_overhead_error_pct": {
+        "median_absolute": 4.435745753977171,
+        "p90_absolute": 8.097872393243598,
+        "max_absolute": 8.097872393243598
+      },
+      "baseline_total_error_pct": {
+        "median_absolute": 6.95011648152839,
+        "p90_absolute": 7.782713344434944,
+        "max_absolute": 7.782713344434944
+      },
+      "baseline_overhead_error_pct": {
+        "median_absolute": 18.494404222503704,
+        "p90_absolute": 48.107340742345464,
+        "max_absolute": 48.107340742345464
+      }
+    },
+    "sglang": {
+      "configurations": 3,
+      "total_error_pct": {
+        "median_absolute": 1.2128221190231603,
+        "p90_absolute": 2.674619971045522,
+        "max_absolute": 2.674619971045522
+      },
+      "overhead_error_pct": {
+        "median_absolute": 4.417213130493581,
+        "p90_absolute": 8.110459800880609,
+        "max_absolute": 8.110459800880609
+      },
+      "capacity_only_total_error_pct": {
+        "median_absolute": 1.2062807088111471,
+        "p90_absolute": 2.6703830772740744,
+        "max_absolute": 2.6703830772740744
+      },
+      "capacity_only_overhead_error_pct": {
+        "median_absolute": 4.435745753977171,
+        "p90_absolute": 8.097872393243598,
+        "max_absolute": 8.097872393243598
+      },
+      "baseline_total_error_pct": {
+        "median_absolute": 6.95011648152839,
+        "p90_absolute": 7.782713344434944,
+        "max_absolute": 7.782713344434944
+      },
+      "baseline_overhead_error_pct": {
+        "median_absolute": 18.494404222503704,
+        "p90_absolute": 48.107340742345464,
+        "max_absolute": 48.107340742345464
+      }
+    }
+  },
+  "observations": [
+    {
+      "case": "trial0-tp2-text-only",
+      "model": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "engine": "sglang",
+      "tensor_parallel_size": "2",
+      "max_num_seqs": "16",
+      "max_model_len": "16384",
+      "prefill_tokens": "8192",
+      "resolved_max_num_seqs": "16",
+      "resolved_prefill_tokens": "8192",
+      "native_scheduler_defaults": "False",
+      "native_prefill_defaults": "False",
+      "request_count": "2",
+      "workload": "text",
+      "request_completed": "True",
+      "native_parameter_bytes": "9082331648",
+      "native_buffer_bytes": "139160064",
+      "native_physical_cache_bytes": "1420984320",
+      "sampled_runtime_bytes": "19697434624",
+      "native_residual_bytes": "9194118656",
+      "missing_evidence": "[]",
+      "usable_for_accuracy": "True",
+      "dataset": "validation-v5-sglang-h200x2",
+      "complete_dataset": true,
+      "gpu_type": "h200",
+      "frozen_total_bytes": 19936329468,
+      "frozen_overhead_bytes": 9445227772,
+      "total_error_pct": 1.2128221190231603,
+      "overhead_error_pct": 2.731192900541135,
+      "overhead_error_MiB": 239.47631454467773,
+      "weight_error_bytes": -3792896,
+      "reference_cache_error_bytes": -8421376,
+      "topology_cache_and_weight_padding_error_bytes": -8421376,
+      "capacity_only_total_error_pct": 1.2062807088111471,
+      "capacity_only_overhead_error_pct": 2.717178615450755,
+      "baseline_total_error_pct": -1.9798198468182426,
+      "baseline_overhead_error_pct": 1.4808079501035243
+    },
+    {
+      "case": "trial1-tp1-text-only",
+      "model": "Qwen/Qwen3.5-9B",
+      "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
+      "engine": "sglang",
+      "tensor_parallel_size": "1",
+      "max_num_seqs": "8",
+      "max_model_len": "12288",
+      "prefill_tokens": "6144",
+      "resolved_max_num_seqs": "8",
+      "resolved_prefill_tokens": "6144",
+      "native_scheduler_defaults": "False",
+      "native_prefill_defaults": "False",
+      "request_count": "2",
+      "workload": "text",
+      "request_completed": "True",
+      "native_parameter_bytes": "18819629024",
+      "native_buffer_bytes": "69456128",
+      "native_physical_cache_bytes": "874676224",
+      "sampled_runtime_bytes": "23170580480",
+      "native_residual_bytes": "3476275232",
+      "missing_evidence": "[]",
+      "usable_for_accuracy": "True",
+      "dataset": "validation-v5-sglang-h200x2",
+      "complete_dataset": true,
+      "gpu_type": "h200",
+      "frozen_total_bytes": 23008610762,
+      "frozen_overhead_bytes": 3322720746,
+      "total_error_pct": -0.6990317663375212,
+      "overhead_error_pct": -4.417213130493581,
+      "overhead_error_MiB": -146.4409694671631,
+      "weight_error_bytes": 6144,
+      "reference_cache_error_bytes": -8421376,
+      "topology_cache_and_weight_padding_error_bytes": -8421376,
+      "capacity_only_total_error_pct": -0.7018122102739777,
+      "capacity_only_overhead_error_pct": -4.435745753977171,
+      "baseline_total_error_pct": 7.782713344434944,
+      "baseline_overhead_error_pct": 48.107340742345464
+    },
+    {
+      "case": "trial2-tp1-image",
+      "model": "Qwen/Qwen3.5-4B",
+      "revision": "851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+      "engine": "sglang",
+      "tensor_parallel_size": "1",
+      "max_num_seqs": "8",
+      "max_model_len": "16384",
+      "prefill_tokens": "6144",
+      "resolved_max_num_seqs": "8",
+      "resolved_prefill_tokens": "6144",
+      "native_scheduler_defaults": "False",
+      "native_prefill_defaults": "False",
+      "request_count": "2",
+      "workload": "mixed-text-image",
+      "request_completed": "True",
+      "native_parameter_bytes": "9078532608",
+      "native_buffer_bytes": "69580032",
+      "native_physical_cache_bytes": "1008893952",
+      "sampled_runtime_bytes": "15205597184",
+      "native_residual_bytes": "5118170624",
+      "missing_evidence": "[]",
+      "usable_for_accuracy": "True",
+      "dataset": "validation-v5-sglang-h200x2",
+      "complete_dataset": true,
+      "gpu_type": "h200",
+      "frozen_total_bytes": 15612289123,
+      "frozen_overhead_bytes": 5533277795,
+      "total_error_pct": 2.674619971045522,
+      "overhead_error_pct": 8.110459800880609,
+      "overhead_error_MiB": 395.8770475387573,
+      "weight_error_bytes": 6144,
+      "reference_cache_error_bytes": -8421376,
+      "topology_cache_and_weight_padding_error_bytes": -8421376,
+      "capacity_only_total_error_pct": 2.6703830772740744,
+      "capacity_only_overhead_error_pct": 8.097872393243598,
+      "baseline_total_error_pct": -6.95011648152839,
+      "baseline_overhead_error_pct": -18.494404222503704
+    }
+  ]
+}

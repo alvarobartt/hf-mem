@@ -1,0 +1,240 @@
+{
+  "computed_at_utc": "2026-11-13T17:47:40.118365+00:00",
+  "scope": "RETROSPECTIVE after both native outcomes. Only model_max_length/sliding_window_size/local_layer_ids parsing changed. No backend coefficients fitted. Original forecasts remain unchanged. Native auto cache reservation and packed-MoE/FA4 graphs are not reimplemented.",
+  "source_sha256": {
+    "src/hf_mem/_overhead.py": "5c40d8edac4a179009339b053f9b8f95d677485b5b2605f9eb88df6760b8cf62",
+    "src/hf_mem/_version.py": "27e8febb48ada44153ea2add9969a2c50a9831a74d9755fdd53c549a888b1cc2",
+    "src/hf_mem/__init__.py": "c6a8c921c7562ef59c41711ecb9df0a50e24501c65e7a1d3a9517597123e6d67",
+    "src/hf_mem/_config.py": "94fd44bb0616a2272771fd5b1e9396808bb8f195c2eb62781f0ab4c187c45d18",
+    "src/hf_mem/estimate.py": "9911c722abc22493b632ec605237cf9855f97e9826a54fbcdb3889af69ada5cc",
+    "src/hf_mem/_onnx.py": "0076f884c881be74833df1dbe7cb757e603e157a4ee6fab370723d7109914be0",
+    "src/hf_mem/_gguf.py": "e16c147ebe2b23c542702a7fb50a35933357e761fd6233d3f6aae8c07ad555b4",
+    "src/hf_mem/_render.py": "cc7ddd61f256a1381706cc8d0f997888f475b2fd92f5b3bfb6e840a1cdab6347",
+    "src/hf_mem/cli.py": "ff01f2fbc9c7e0c0dda246560bdad349fd8b9d8a71f8eaca589bb6ba82c0018d",
+    "src/hf_mem/_safetensors.py": "2216fe99d34829ac4d4e18d4a83d80936b1d8ddfa4acba3e947042bf385d0e0c",
+    "src/hf_mem/_weights.py": "3d39217368566c74caa793fb72ab06189f444e27aa124c9f0474c4b1f09285db",
+    "src/hf_mem/_source.py": "496d00273e6dcefdaf890da392fdefd1afc8c98127e8cdafc4edf9da7373d0d9"
+  },
+  "forecasts": [
+    {
+      "gpus": 4,
+      "context_length": 262144,
+      "max_running_requests": 64,
+      "arguments": {
+        "model_id": "thinkingmachines/Inkling-2-Small",
+        "revision": "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+        "engine": "sglang",
+        "gpu_type": "nvidia-h200",
+        "gpu_memory": "4x141",
+        "max_model_len": 262144,
+        "max_num_seqs": 64
+      },
+      "estimate": {
+        "version": "hf-mem@1.0.0",
+        "model": "thinkingmachines/Inkling-2-Small",
+        "revision": "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+        "file": null,
+        "format": "safetensors",
+        "total": 404197812715,
+        "weights": {
+          "bytes": 390056448320,
+          "params": 383072987216,
+          "dtypes": {
+            "U8": {
+              "bytes": 247669456896,
+              "params": 247669456896
+            },
+            "F8_E4M3": {
+              "bytes": 128421199872,
+              "params": 128421199872
+            },
+            "BF16": {
+              "bytes": 13963530240,
+              "params": 6981765120
+            },
+            "F32": {
+              "bytes": 2261312,
+              "params": 565328
+            }
+          }
+        },
+        "offloaded": null,
+        "components": null,
+        "kv_cache": {
+          "bytes": 11444682752,
+          "dtype": "BF16",
+          "max_model_len": 262144,
+          "batch_size": 1,
+          "layers": {
+            "full": 8,
+            "sliding": 40
+          }
+        },
+        "overhead": {
+          "bytes": 2696681643,
+          "activations": 1760221593,
+          "encoder": 147456,
+          "graphs": 58151166,
+          "runtime": 878161428,
+          "max_num_seqs": 64,
+          "reference_engine": "sglang",
+          "gpu_type": "nvidia-h200"
+        },
+        "moe": null,
+        "fit": {
+          "gpu_memory": 151397597184,
+          "usable": 140037408685,
+          "required": 415123207148,
+          "gpus": 4,
+          "needed": 4,
+          "fits": true,
+          "max_model_len": 1048576,
+          "overhead_per_gpu": 3405519019
+        },
+        "warnings": []
+      }
+    },
+    {
+      "gpus": 8,
+      "context_length": 1048576,
+      "max_running_requests": null,
+      "arguments": {
+        "model_id": "thinkingmachines/Inkling-2-Small",
+        "revision": "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+        "engine": "sglang",
+        "gpu_type": "nvidia-h200",
+        "gpu_memory": "8x141",
+        "max_model_len": 1048576,
+        "max_num_seqs": null
+      },
+      "estimate": {
+        "version": "hf-mem@1.0.0",
+        "model": "thinkingmachines/Inkling-2-Small",
+        "revision": "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+        "file": null,
+        "format": "safetensors",
+        "total": 438917831841,
+        "weights": {
+          "bytes": 390056448320,
+          "params": 383072987216,
+          "dtypes": {
+            "U8": {
+              "bytes": 247669456896,
+              "params": 247669456896
+            },
+            "F8_E4M3": {
+              "bytes": 128421199872,
+              "params": 128421199872
+            },
+            "BF16": {
+              "bytes": 13963530240,
+              "params": 6981765120
+            },
+            "F32": {
+              "bytes": 2261312,
+              "params": 565328
+            }
+          }
+        },
+        "offloaded": null,
+        "components": null,
+        "kv_cache": {
+          "bytes": 37214486528,
+          "dtype": "BF16",
+          "max_model_len": 1048576,
+          "batch_size": 1,
+          "layers": {
+            "full": 8,
+            "sliding": 40
+          }
+        },
+        "overhead": {
+          "bytes": 11646896993,
+          "activations": 1914608025,
+          "encoder": 147456,
+          "graphs": 152854493,
+          "runtime": 9579287019,
+          "max_num_seqs": 2048,
+          "reference_engine": "sglang",
+          "gpu_type": "nvidia-h200"
+        },
+        "moe": null,
+        "fit": {
+          "gpu_memory": 151397597184,
+          "usable": 140037408685,
+          "required": 530266268376,
+          "gpus": 8,
+          "needed": 4,
+          "fits": true,
+          "max_model_len": 1048576,
+          "overhead_per_gpu": 12874416691
+        },
+        "warnings": []
+      }
+    }
+  ],
+  "default_context_check": {
+    "version": "hf-mem@1.0.0",
+    "model": "thinkingmachines/Inkling-2-Small",
+    "revision": "aac974122acd33ddb0d3e1f54433a9c5dd2249ce",
+    "file": null,
+    "format": "safetensors",
+    "total": 438917831841,
+    "weights": {
+      "bytes": 390056448320,
+      "params": 383072987216,
+      "dtypes": {
+        "U8": {
+          "bytes": 247669456896,
+          "params": 247669456896
+        },
+        "F8_E4M3": {
+          "bytes": 128421199872,
+          "params": 128421199872
+        },
+        "BF16": {
+          "bytes": 13963530240,
+          "params": 6981765120
+        },
+        "F32": {
+          "bytes": 2261312,
+          "params": 565328
+        }
+      }
+    },
+    "offloaded": null,
+    "components": null,
+    "kv_cache": {
+      "bytes": 37214486528,
+      "dtype": "BF16",
+      "max_model_len": 1048576,
+      "batch_size": 1,
+      "layers": {
+        "full": 8,
+        "sliding": 40
+      }
+    },
+    "overhead": {
+      "bytes": 11646896993,
+      "activations": 1914608025,
+      "encoder": 147456,
+      "graphs": 152854493,
+      "runtime": 9579287019,
+      "max_num_seqs": 2048,
+      "reference_engine": "sglang",
+      "gpu_type": "nvidia-h200"
+    },
+    "moe": null,
+    "fit": {
+      "gpu_memory": 151397597184,
+      "usable": 140037408685,
+      "required": 530266268376,
+      "gpus": 8,
+      "needed": 4,
+      "fits": true,
+      "max_model_len": 1048576,
+      "overhead_per_gpu": 12874416691
+    },
+    "warnings": []
+  }
+}
