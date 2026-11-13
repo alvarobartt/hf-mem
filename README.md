@@ -286,7 +286,7 @@ $ uvx hf-mem onnx-community/Qwen3-0.6B-ONNX --file onnx/model_q4f16.onnx
 └─────────────────┴─────────────────────────────────────────┘
 ```
 
-The weights are the initializers in the ONNX graph, and the KV cache comes from the `past_*` graph inputs, i.e. the dtype and the cached heads per token as exported, with the context length from `config.json`. ONNX files over 16 MiB with the weights inline are estimated from their file sizes, reading only the graph inputs at the end of the file, and the ONNX Runtime overhead is not estimated.
+The weights are the initializers in the ONNX graph, and the KV cache comes from the `past_*`, `cache.*` or `cache_params.*` graph inputs, i.e. the dtype and the cached heads per token as exported, with the context length from `config.json`. This includes Transformers' cache rename in [#50585](https://github.com/huggingface/transformers/pull/50585). ONNX files over 16 MiB with the weights inline are estimated from their file sizes, reading only the graph inputs at the end of the file, and the ONNX Runtime overhead is not estimated.
 
 ### Local models and the cache
 

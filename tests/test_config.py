@@ -128,6 +128,116 @@ def test_text_config_resolution() -> None:
     assert _config.text_config({**llama_config(), "architectures": ["BertForMaskedLM"]}) is None
 
 
+@pytest.mark.parametrize(
+    "key", ["max_position_embeddings", "model_max_length", "n_positions", "max_seq_len", "seq_length"]
+)
+@pytest.mark.parametrize("model_type", ["llama", "qwen2", "gemma3_text"])
+def test_context_aliases_override_architecture_defaults(key: str, model_type: str) -> None:
+    config = llama_config(model_type=model_type)
+    del config["max_position_embeddings"]
+    config[key] = 65536
+    assert _config.normalize(config)["max_position_embeddings"] == 65536
+    assert "max_position_embeddings" not in config or key == "max_position_embeddings"
+
+
+def test_explicit_legacy_context_takes_precedence_over_aliases() -> None:
+    assert _config.normalize(llama_config(model_max_length=65536))["max_position_embeddings"] == 1024
+    assert (
+        _config.normalize(llama_config(max_position_embeddings=None, model_max_length=65536))[
+            "max_position_embeddings"
+        ]
+        == 65536
+    )
+
+
+@pytest.mark.parametrize("child_key", ["dtype", "torch_dtype"])
+@pytest.mark.parametrize("parent_key", ["dtype", "torch_dtype"])
+def test_nested_dtype_precedes_the_parent_alias(child_key: str, parent_key: str) -> None:
+    child = llama_config()
+    del child["torch_dtype"]
+    child[child_key] = "bfloat16"
+    config = some(_config.text_config({parent_key: "float16", "text_config": child}))
+    assert _config.kv_dtype(config, "auto", Weights(), []) == "BF16"
+
+
+def test_local_layers_use_sliding_attention_dimensions() -> None:
+    config = llama_config(
+        head_dim=64,
+        swa_head_dim=32,
+        swa_num_key_value_heads=4,
+        local_layer_ids=[0, 2],
+        sliding_window_size=128,
+    )
+    size, layers = kv(config, length=100000)
+    assert layers == {"full": 2, "sliding": 2, "state": 0, "none": 0}
+    assert size == (2 * 100000 * 2 * 2 * 64 + 2 * sliding_tokens(128) * 2 * 4 * 32) * 2
+    explicit = {**config, "layer_types": ["full_attention"] * 4}
+    assert kv(explicit, length=100000)[1]["full"] == 4
+
+
+def test_per_layer_attention_overrides_and_zero_padded_indices() -> None:
+    config = llama_config(
+        layer_types=["sliding_attention", "full_attention", "sliding_attention", "full_attention"],
+        sliding_window=128,
+        head_dim=32,
+        per_layer_config={
+            "01": {"head_dim": 64, "num_key_value_heads": 1},
+            "02": {"sliding_window": 256},
+            "03": {"head_dim": None, "num_attention_heads": 4},
+        },
+    )
+    size, layers = kv(config, length=100000, batch=2)
+    expected = (sliding_tokens(128) + sliding_tokens(256)) * 2 * 2 * 32
+    expected += 100000 * (2 * 1 * 64 + 2 * 2 * 64)
+    assert size == expected * 2 * 2
+    assert layers == {"full": 2, "sliding": 2, "state": 0, "none": 0}
+    assert _config.kv_heads(config) == 2
+    # TP=4 replicates the one-head layer four times and the two-head layers twice.
+    replicated, _ = _config.kv_cache(config, "BF16", 100000, 2, tensor_parallel_size=4)
+    assert replicated == (expected * 2 + 100000 * 2 * 1 * 64 * 2) * 2 * 2
+
+
+def test_per_layer_windows_can_define_the_layer_kinds() -> None:
+    config = llama_config(per_layer_config={"1": {"sliding_window": 128}, "3": {"attention_chunk_size": 256}})
+    assert _config.layer_kinds(_config.normalize(config)) == ["full", "sliding", "full", "sliding"]
+
+
+@pytest.mark.parametrize(
+    "sharing", [{"num_kv_shared_layers": 2}, {"kv_sharing_modes": ["store", None, "reuse", "reuse"]}]
+)
+@pytest.mark.parametrize("heterogeneous", [False, True])
+def test_shared_layers_do_not_allocate_another_cache(sharing: dict[str, Any], heterogeneous: bool) -> None:
+    config = llama_config(**sharing)
+    if heterogeneous:
+        config["per_layer_config"] = {"1": {"head_dim": 64}, "2": {"head_dim": 128}}
+    size, layers = kv(config)
+    assert layers == {"full": 2, "sliding": 0, "state": 0, "none": 2}
+    assert size == 1024 * 2 * 2 * (32 + (64 if heterogeneous else 32)) * 2
+
+
+def test_dummy_layers_do_not_allocate_cache() -> None:
+    assert kv(llama_config(layer_types=["dummy"] * 4))[0] == 0
+
+
+@pytest.mark.parametrize("explicit_modes", [False, True])
+def test_shared_mla_retains_independent_indexer_caches(explicit_modes: bool) -> None:
+    # Transformers #50305: a KV consumer may still own an indexer cache.
+    config = llama_config(
+        kv_lora_rank=512,
+        qk_rope_head_dim=64,
+        kv_source_layers=[0, 1, 0, 1],
+        no_rope_layers=[1, 0, 1, 0],
+        index_head_dim=128,
+        indexer_types=["full", "full", "full", "shared"],
+    )
+    if explicit_modes:
+        config["kv_sharing_modes"] = ["store", "store", "reuse_but_indexer", "reuse"]
+    size, layers = kv(config)
+    assert layers == {"full": 2, "sliding": 0, "state": 0, "none": 2}
+    assert size == 1024 * ((512 + 64 + 512) * 2 + 3 * (128 + 4))
+    assert _config.kv_cache(config, "BF16", 1024, 1, tensor_parallel_size=4)[0] == size * 4
+
+
 def test_is_generative() -> None:
     assert _config.is_generative({"architectures": ["Qwen3ForCausalLM"]}, {})
     assert _config.is_generative({"architectures": ["Custom"]}, {"generation_config.json": 1})
@@ -139,6 +249,7 @@ def test_is_generative() -> None:
     [
         ({"torch_dtype": "bfloat16"}, "auto", "BF16"),
         ({"dtype": "float16"}, "auto", "F16"),
+        ({"dtype": "float16", "torch_dtype": "bfloat16"}, "auto", "F16"),
         ({"torch_dtype": "bfloat16", "quantization_config": {"quant_method": "fp8"}}, "auto", "BF16"),
         ({"quantization_config": {"kv_cache_scheme": {"num_bits": 8}}}, "auto", "F8_E4M3"),
         ({"quantization_config": {"kv_cache_quant_algo": "FP8"}}, "auto", "F8_E4M3"),

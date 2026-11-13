@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 
@@ -21,6 +22,25 @@ def test_dense_model_with_kv_cache(tmp_path: Path) -> None:
     assert result.kv_cache is not None
     assert some(result.kv_cache).bytes == 2 * 4 * 2 * 32 * 1024 * 2
     assert result.total == nbytes + some(result.kv_cache).bytes + some(result.overhead).bytes
+
+
+def test_inkling2_config_estimates_the_decoder_and_local_layers(tmp_path: Path) -> None:
+    # https://huggingface.co/thinkingmachines/Inkling-2-Small/blob/main/config.json
+    config = json.loads((Path(__file__).parent / "fixtures" / "inkling2.json").read_text())
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path))
+
+    cache = some(result.kv_cache)
+    assert cache.max_model_len == 1048576 and cache.dtype == "BF16"
+    assert cache.layers == {"full": 8, "sliding": 40, "state": 0, "none": 0}
+    window_tokens = (-(-(1024 - 1 + 2 * 8192) // 16) + 1) * 16
+    assert cache.bytes == (8 * 1048576 + 40 * window_tokens) * 2 * 8 * 128 * 2
+    assert not any("KV cache estimation skipped" in warning for warning in result.warnings)
+
+    override = some(estimate(str(tmp_path), max_model_len=128, batch_size=2).kv_cache)
+    assert override.bytes == 48 * 128 * 2 * 8 * 128 * 2 * 2
 
 
 def test_kv_cache_options(tmp_path: Path) -> None:
