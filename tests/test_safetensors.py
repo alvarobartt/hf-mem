@@ -161,20 +161,25 @@ def test_unindexed_files_are_separate_components(tmp_path: Path) -> None:
         estimate(str(tmp_path), file="missing.safetensors")
 
 
-def test_moe_breakdown(tmp_path: Path) -> None:
+@pytest.mark.parametrize("active_key", ["num_experts_per_tok", "num_experts_per_token", "top_k"])
+@pytest.mark.parametrize("active, expected", [(0, None), (True, None), (1, 1), (2, 2)])
+def test_moe_breakdown(tmp_path: Path, active_key: str, active: int, expected: int | None) -> None:
     tensors = {"model.embed_tokens.weight": ("BF16", [100, 64])}
     for layer in range(2):
         for expert in range(4):
             tensors[f"model.layers.{layer}.mlp.experts.{expert}.up_proj.weight"] = ("BF16", [128, 64])
     write_safetensors(str(tmp_path / "model.safetensors"), tensors)
-    write_json(str(tmp_path / "config.json"), llama_config(num_local_experts=4, num_experts_per_tok=2))
+    config = llama_config(num_local_experts=4)
+    config[active_key] = active
+    write_json(str(tmp_path / "config.json"), config)
 
     result = estimate(str(tmp_path))
     moe = result.moe
 
     assert moe is not None
     assert "EXPERTS (4 x 16.38K PARAMS, 0.00 GiB)" in table(result)
-    assert (moe.experts, moe.active) == (4, 2)
+    assert (moe.experts, moe.active) == (4, expected)
+    assert result.to_dict()["moe"]["active"] == expected
     assert moe.expert.bytes == 2 * 128 * 64 * 2
     assert moe.experts_total.bytes == 4 * moe.expert.bytes
     assert moe.base.bytes == 100 * 64 * 2
