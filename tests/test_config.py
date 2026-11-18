@@ -38,6 +38,29 @@ def test_sliding_window_layers_reserve_the_window_plus_batched_tokens() -> None:
     assert kv(hybrid, length=1024)[0] == 4 * 1024 * 2 * 2 * 32 * 2
 
 
+def test_hybrid_layers_are_padded_to_whole_vllm_groups() -> None:
+    # Gemma 3 27B: 10 full + 52 sliding layers, so vLLM groups 10 layers at a time and pads sliding to 60
+    gemma3 = llama_config(num_hidden_layers=62, sliding_window=128, sliding_window_pattern=6)
+    size, layers = kv(gemma3, length=100_000)
+    assert size == (10 * 100_000 + 60 * sliding_tokens(128)) * 2 * 2 * 32 * 2
+    assert layers == {"full": 10, "sliding": 52, "state": 0, "none": 0}
+
+
+def test_hybrid_layers_that_divide_into_groups_are_not_padded() -> None:
+    config = llama_config(num_hidden_layers=30, sliding_window=128, sliding_window_pattern=6)
+    assert kv(config, length=100_000)[0] == (5 * 100_000 + 25 * sliding_tokens(128)) * 2 * 2 * 32 * 2
+
+
+def test_hybrid_group_size_uses_the_larger_count_when_close() -> None:
+    # vLLM pads 12 sliding + 13 full to 13 + 13 rather than 12 sliding + 24 full
+    config = llama_config(
+        num_hidden_layers=25,
+        sliding_window=128,
+        layer_types=["sliding_attention"] * 12 + ["full_attention"] * 13,
+    )
+    assert kv(config, length=100_000)[0] == (13 * 100_000 + 13 * sliding_tokens(128)) * 2 * 2 * 32 * 2
+
+
 def test_gemma3_defaults() -> None:
     config = {
         "model_type": "gemma3_text",
@@ -256,6 +279,9 @@ def test_is_generative() -> None:
         ({"torch_dtype": "bfloat16"}, "fp8_e5m2", "F8_E5M2"),
         ({"torch_dtype": "bfloat16"}, "fp8", "F8_E4M3"),
         ({"torch_dtype": "bfloat16"}, "float16", "F16"),
+        ({"torch_dtype": "float32"}, "auto", "BF16"),
+        ({"dtype": "float32"}, "auto", "BF16"),
+        ({"torch_dtype": "float32"}, "float16", "F16"),
     ],
 )
 def test_kv_dtype(config: dict[str, Any], requested: str, expected: str) -> None:
@@ -268,6 +294,12 @@ def test_kv_dtype_falls_back_to_the_dominant_weight_dtype() -> None:
     weights.add("F8_E4M3", 100, 100)
     assert _config.kv_dtype({}, "auto", weights, warnings) == "F16"
     assert warnings
+
+
+def test_kv_dtype_downcasts_fp32_weights_as_vllm_does() -> None:
+    weights = Weights()
+    weights.add("F32", 10, 40)
+    assert _config.kv_dtype({}, "auto", weights, []) == "BF16"
 
 
 def test_global_attention_layers_use_their_own_kv_heads_and_head_dim() -> None:

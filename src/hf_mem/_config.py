@@ -200,15 +200,21 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
         return "F8_E4M3"
     dtype = config.get("dtype") or config.get("torch_dtype")
     if isinstance(dtype, str):
-        return _TORCH.get(dtype.removeprefix("torch."), "F16")
+        return _downcast_f32(_TORCH.get(dtype.removeprefix("torch."), "F16"))
 
     counts = {d: w.params for d, w in weights.dtypes.items() if d in {"BF16", "F16", "F32"}}
-    dtype = max(counts, key=counts.__getitem__) if counts else "BF16"
+    dtype = _downcast_f32(max(counts, key=counts.__getitem__) if counts else "BF16")
     warnings.append(
         f"The KV cache dtype could not be inferred from `config.json`, so it defaults to {dtype}, set "
         "`--kv-cache-dtype` to override it."
     )
     return dtype
+
+
+def _downcast_f32(dtype: str) -> str:
+    # vLLM serves FP32 checkpoints in the platform's preferred dtype (BF16 on CUDA), so the KV cache is 16-bit,
+    # see `_resolve_auto_dtype` in `vllm/config/model.py`
+    return "BF16" if dtype == "F32" else dtype
 
 
 def layer_kinds(config: dict[str, Any]) -> list[str]:
@@ -358,6 +364,14 @@ def _packed_mla(
     return size * tensor_parallel_size * batch_size, layers
 
 
+def _group_size(*counts: int) -> int:
+    # vLLM's hybrid KV cache manager splits each attention type into groups of this many layers and pads the last
+    # group of each type, see `_get_kv_cache_groups_uniform_page_size` in `vllm/v1/core/kv_cache_utils.py`
+    present = [n for n in counts if n]
+    smallest, largest = min(present), max(present)
+    return largest if largest < smallest * 1.5 else smallest
+
+
 def kv_cache(
     config: dict[str, Any],
     dtype: str,
@@ -439,6 +453,9 @@ def kv_cache(
     dtype_bytes = _BYTES.get(dtype, 2)
     token, full_token = int(width * dtype_bytes), int(full_width * dtype_bytes)
     if not state:
+        if full and sliding:
+            group = _group_size(full, sliding)
+            full, sliding = _cdiv(full, group) * group, _cdiv(sliding, group) * group
         size = full * _cdiv(max_model_len, BLOCK_SIZE) * full_token + sliding * sliding_pages * token
         return size * BLOCK_SIZE * batch_size + indexer, layers
 
@@ -447,7 +464,7 @@ def kv_cache(
         return state * state_pages * state_bytes * batch_size + indexer, layers
     alignment = 128 if config.get("linear_attn_config") else BLOCK_SIZE
     block = max(alignment, _cdiv(_cdiv(state_bytes, token), alignment) * alignment)
-    group = min(n for n in (full, sliding, state) if n)
+    group = _group_size(full, sliding, state)
     size = _cdiv(full, group) * _cdiv(max_model_len, block) * full_token
     size += _cdiv(sliding, group) * (_cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len)) * token
     size += _cdiv(state, group) * state_pages * token
