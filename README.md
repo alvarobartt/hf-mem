@@ -158,23 +158,13 @@ $ uvx hf-mem google/embeddinggemma-2
 └─────────────────┴──────────────────────────────────┘
 ```
 
-Text encoders, rerankers and Sentence Transformers include a warmup estimate over `--max-num-batched-tokens` tokens, using `--max-model-len` as the sequence length (otherwise the Sentence Transformers or model configuration). The batch can contain several sequences. No KV cache or decoding graphs are added.
+Text encoders, rerankers and Sentence Transformers include warmup memory. Use `--max-num-batched-tokens` for the warmup token budget and `--max-model-len` for the sequence length.
 
 ```bash
 uvx hf-mem BAAI/bge-base-en-v1.5 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
 ```
 
-By default, weights keep their stored dtypes, including mixed precision and quantization buffers. Activations use the configured dtype or the dominant floating-point weight dtype. For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` explicitly casts floating-point parameters and activations; integer tensors remain unchanged. Other model types reject this option. Warmup assumes memory-efficient attention in half precision, and eager attention for MPNet, DeBERTa, configurations selecting it, and F32 activations, as memory-efficient attention kernels need half precision. Fit checks assume one replica per GPU.
-
-To estimate a Text Embeddings Inference deployment, use its configured `--dtype` (`float16` or `float32`) and the actual number of warmup tokens, which may be smaller than its batch limit:
-
-```bash
-uvx hf-mem BAAI/bge-base-en-v1.5 --dtype float16 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
-```
-
-Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Loading allows for a temporary tensor in its stored dtype alongside the converted weights, so F32 checkpoints loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
-
-FP32 decoder checkpoints use a 16-bit CUDA serving reference for floating-point weights and automatic KV cache precision. The estimate labels that reference F16; an engine may choose BF16 with the same memory width. Encoder defaults preserve their stored precision, and quantized checkpoints keep their declared representation.
+For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` sets weight and activation precision. Encoder fit checks assume one replica per GPU.
 
 ### GGUF
 
@@ -335,17 +325,17 @@ Gated and private models need a token, read from `--hf-token`, `HF_TOKEN`, or th
 
 ### Deployment sizing
 
-Use `--gpu-memory` to check a deployment. Bare sizes and `GiB` are binary; `GB` is decimal. For example, `8x141` uses 141 GiB per GPU, while `8x141GB` means 141 billion bytes per GPU. The default allocation budget is 90%, with the initialization allowance included in the recommendation. Decoder initialization uses at least 1 GiB of workspace per GPU, sharing the modeled activation reserve. This is an allowance for temporary workspaces rather than a claim that an engine always allocates that amount.
+Use `--gpu-memory` to check whether a model fits. Bare sizes and `GiB` are binary; `GB` is decimal: `8x141` means eight GPUs with 141 GiB each. The recommendation includes startup memory and a 90% allocation budget, adjustable with `--gpu-memory-utilization`.
 
 ```bash
-uvx hf-mem thinkingmachines/Inkling-2-Small --engine sglang --gpu-type nvidia-h200 --gpu-memory 8x141 --context-length 1048576
+uvx hf-mem thinkingmachines/Inkling-2-Small --engine sglang --gpu-memory 8x141 --context-length 1048576
 ```
 
-Optional GPU profiles are `nvidia-t4`, `nvidia-a10g`, `nvidia-l4`, `nvidia-l40s`, `nvidia-a100`, `nvidia-h100`, `nvidia-h200` and `nvidia-rtx-pro-6000`. Unprefixed names remain aliases. A named profile checks capacity against board variants, allowing driver/ECC reservations: H200 accepts its 141 label or a measured `139.8GiB`, and rejects `80`. It does not query hardware or identify partitions. Without a profile, capacity selects a coarse workspace reference.
+`--gpu-type` is optional. Supported profiles are `nvidia-t4`, `nvidia-a10g`, `nvidia-l4`, `nvidia-l40s`, `nvidia-a100`, `nvidia-h100`, `nvidia-h200` and `nvidia-rtx-pro-6000`. When provided, `--gpu-memory` must match a supported capacity for that GPU, allowing for driver reservations.
 
-`--engine sglang` selects SGLang scheduling/workspace defaults; Safetensors otherwise use the vLLM reference, except Inkling 2 uses its SGLang reference. GGUF uses llama.cpp. These profiles share model geometry and approximate runtime allowances rather than reproducing an engine's allocator or every optimization.
+Use `--engine sglang` for SGLang estimates. Safetensors default to vLLM, except Inkling 2 defaults to SGLang. GGUF uses llama.cpp.
 
-For encoder-free deployment, `--language-model-only` removes identified encoder/projector tensors and encoder activations. Unknown tensor namespaces remain counted. Engine support for this mode varies by architecture. The legacy `--text-only` option keeps the weights and omits encoder activations only.
+Use `--language-model-only` to exclude identified vision/audio encoders and projectors when deploying a multimodal model for language tasks only.
 
 | Meaning | Options |
 | --- | --- |
@@ -356,7 +346,7 @@ For encoder-free deployment, `--language-model-only` removes identified encoder/
 | Prefill tokens | `--max-num-batched-tokens`, `--chunked-prefill-size` |
 | Full sliding-window storage | `--disable-hybrid-kv-cache-manager`, `--disable-hybrid-swa-memory`, `--swa-full`, `--full-sliding-window-cache` |
 
-llama.cpp's `--ctx-size`/`-c` is the total context pool, divided by `--parallel`, and selects GGUF. `--no-mmproj`/`--no-mmproj-auto` omit its projector; `--cache-type-k`/`--cache-type-v` require matching types. Native llama.cpp `--batch-size` counts tokens, while hf-mem's counts sequences. SGLang's `--mem-fraction-static` has different semantics from the overall fit budget and is not an alias. Full-window aliases model storage, not every behavioral effect of disabling an engine's cache manager.
+For llama.cpp, `--ctx-size`/`-c` sets the total context pool, divided by `--parallel`, and selects GGUF. `--no-mmproj` omits the projector. `--cache-type-k` and `--cache-type-v` must match. hf-mem's `--batch-size` counts sequences; llama.cpp's counts tokens.
 
 ### JSON and Markdown
 
@@ -430,7 +420,7 @@ hf extensions add alvarobartt/hf-mem
 - **KV cache**: what the engine allocates for `--max-model-len` tokens and `--batch-size` sequences, following the model's attention: full attention caches every token, sliding window layers only the window, latent and compressed attention (e.g. DeepSeek, GLM) a smaller record per token, and linear attention or Mamba layers a fixed state per sequence.
 - **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, the CUDA graphs, and the runtime (the CUDA context and library workspaces).
 
-The reference estimates use shared weight/cache geometry and workspace allowances, with optional engine and hardware defaults. Fitting recomputes sharded and replicated storage at each GPU count and context candidate. Runtime overhead and initialization can vary with kernels, graph capture and other optimizations.
+Estimates depend on the engine and workload settings. Kernels and other runtime optimizations can change memory use.
 
 ## Limitations
 
@@ -438,8 +428,6 @@ The reference estimates use shared weight/cache geometry and workspace allowance
 - ONNX models have no overhead estimate, and GGUF and ONNX listings estimate each file from its size, so a single file (`:<quantization>` or `--file`) gives the most accurate numbers.
 - vLLM profiles the vision encoder of some models (e.g. Qwen2.5-VL) with a video when it has more tokens than an image, which can reserve a few GiB more (`hf-mem` warns about it).
 - PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, and encoder-decoder models (e.g. Whisper) have no KV cache estimate.
-- Kimi K3.1 defaults to vLLM's `fp8_ds_mla` cache layout on Hopper. Use `--kv-cache-dtype fp8` for the per-tensor FP8 layout used by FlashInfer on Blackwell.
-- A capacity-only profile cannot identify GPU architecture or backend selection. AMD and partitioned GPU configurations have no dedicated profile.
 
 ## References
 
