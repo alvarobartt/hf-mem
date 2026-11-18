@@ -849,3 +849,32 @@ def test_precision_cast_preserves_non_parameter_bytes_without_mutating_weights()
     assert result.dtypes["F32"].bytes == 4096 and result.dtypes["F32"].params == 0
     assert result.dtypes["F16"].bytes == 2048 and result.dtypes["U8"].bytes == 512
     assert weights.to_dict() == before
+
+
+def test_fp32_decoder_reference_casts_weights_and_preserves_integer_buffers(tmp_path: Path) -> None:
+    stored = write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {"model.embed_tokens.weight": ("F32", [100, 64]), "position_ids": ("I64", [3])},
+    )
+    write_json(str(tmp_path / "config.json"), llama_config(torch_dtype="float32"))
+    result = estimate(str(tmp_path))
+    assert result.weights.bytes == (stored - 24) // 2 + 24
+    assert set(result.weights.dtypes) == {"F16", "I64"}
+    assert some(result.kv_cache).dtype == "F16"
+    assert any("16-bit CUDA serving reference" in warning for warning in result.warnings)
+
+
+def test_fp32_expert_storage_stays_consistent_with_the_decoder_reference(tmp_path: Path) -> None:
+    tensors = {"model.embed_tokens.weight": ("F32", [100, 64])}
+    for index in range(4):
+        tensors[f"model.layers.0.mlp.experts.{index}.up_proj.weight"] = ("F32", [128, 64])
+    stored = write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(torch_dtype="float32", num_local_experts=4, num_experts_per_tok=1),
+    )
+    result = estimate(str(tmp_path))
+    moe = some(result.moe)
+    assert result.weights.bytes == stored // 2
+    assert moe.base.bytes + moe.experts_total.bytes == result.weights.bytes
+    assert moe.active == 1

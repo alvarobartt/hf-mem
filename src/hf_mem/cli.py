@@ -60,7 +60,7 @@ def main() -> None:
     parser.add_argument(
         "--kv-cache-dtype",
         default="auto",
-        help="KV cache dtype, `auto` uses the model dtype (Safetensors, FP32 served as BF16 as in vLLM) or F16 (GGUF). "
+        help="KV cache dtype, `auto` uses model precision (16-bit for FP32 decoders) or F16 for GGUF. "
         f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(t.lower() for t in CACHE_TYPES)}. ONNX: set by the graph.",
     )
     parser.add_argument(

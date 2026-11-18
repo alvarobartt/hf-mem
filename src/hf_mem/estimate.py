@@ -413,7 +413,7 @@ def _loading_transient(components: dict[str, Weights], dtype: str) -> int:
     )
 
 
-def _encoder_size(config: dict[str, Any], weights: Weights) -> int:
+def _float_size(config: dict[str, Any], weights: Weights) -> int:
     dtype = config.get("dtype") or config.get("torch_dtype")
     sizes = {"float64": 8, "float32": 4, "float16": 2, "bfloat16": 2}
     if isinstance(dtype, str) and dtype.removeprefix("torch.") in sizes:
@@ -504,10 +504,27 @@ async def _estimate_safetensors(
             or any(d not in ("F64", "F32", "F16", "BF16", "I64", "I32", "I16", "BOOL") for d in weights.dtypes)
         ):
             raise RuntimeError(_ENCODER_DTYPE_ONLY)
-        estimate.components = {name: component.cast(dtype) for name, component in components.items()}
+    weight_dtype = dtype
+    if (
+        not text_encoder
+        and config
+        and _config.is_generative(config, files)
+        and not quantization
+        and _float_size(_config.text_config(config) or config, weights) == 4
+    ):
+        weight_dtype = "float16"
+        warnings.append(
+            "FP32 decoder weights use a 16-bit CUDA serving reference; engines may select F16 or BF16."
+        )
+    if weight_dtype is not None:
+        estimate.components = {name: component.cast(weight_dtype) for name, component in components.items()}
         estimate.weights = weights = Weights()
         for component in estimate.components.values():
             weights.merge(component)
+        experts = {
+            name: {index: expert.cast(weight_dtype) for index, expert in group.items()}
+            for name, group in experts.items()
+        }
     if text_encoder:
         encoder_config = _config.normalize(config)
         length = await _encoder_length(source, encoder_config, max_model_len)
@@ -536,7 +553,7 @@ async def _estimate_safetensors(
                 "Encoder warmup estimation skipped, as the sequence length is unknown, set `--max-model-len`."
             )
         else:
-            size = DTYPES[dtype][1] if dtype else _encoder_size(encoder_config, weights)
+            size = DTYPES[dtype][1] if dtype else _float_size(encoder_config, weights)
             estimate.overhead = overhead = _overhead.encoder_warmup(encoder_config, files, tokens, length, size)
             if dtype:
                 transient = _loading_transient(components, dtype)
@@ -595,7 +612,9 @@ async def _estimate_safetensors(
 
     if len(components) == 1:
         name = next(iter(components))
-        estimate.moe = _safetensors.moe_breakdown(components[name], experts.get(name, {}), text, warnings)
+        estimate.moe = _safetensors.moe_breakdown(
+            estimate.components[name], experts.get(name, {}), text, warnings
+        )
     length = max_model_len or text.get("max_position_embeddings")
     if not isinstance(length, int):
         warnings.append(
