@@ -455,6 +455,25 @@ def kv_cache(
             )[0]
         return size, counts
     if tensor_parallel_size > 1:
+        if "state" not in layer_kinds(config):
+            sharded = {
+                **config,
+                "num_key_value_heads": _cdiv(
+                    config.get("num_key_value_heads") or config["num_attention_heads"], tensor_parallel_size
+                ),
+            }
+            for name in ("num_global_key_value_heads", "swa_num_key_value_heads"):
+                if config.get(name):
+                    sharded[name] = _cdiv(config[name], tensor_parallel_size)
+            size, layers = kv_cache(
+                sharded,
+                dtype,
+                max_model_len,
+                batch_size,
+                batched_tokens,
+                full_sliding_window_cache=full_sliding_window_cache,
+            )
+            return size * tensor_parallel_size, layers
         if config.get("linear_attn_config"):
             sharded = {
                 **config,

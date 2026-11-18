@@ -342,9 +342,11 @@ Use `--language-model-only` to exclude identified vision/audio encoders and proj
 | Model | positional ID, `--model`, `--model-path`, `--hf-repo` |
 | Context per sequence | `--max-model-len`, `--context-length`, `--context-len` |
 | Cached sequences | `--batch-size`, `--parallel`, `-np` |
-| Scheduler capacity | `--max-num-seqs`, `--max-running-requests` |
+| Admitted requests | `--max-num-seqs`, `--max-running-requests` |
 | Prefill tokens | `--max-num-batched-tokens`, `--chunked-prefill-size` |
 | Full sliding-window storage | `--disable-hybrid-kv-cache-manager`, `--disable-hybrid-swa-memory`, `--swa-full`, `--full-sliding-window-cache` |
+
+Match `--max-num-seqs` to the server's admission limit; `--batch-size` is the number of sequences in the workload.
 
 For llama.cpp, `--ctx-size`/`-c` sets the total context pool, divided by `--parallel`, and selects GGUF. `--no-mmproj` omits the projector. `--cache-type-k` and `--cache-type-v` must match. hf-mem's `--batch-size` counts sequences; llama.cpp's counts tokens.
 
@@ -363,15 +365,15 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
   "revision": "main",
   "file": null,
   "format": "safetensors",
-  "total": 22911041288,
-  "recommended_gpu_memory": 26068644020,
+  "total": 22921527048,
+  "recommended_gpu_memory": 26080294865,
   "gpu_memory_utilization": 0.9,
   "startup_reserve_per_gpu": 550738330,
   "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
   "offloaded": null,
   "components": null,
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 1697732360, "activations": 523003494, "encoder": 0, "graphs": 326472826, "runtime": 848256040, "buffers": 0, "loading": 0, "max_num_seqs": 256, "reference_engine": "vllm"},
+  "overhead": {"bytes": 1708218120, "activations": 523003494, "encoder": 0, "graphs": 326472826, "runtime": 848256040, "buffers": 10485760, "loading": 0, "max_num_seqs": 256, "reference_engine": "vllm"},
   "moe": null,
   "fit": null,
   "warnings": []
@@ -382,7 +384,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 - `startup_reserve_per_gpu`, when present, is initialization storage beyond the modeled runtime allocations. `fit.startup_required` includes it in the fit decision.
 - `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` is `null` for non-generative models; text encoders include warmup `overhead`, while other non-generative models have no overhead estimate.
 - `file`, `offloaded` (weights in CPU memory, not in `total`), `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
-- For multiple GPUs, `fit.required` includes topology replication and per-GPU overhead; `total` remains the component reference sum.
+- With `--gpu-memory NxSIZE`, all memory totals include the requested topology. `total` equals `fit.required`, before startup memory and budget headroom.
 - `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
 - `format` is `safetensors`, `gguf` or `onnx`.
 - GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
@@ -418,7 +420,7 @@ hf extensions add alvarobartt/hf-mem
 
 - **Weights**: tensor storage at the selected serving precision, per dtype and component. Weights that the engine keeps in CPU memory are reported apart, as vLLM does with the DeepSeek-V4.1 Engram tables and llama.cpp with the token embeddings.
 - **KV cache**: what the engine allocates for `--max-model-len` tokens and `--batch-size` sequences, following the model's attention: full attention caches every token, sliding window layers only the window, latent and compressed attention (e.g. DeepSeek, GLM) a smaller record per token, and linear attention or Mamba layers a fixed state per sequence.
-- **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, the CUDA graphs, and the runtime (the CUDA context and library workspaces).
+- **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, persistent buffers, CUDA graphs, and the runtime (the CUDA context and library workspaces).
 
 Estimates depend on the engine and workload settings. Kernels and other runtime optimizations can change memory use.
 

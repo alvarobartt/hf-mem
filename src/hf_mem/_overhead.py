@@ -1,6 +1,6 @@
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from hf_mem import _config
@@ -154,6 +154,24 @@ class Overhead:
             + self.weight_adjustment
         )
 
+    def scaled(self, count: int) -> "Overhead":
+        return replace(
+            self,
+            **{
+                name: getattr(self, name) * count
+                for name in (
+                    "activations",
+                    "encoder",
+                    "graphs",
+                    "runtime",
+                    "context",
+                    "buffers",
+                    "loading",
+                    "weight_adjustment",
+                )
+            },
+        )
+
     def to_dict(self) -> dict[str, Any]:
         out = {
             "bytes": self.bytes,
@@ -271,6 +289,41 @@ def supports_video(config: dict[str, Any], files: Any) -> bool:
     return bool(vision) and (
         "video_preprocessor_config.json" in files or bool(vision.get("temporal_patch_size"))
     )
+
+
+def position_buffers(config: dict[str, Any]) -> int:
+    tables = set()
+    for layer, kind in zip(_config._layer_configs(config), _config.layer_kinds(config)):
+        if kind not in {"full", "sliding"} or layer.get("qk_rope_head_dim") == 0:
+            continue
+        parameters = layer.get("rope_parameters") or layer.get("rope_scaling") or {}
+        parameters = parameters if isinstance(parameters, dict) else {}
+        params = parameters.get(f"{kind}_attention", parameters)
+        if not isinstance(params, dict) or params.get("mrope_section"):
+            continue
+        theta = (
+            params.get("rope_theta")
+            or (layer.get("rope_local_base_freq") if kind == "sliding" else layer.get("rope_theta"))
+            or layer.get("rope_theta")
+        )
+        if not params and not theta:
+            continue
+        dimension = (
+            layer.get("qk_rope_head_dim")
+            or (layer.get("global_head_dim") if kind == "full" else layer.get("swa_head_dim"))
+            or layer.get("head_dim")
+            or (layer.get("hidden_size") or 0) // max(1, layer.get("num_attention_heads") or 1)
+        )
+        if type(dimension) is int and dimension > 0:
+            tables.add(
+                (
+                    layer.get("max_position_embeddings") or 0,
+                    dimension,
+                    repr(theta),
+                    repr(sorted(params.items())),
+                )
+            )
+    return sum(positions * dimension * 2 for positions, dimension, _, _ in tables)
 
 
 def decoder(
@@ -392,6 +445,7 @@ def decoder(
         int(max(0, graphs)),
         int(non_torch + context + communication + (capacity + 1) * context_length * 4 * (engine == "sglang")),
         int(context),
+        buffers=position_buffers(config),
         max_num_seqs=capacity,
         reference_engine=engine,
         gpu_type=gpu_type_name(gpu_type) if gpu_type is not None else None,

@@ -124,5 +124,24 @@ def test_small_decoder_capacity_includes_shared_initialization_workspace(tmp_pat
     write_json(str(tmp_path / "config.json"), llama_config())
     result = estimate(str(tmp_path), gpu_memory="4x24")
     assert result.overhead is not None and result.fit is not None
-    assert result.overhead.activations + result.startup_reserve_per_gpu >= GIB
+    assert result.overhead.activations // 4 + result.startup_reserve_per_gpu >= GIB
     assert result.fit.startup_required == result.fit.required + 4 * result.startup_reserve_per_gpu
+
+
+@pytest.mark.parametrize("engine", ["vllm", "sglang"])
+@pytest.mark.parametrize("ranks", [1, 2, 4, 8])
+@pytest.mark.parametrize("heads", [1, 4])
+def test_selected_topology_breakdown_matches_the_fit(
+    tmp_path: Path, engine: str, ranks: int, heads: int
+) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config(num_key_value_heads=heads))
+    result = estimate(str(tmp_path), engine=engine, gpu_memory=f"{ranks}x24")
+    assert result.fit is not None and result.kv_cache is not None and result.overhead is not None
+    assert result.total == result.fit.required
+    assert result.total == result.weights.bytes + result.kv_cache.bytes + result.overhead.bytes
+    assert result.kv_cache.bytes == result.fit.cache_bytes
+    assert result.fit.overhead_per_gpu is not None
+    assert result.overhead.bytes == ranks * result.fit.overhead_per_gpu
+    assert f"| Engine reference | {engine} |" in markdown(result)
+    assert result.to_dict()["total"] == result.fit.required

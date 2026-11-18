@@ -260,6 +260,8 @@ def markdown(estimate: Estimate | Listing) -> str:
         return "\n".join([f"Memory estimate for {where}", "", *rows])
 
     rows = ["| | Memory | Params |", "|---|--:|--:|"]
+    if estimate.overhead and estimate.overhead.reference_engine:
+        rows.append(f"| Engine reference | {estimate.overhead.reference_engine} | |")
     if (recommended := estimate.recommended_gpu_memory) is not None:
         rows.append(
             f"| **Recommended GPU capacity** | **{gib(recommended)} GiB ({recommended / 10**9:.2f} GB)** | |"

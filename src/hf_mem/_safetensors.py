@@ -351,7 +351,8 @@ async def read_components(
         skipped = sum(skipped_encoder.values())
         if skipped:
             warnings.append(
-                f"Language-model-only mode excludes {skipped / (1 << 30):.2f} GiB of identified encoder/projector weights."
+                f"Language-model-only mode excludes {skipped / (1 << 30):.2f} GiB of identified encoder/projector weights. "
+                "Engine compatibility is not checked."
             )
         else:
             warnings.append(

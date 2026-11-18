@@ -172,7 +172,7 @@ def _fit(
     kv_heads: int | None = None,
     padding: Callable[[int], int] | None = None,
     kv_bytes: Callable[[int, int], int] | None = None,
-    rank_overhead: Callable[[int], int] | None = None,
+    rank_overhead: Callable[[int], _overhead.Overhead] | None = None,
     overhead_at_context: Callable[[int, int], int] | None = None,
     max_gpus: int | None = None,
     startup_reserve: Callable[[int], int] | None = None,
@@ -190,7 +190,7 @@ def _fit(
         kv_per_token=slope,
         max_model_len=kv.max_model_len if kv else 0,
         context_length=max(context_length, kv.max_model_len if kv else 0),
-        overhead=rank_overhead
+        overhead=(lambda n: rank_overhead(n).bytes)
         if rank_overhead is not None
         else estimate.overhead.bytes
         if estimate.overhead
@@ -204,6 +204,14 @@ def _fit(
         startup_reserve=startup_reserve or estimate.startup_reserve_per_gpu,
         max_gpus=max_gpus,
     )
+    ranks = estimate.fit.gpus or 1
+    if estimate.overhead is not None:
+        selected = rank_overhead(ranks) if rank_overhead else estimate.overhead
+        estimate.overhead = selected.scaled(ranks)
+    if kv is not None and estimate.fit.cache_bytes is not None:
+        kv.bytes = estimate.fit.cache_bytes
+    if estimate.overhead is not None:
+        estimate.overhead.weight_adjustment += estimate.fit.required - estimate.total
 
 
 def _mxfp4_padding(
@@ -284,7 +292,7 @@ async def _estimate_gguf(
             gpu_memory,
             utilization,
             kv_bytes=cache_bytes if kv else None,
-            rank_overhead=(lambda n: overhead(requested_length).bytes) if kv else None,
+            rank_overhead=(lambda n: overhead(requested_length)) if kv else None,
             overhead_at_context=(lambda n, length: overhead(length).bytes) if kv else None,
         )
         return estimate
@@ -865,7 +873,7 @@ async def _estimate_safetensors(
         _config.kv_heads(text),
         _mxfp4_padding(config, text, weights),
         lambda length, n: cache(length, n)[0],
-        lambda n: overhead(n).bytes,
+        overhead,
         lambda n, length: overhead(n, length).bytes,
         startup_reserve=startup,
     )

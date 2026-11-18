@@ -135,9 +135,8 @@ def main() -> None:
         "--max-running-requests",
         dest="max_num_seqs",
         type=int,
-        help="Scheduler sequence capacity for Safetensors overhead, separate from --batch-size. "
-        "vLLM defaults to 256 or 1024 on Hopper/Blackwell; SGLang uses 2048 request slots "
-        "with separate hardware-dependent graph caps. Automatic cache reservations may be larger.",
+        help="Admission limit for Safetensors cache and runtime reservations, separate from --batch-size. "
+        "Defaults depend on the engine and GPU.",
     )
     parser.add_argument(
         "--disable-hybrid-kv-cache-manager",

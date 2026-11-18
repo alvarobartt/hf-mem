@@ -511,3 +511,21 @@ def test_fp32_auto_cache_uses_a_shared_16_bit_reference(config: dict[str, Any]) 
     weights.add("F32", 10, 40)
     assert _config.kv_dtype(config, "auto", weights, []) == "F16"
     assert _config.kv_dtype(config, "bfloat16", weights, []) == "BF16"
+
+
+def test_tensor_parallel_replication_uses_each_attention_types_head_count() -> None:
+    config = llama_config(
+        num_hidden_layers=2,
+        num_attention_heads=16,
+        num_key_value_heads=16,
+        num_global_key_value_heads=4,
+        head_dim=128,
+        global_head_dim=256,
+        layer_types=["full_attention", "sliding_attention"],
+        sliding_window=128,
+    )
+    single = _config.kv_cache(config, "BF16", 4096, 1, 256)[0]
+    parallel = _config.kv_cache(config, "BF16", 4096, 1, 256, tensor_parallel_size=8)[0]
+    full_cache = 4096 * 4 * 256 * 2 * 2
+    assert parallel == single + full_cache
+    assert parallel < 2 * single

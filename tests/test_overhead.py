@@ -441,3 +441,24 @@ def test_eager_alibi_keeps_the_bias_of_every_position_pair() -> None:
     assert half.buffers == 0
     assert full.bytes == full.activations + full.buffers + full.runtime
     assert full.to_dict()["buffers"] == full.buffers and full.to_dict()["loading"] == 0
+
+
+def test_position_tables_are_shared_by_matching_dimensions_and_parameters() -> None:
+    config: dict[str, Any] = {
+        "max_position_embeddings": 4096,
+        "num_hidden_layers": 4,
+        "num_attention_heads": 8,
+        "hidden_size": 512,
+        "head_dim": 64,
+        "global_head_dim": 128,
+        "layer_types": ["full_attention", "sliding_attention"] * 2,
+        "rope_parameters": {
+            "full_attention": {"rope_type": "default", "rope_theta": 1000000},
+            "sliding_attention": {"rope_type": "default", "rope_theta": 10000},
+        },
+    }
+    assert _overhead.position_buffers(config) == 4096 * (128 + 64) * 2
+    assert _overhead.position_buffers(
+        {**config, "num_hidden_layers": 8, "layer_types": config["layer_types"] * 2}
+    ) == _overhead.position_buffers(config)
+    assert _overhead.position_buffers({**config, "rope_parameters": {}, "global_head_dim": None}) == 0
