@@ -116,28 +116,21 @@ def _dtype_items(weights: Weights, total: int) -> list[Item]:
 def table(estimate: Estimate | Listing, color: bool = False) -> str:
     if isinstance(estimate, Listing):
         return _listing(estimate, color)
-    total, kv, weights = estimate.total or 1, estimate.kv_cache, estimate.weights
+    recommended = estimate.recommended_gpu_memory
+    total, kv, weights = recommended or estimate.total or 1, estimate.kv_cache, estimate.weights
     offloaded = estimate.offloaded
     all_params = weights.params + (offloaded.params if offloaded else 0)
     params = f"{short(all_params)} PARAMS" if weights.params else "FROM FILE SIZES"
     parts = [params] + (["KV CACHE"] if kv else []) + (["OVERHEAD"] if estimate.overhead else [])
     summary = f"{gib(estimate.total)} GiB ({' + '.join(parts)})"
     requirements: list[Item] = []
-    if (recommended := estimate.recommended_gpu_memory) is not None:
+    if recommended is not None:
         ranks = (estimate.fit.gpus or 1) if estimate.fit else 1
         topology = f" ACROSS {ranks} GPUS" if ranks > 1 else " ON ONE GPU"
         capacity = f"{gib(recommended)} GiB ({recommended / 10**9:.2f} GB){topology}"
         requirements.append(("GPU CAPACITY", capacity, "RECOMMENDED", 1.0))
-    requirements.append(("TOTAL MEMORY", summary, "ALLOCATIONS", 1.0))
-    if estimate.startup_reserve_per_gpu:
-        requirements.append(
-            (
-                "STARTUP RESERVE",
-                f"{gib(estimate.startup_reserve_per_gpu)} GiB PER GPU (INITIALIZATION)",
-                "",
-                0.0,
-            )
-        )
+    else:
+        requirements.append(("TOTAL MEMORY", summary, "", 1.0))
     sections: list[Section] = [(None, requirements)]
     if offloaded:
         cpu = f"{gib(offloaded.bytes)} GiB ({short(offloaded.params)} PARAMS OFFLOADED, NOT ON GPU)"
@@ -202,8 +195,8 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
         sections.append((f"OVERHEAD ({gib(overhead.bytes)} GiB)", items))
     if fit := estimate.fit:
         gpus = fit.gpus or 1
-        capacity = gpus * fit.usable
-        requirement = max(fit.required, fit.startup_required or 0)
+        capacity = gpus * (fit.gpu_memory if recommended is not None else fit.usable)
+        requirement = recommended if recommended is not None else max(fit.required, fit.startup_required or 0)
         text = f"{gib(requirement)} / {gib(capacity)} GiB [{requirement / capacity:.0%}] ON {gpus} x {gib(fit.gpu_memory)} GiB"
         if kv and fit.max_model_len:
             text += f", UP TO {fit.max_model_len} TOKENS"
@@ -248,11 +241,12 @@ def _color(lines: list[str], enabled: bool = False) -> str:
 def markdown(estimate: Estimate | Listing) -> str:
     where = f"[`{estimate.model}`]({estimate.url})" + (f" @ `{estimate.revision}`" if estimate.revision else "")
     if isinstance(estimate, Listing):
-        rows = ["| File | GPU capacity | Allocations | Weights | KV cache |", "|---|--:|--:|--:|--:|"]
+        label = "GPU capacity" if any(f.recommended_gpu_memory for f in estimate.files) else "Memory"
+        rows = [f"| File | {label} | Weights | KV cache |", "|---|--:|--:|--:|"]
         for f in estimate.files:
             kv = f"{gib(f.kv_cache.bytes)} GiB" if f.kv_cache else "-"
-            capacity = f"{gib(f.recommended_gpu_memory)} GiB" if f.recommended_gpu_memory else "-"
-            rows.append(f"| `{f.file}` | {capacity} | {gib(f.total)} GiB | {gib(f.weights.bytes)} GiB | {kv} |")
+            capacity = f"{gib(f.recommended_gpu_memory or f.total)} GiB"
+            rows.append(f"| `{f.file}` | {capacity} | {gib(f.weights.bytes)} GiB | {kv} |")
         return "\n".join([f"Memory estimate for {where}", "", *rows])
 
     rows = ["| | Memory | Params |", "|---|--:|--:|"]
@@ -260,11 +254,10 @@ def markdown(estimate: Estimate | Listing) -> str:
         rows.append(
             f"| **Recommended GPU capacity** | **{gib(recommended)} GiB ({recommended / 10**9:.2f} GB)** | |"
         )
-    if estimate.startup_reserve_per_gpu:
-        rows.append(f"| Startup allowance per GPU | {gib(estimate.startup_reserve_per_gpu)} GiB | |")
-    rows.append(
-        f"| **Total** | **{gib(estimate.total)} GiB** | {short(estimate.weights.params) if estimate.weights.params else '-'} |"
-    )
+    else:
+        rows.append(
+            f"| **Total** | **{gib(estimate.total)} GiB** | {short(estimate.weights.params) if estimate.weights.params else '-'} |"
+        )
     for name, component in (
         estimate.components if len(estimate.components) > 1 else {"Weights": estimate.weights}
     ).items():

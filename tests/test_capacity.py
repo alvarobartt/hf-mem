@@ -45,8 +45,9 @@ def test_model_only_recommendation_includes_requested_headroom(tmp_path: Path) -
     assert regular.total < regular.recommended_gpu_memory < reserved.recommended_gpu_memory
     assert reserved.to_dict()["gpu_memory_utilization"] == 0.5
     assert "GPU CAPACITY" in table(reserved)
-    assert "ALLOCATIONS" in table(reserved)
+    assert "TOTAL MEMORY" not in table(reserved) and "ALLOCATIONS" not in table(reserved)
     assert "Recommended GPU capacity" in markdown(reserved)
+    assert "| **Total** |" not in markdown(reserved)
 
 
 def test_topology_recommendation_uses_rank_allocations(tmp_path: Path) -> None:

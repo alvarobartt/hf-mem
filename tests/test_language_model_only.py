@@ -51,7 +51,7 @@ def test_language_only_skips_identified_weights_and_activations_but_text_request
     assert lm.startup_reserve_per_gpu >= omitted
     if engine == "vllm":
         assert some(lm.fit).startup_required == some(lm.fit).required + 2 * lm.startup_reserve_per_gpu
-        assert "STARTUP RESERVE" in table(lm)
+        assert "STARTUP RESERVE" not in table(lm)
     asynchronous = asyncio.run(arun(str(tmp_path), language_model_only=True, **options))
     assert asynchronous.to_dict() == lm.to_dict()
 

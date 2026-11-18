@@ -35,7 +35,7 @@ def cli(
 def test_table(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
     code, out, err = cli(monkeypatch, capsys, model)
     assert code == 0
-    assert "TOTAL MEMORY" in out and "KV CACHE (1024 TOKENS" in out and "MODEL (" in out
+    assert "GPU CAPACITY" in out and "KV CACHE (1024 TOKENS" in out and "MODEL (" in out
     assert f"hf-mem v{__version__}" in out
     assert "\x1b[" not in out and err == ""
     assert len({len(line) for line in out.splitlines()}) == 1
@@ -84,7 +84,7 @@ def test_terminal_color_is_opt_in(
 
     assert code == 0
     assert ("\x1b[" in out) is expected
-    assert "TOTAL MEMORY" in out
+    assert "GPU CAPACITY" in out
 
 
 def test_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
@@ -121,11 +121,11 @@ def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[
     fit = json.loads(out)["fit"]
     assert code == 0 and fit["gpus"] == 2 and fit["needed"] == 1 and fit["fits"]
     assert fit["max_model_len"] == 1024
-    usable = fit["usable"] / (1 << 30)
+    capacity = fit["gpu_memory"] / (1 << 30)
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "4")
-    assert code == 0 and "GPU MEMORY" in out and f"/ {usable:.2f} GiB [" in out and "│ FITS " in out
+    assert code == 0 and "GPU MEMORY" in out and f"/ {capacity:.2f} GiB [" in out and "│ FITS " in out
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4")
-    assert "FITS ON 1 GPU" in out and f"/ {2 * usable:.2f} GiB [" in out
+    assert "FITS ON 1 GPU" in out and f"/ {2 * capacity:.2f} GiB [" in out
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "--output", "markdown")
     assert "| Overhead (activations, graphs, runtime) |" in out
     assert "Fits on 2 x 4.00 GiB, needs 1 GPU, up to 1024 tokens." in out
@@ -138,7 +138,7 @@ def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[
 def test_markdown(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
     code, out, _ = cli(monkeypatch, capsys, model, "--output", "markdown")
     assert code == 0
-    assert "| **Total** |" in out and "| KV cache (BF16, 1024 tokens x 1) |" in out
+    assert "| **Recommended GPU capacity** |" in out and "| KV cache (BF16, 1024 tokens x 1) |" in out
 
 
 def test_removed_flags(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
