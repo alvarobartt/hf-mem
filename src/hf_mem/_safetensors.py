@@ -252,8 +252,8 @@ def _pool() -> Any:
         return None
 
 
-def _int(config: dict[str, Any], *keys: str) -> int | None:
-    return next((v for k in keys if isinstance(v := config.get(k), int) and v > 1), None)
+def _int(config: dict[str, Any], *keys: str, minimum: int = 2) -> int | None:
+    return next((v for k in keys if type(v := config.get(k)) is int and v >= minimum), None)
 
 
 def moe_breakdown(
@@ -283,7 +283,7 @@ def moe_breakdown(
             base.add(dtype, entry.params - removed.params, entry.bytes - removed.bytes)
     return MoE(
         experts=count or len(ids),
-        active=_int(config, "num_experts_per_tok", "num_experts_per_token", "top_k"),
+        active=_int(config, "num_experts_per_tok", "num_experts_per_token", "top_k", minimum=1),
         base=base,
         expert=template,
         experts_total=total,
