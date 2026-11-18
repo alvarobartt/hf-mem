@@ -61,7 +61,7 @@ $ uvx hf-mem zai-org/GLM-5.3-Flash
 └─────────────────┴─────────────────────────────────────────────────────┘
 ```
 
-For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, which as in vLLM is the model dtype unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
+For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, using model precision unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
 
 ```console
 $ uvx hf-mem Qwen/Qwen3.8-27B --max-model-len 32768 --batch-size 4
@@ -161,6 +161,8 @@ uvx hf-mem BAAI/bge-base-en-v1.5 --dtype float16 --max-num-batched-tokens 2048 -
 ```
 
 Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Loading allows for a temporary tensor in its stored dtype alongside the converted weights, so F32 checkpoints loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
+
+FP32 decoder checkpoints use a 16-bit CUDA serving reference for floating-point weights and automatic KV cache precision. The estimate labels that reference F16; an engine may choose BF16 with the same memory width. Encoder defaults preserve their stored precision, and quantized checkpoints keep their declared representation.
 
 ### GGUF
 

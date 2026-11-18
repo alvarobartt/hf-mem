@@ -415,3 +415,11 @@ def test_kimi_dense_cache_keeps_the_prefill_checkpoint() -> None:
     config = kimi_config(sparse=False)
     assert _config.kv_cache(config, "BF16", 131072, 1)[0] == 637009920
     assert _config.kv_cache(config, "BF16", 1048576, 1)[0] == 3822059520
+
+
+@pytest.mark.parametrize("config", [{"dtype": "float32"}, {"torch_dtype": "float32"}, {}])
+def test_fp32_auto_cache_uses_a_shared_16_bit_reference(config: dict[str, Any]) -> None:
+    weights = Weights()
+    weights.add("F32", 10, 40)
+    assert _config.kv_dtype(config, "auto", weights, []) == "F16"
+    assert _config.kv_dtype(config, "bfloat16", weights, []) == "BF16"

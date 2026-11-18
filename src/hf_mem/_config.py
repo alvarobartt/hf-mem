@@ -227,15 +227,19 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
         return "F8_E4M3"
     dtype = config.get("dtype") or config.get("torch_dtype")
     if isinstance(dtype, str):
-        return _TORCH.get(dtype.removeprefix("torch."), "F16")
+        return _downcast_f32(_TORCH.get(dtype.removeprefix("torch."), "F16"))
 
     counts = {d: w.params for d, w in weights.dtypes.items() if d in {"BF16", "F16", "F32"}}
-    dtype = max(counts, key=counts.__getitem__) if counts else "BF16"
+    dtype = _downcast_f32(max(counts, key=counts.__getitem__) if counts else "BF16")
     warnings.append(
         f"The KV cache dtype could not be inferred from `config.json`, so it defaults to {dtype}, set "
         "`--kv-cache-dtype` to override it."
     )
     return dtype
+
+
+def _downcast_f32(dtype: str) -> str:
+    return "F16" if dtype == "F32" else dtype
 
 
 def layer_kinds(config: dict[str, Any]) -> list[str]:
