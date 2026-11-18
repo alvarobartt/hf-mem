@@ -292,7 +292,11 @@ def _state_bytes(metadata: dict[str, Any], arch: str) -> int:
 
 
 def kv_cache(
-    metadata: dict[str, Any], max_model_len: int, batch_size: int, dtype: str
+    metadata: dict[str, Any],
+    max_model_len: int,
+    batch_size: int,
+    dtype: str,
+    full_sliding_window_cache: bool = False,
 ) -> tuple[int, dict[str, int]] | None:
     arch = str(metadata.get("general.architecture"))
     blocks = metadata.get(f"{arch}.block_count")
@@ -327,7 +331,9 @@ def kv_cache(
         sliding = [(i + 1) % _SWA_PATTERN[arch] != 0 for i in range(blocks)]
     else:
         sliding = [False] * blocks
-    swa_tokens = min(max_model_len, (window or max_model_len) + 512)
+    swa_tokens = (
+        max_model_len if full_sliding_window_cache else min(max_model_len, (window or max_model_len) + 512)
+    )
 
     tokens = sum(w * (swa_tokens if s else max_model_len) for w, s in zip(widths, sliding))
     recurrent = sum(1 for w in widths if not w) if state else 0

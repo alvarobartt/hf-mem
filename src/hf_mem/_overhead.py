@@ -14,9 +14,89 @@ CLIP_MAX_TOKENS = {"pixtral": 1024, "lfm2": 256}
 CLIP_DYNAMIC_TOKENS = 4096
 CLIP_AUDIO_POSITIONS = 1500
 
+GPU_TYPES: dict[str, tuple[float, float | None, bool, bool]] = {
+    "t4": (16, 0.14, False, False),
+    "a10g": (24, 0.32, False, False),
+    "l4": (24, 0.25, False, False),
+    "l40s": (48, 0.52, False, False),
+    "a100": (80, 0.52, True, False),
+    "h100": (80, None, True, True),
+    "h200": (141, 0.70, True, True),
+    "rtx-pro-6000": (96, 0.70, False, False),
+}
+
+
+GPU_CAPACITIES = {
+    "t4": (16,),
+    "a10g": (24,),
+    "l4": (24,),
+    "l40s": (48,),
+    "a100": (40, 80),
+    "h100": (80, 94, 96),
+    "h200": (141,),
+    "rtx-pro-6000": (96,),
+}
+GPU_TYPE_NAMES = tuple("nvidia-" + name for name in GPU_TYPES)
+
+
+def normalize_gpu_type(value: str) -> str:
+    name = value.lower().removeprefix("nvidia-")
+    if name not in GPU_TYPES:
+        raise RuntimeError(f"`--gpu-type` must be one of {', '.join(GPU_TYPE_NAMES)}.")
+    return name
+
+
+def gpu_type_name(value: str) -> str:
+    return "nvidia-" + normalize_gpu_type(value)
+
+
+def validate_gpu_memory(gpu_memory: str, gpu_type: str) -> None:
+    name = normalize_gpu_type(gpu_type)
+    size = parse_gpu_memory(gpu_memory)[1] / GIB
+    capacities = GPU_CAPACITIES[name]
+    fraction = 0.90 if name in {"t4", "a10g", "l4", "l40s"} else 0.98
+    if not any(capacity * fraction <= size <= capacity for capacity in capacities):
+        expected = " or ".join(str(capacity) for capacity in capacities)
+        raise RuntimeError(
+            f"`--gpu-memory={gpu_memory}` does not match {gpu_type_name(name)} "
+            f"(nominal capacity {expected}; --gpu-memory uses GiB per GPU). "
+            "Driver-reported totals within the board family's ECC/reservation range are accepted. "
+            "Use --gpu-memory-utilization to limit the usable fraction."
+        )
+
+
+def hardware(gpu_memory: str | None, gpu_type: str | None) -> tuple[float, bool, bool]:
+    size = parse_gpu_memory(gpu_memory)[1] / GIB if gpu_memory is not None else 80.0
+    context = None
+    fast, hopper = size >= 70, size >= 120
+    if gpu_type is not None:
+        gpu_type = normalize_gpu_type(gpu_type)
+        capacity, context, fast, hopper = GPU_TYPES[gpu_type]
+        if gpu_memory is None:
+            size = capacity
+    if context is None:
+        points = [(16, 0.14), (24, 0.29), (48, 0.52), (80, 0.52), (140, 0.70)]
+        context = points[-1][1]
+        if size <= points[0][0]:
+            context = points[0][1]
+        for (left, low), (right, high) in zip(points, points[1:]):
+            if left <= size <= right:
+                context = low + (high - low) * (size - left) / (right - left)
+                break
+    return context * GIB, fast, hopper
+
+
+def default_sequences(gpu_memory: str | None, gpu_type: str | None, engine: str) -> int:
+    if engine == "sglang":
+        return 2048
+    name = normalize_gpu_type(gpu_type) if gpu_type is not None else None
+    return 1024 if hardware(gpu_memory, name)[2] or name == "rtx-pro-6000" else 256
+
+
 # Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
 _PROFILES = {
     "small": {
+        "seqs": 256,
         "vocab": 5004,
         "inter": 6.6,
         "hidden": 77.2,
@@ -31,6 +111,7 @@ _PROFILES = {
         "context": 0.83 * GIB,
     },
     "large": {
+        "seqs": 1024,
         "vocab": 12702,
         "inter": 0,
         "hidden": 13.2,
@@ -55,24 +136,68 @@ class Overhead:
     graphs: int
     runtime: int
     context: int
+    max_num_seqs: int | None = None
+    reference_engine: str | None = None
+    gpu_type: str | None = None
+    weight_adjustment: int = 0
 
     @property
     def bytes(self) -> int:
-        return self.activations + self.encoder + self.graphs + self.runtime
+        return self.activations + self.encoder + self.graphs + self.runtime + self.weight_adjustment
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "bytes": self.bytes,
             "activations": self.activations,
             "encoder": self.encoder,
             "graphs": self.graphs,
             "runtime": self.runtime,
         }
+        if self.max_num_seqs is not None:
+            out["max_num_seqs"] = self.max_num_seqs
+        if self.reference_engine is not None:
+            out["reference_engine"] = self.reference_engine
+        if self.gpu_type is not None:
+            out["gpu_type"] = self.gpu_type
+        if self.weight_adjustment:
+            out["weight_adjustment"] = self.weight_adjustment
+        return out
 
 
-def batched_tokens(gpu_memory: str | None, override: int | None = None) -> int:
+def _capacity_gib(gpu_memory: str | None, gpu_type: str | None) -> float:
+    if gpu_memory is not None:
+        return parse_gpu_memory(gpu_memory)[1] / GIB
+    return GPU_TYPES[normalize_gpu_type(gpu_type)][0] if gpu_type is not None else 80.0
+
+
+def graph_capacity(gpu_memory: str | None, gpu_type: str | None, ranks: int, engine: str) -> int:
+    if engine == "vllm":
+        return 256
+    size = _capacity_gib(gpu_memory, gpu_type)
+    if size < 20:
+        return 8
+    if size < 35:
+        return 48 if ranks < 4 else 160
+    if size < 60:
+        return 32 if ranks < 4 else 160
+    return 256 if ranks < 4 and size < 160 else 512
+
+
+def batched_tokens(
+    gpu_memory: str | None, override: int | None = None, gpu_type: str | None = None, engine: str = "vllm"
+) -> int:
+    if gpu_type is not None:
+        gpu_type = normalize_gpu_type(gpu_type)
     if override is not None:
         return override
+    if engine == "sglang":
+        size = _capacity_gib(gpu_memory, gpu_type)
+        return 2048 if size < 20 else 4096 if size < 60 else 8192 if size < 160 else 16384
+    if gpu_type == "a100":
+        return 2048
+    if gpu_type is not None:
+        size = GPU_TYPES[gpu_type][0] * GIB
+        return 16384 if size >= LARGEST_GPU else 8192 if size >= LARGE_GPU else 2048
     size = parse_gpu_memory(gpu_memory)[1] if gpu_memory is not None else LARGE_GPU
     return 16384 if size >= LARGEST_GPU else 8192 if size >= LARGE_GPU else 2048
 
@@ -112,12 +237,18 @@ def _root(config: dict[str, Any]) -> dict[str, Any]:
     return thinker if isinstance(thinker, dict) else config
 
 
-def encoder(config: dict[str, Any], processor: dict[str, Any]) -> int:
+def encoder(
+    config: dict[str, Any], processor: dict[str, Any], context_length: int | None = None, engine: str = "vllm"
+) -> int:
     root = _root(config)
     vision, audio = root.get("vision_config"), root.get("audio_config")
     largest = 0
     if isinstance(vision, dict):
-        largest = _tower_bytes(vision, _image_patches(root, vision, processor))
+        positions = _image_patches(root, vision, processor)
+        merge = vision.get("spatial_merge_size") or processor.get("merge_size")
+        if context_length is not None and isinstance(merge, int) and merge > 0:
+            positions = min(positions, context_length * merge**2)
+        largest = int(_tower_bytes(vision, positions) * 1.5)
     if isinstance(audio, dict):
         largest = max(largest, _tower_bytes(audio, audio.get("max_source_positions") or 1500))
     return largest
@@ -131,23 +262,129 @@ def supports_video(config: dict[str, Any], files: Any) -> bool:
     )
 
 
-def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_bytes: int = 0) -> Overhead:
-    p = _PROFILES["large" if tokens >= 8192 else "small"]
+def vllm(
+    config: dict[str, Any],
+    moe: bool,
+    hybrid: bool,
+    tokens: int,
+    encoder_bytes: int = 0,
+    max_num_seqs: int | None = None,
+    tensor_parallel_size: int = 1,
+    gpu_memory: str | None = None,
+    gpu_type: str | None = None,
+    engine: str = "vllm",
+    batch_size: int = 1,
+    context_length: int = 0,
+) -> Overhead:
+    if gpu_type is not None:
+        gpu_type = normalize_gpu_type(gpu_type)
     layers = config.get("num_hidden_layers") or 0
     hidden = config.get("hidden_size") or 0
     vocab = config.get("vocab_size") or 32000
     intermediate = config.get("intermediate_size") or config.get("ffn_hidden_size") or 4 * hidden
     if moe and config.get("moe_intermediate_size"):
         intermediate = config["moe_intermediate_size"] * (config.get("num_experts_per_tok") or 1)
-    activations = p["vocab"] * vocab + tokens * (p["inter"] * intermediate + p["hidden"] * hidden) + p["act"]
-    graphs = (
-        p["graph"]
-        + layers
-        * (p["graph_layer"] + moe * p["graph_moe"] + hybrid * p["graph_hybrid"] + p["graph_lh"] * hidden)
-        + p["graph_width"] * (hidden + intermediate)
+
+    def graph_bytes(profile: dict[str, float]) -> float:
+        return (
+            profile["graph"]
+            + layers
+            * (
+                profile["graph_layer"]
+                + moe * profile["graph_moe"]
+                + hybrid * profile["graph_hybrid"]
+                + profile["graph_lh"] * hidden
+            )
+            + profile["graph_width"] * (hidden + intermediate)
+        )
+
+    context, fast, hopper = hardware(gpu_memory, gpu_type)
+    n = tensor_parallel_size
+    capacity = max_num_seqs if max_num_seqs is not None else default_sequences(gpu_memory, gpu_type, engine)
+    bounded_capacity = min(
+        tokens, max(batch_size, min(capacity, graph_capacity(gpu_memory, gpu_type, n, engine)))
     )
-    context = int(p["context"])
-    return Overhead(int(activations), encoder_bytes, int(graphs), int(p["non_torch"]) + context, context)
+    fraction = min(1.0, max(0.0, (tokens - 2048) / (8192 - 2048)))
+
+    def interpolate(key: str) -> float:
+        small, large = _PROFILES["small"], _PROFILES["large"]
+        left, right = small[key] / small["seqs"], large[key] / large["seqs"]
+        return (left + fraction * (right - left)) * bounded_capacity
+
+    def graph_pool(profile: dict[str, float]) -> float:
+        return graph_bytes(profile) * (0.05 + 0.95 * bounded_capacity / profile["seqs"])
+
+    left, right = graph_pool(_PROFILES["small"]), graph_pool(_PROFILES["large"])
+    graphs = left + fraction * (right - left)
+    if engine == "sglang" and fast and not hopper and n > 1:
+        graphs += 0.35 * GIB * bounded_capacity / 256 * min(1.0, (config.get("head_dim") or 128) / 128)
+    head_dim = config.get("head_dim") or hidden // max(1, config.get("num_attention_heads") or 1)
+    head_factor = min(1.0, (head_dim or 128) / 128)
+    if engine == "vllm" and not hopper:
+        graphs -= 0.14 * GIB * bounded_capacity / 256 * (1 - fraction)
+    logits = 4 * vocab * bounded_capacity
+    query_width = (config.get("num_attention_heads") or 0) * (config.get("head_dim") or 0)
+    activation_width = (hidden + max(hidden, query_width / n)) / 2
+    gdn = hybrid and bool(config.get("linear_num_value_heads"))
+    if engine == "sglang" and (not hopper or gdn):
+        activations = 0.9 * GIB + tokens * (32 * activation_width + 2.6 * intermediate / n) + logits
+    else:
+        small = 2048 * (6.6 * intermediate / n + 24 * activation_width)
+        workspace = ((0.55 if engine == "vllm" else 0.70) + 0.35 / n) if hopper else 0.72 / n
+        if engine == "sglang":
+            workspace *= min(1.0, hidden / 4096)
+        large = workspace * GIB + 8192 * 13.2 * activation_width
+        if tokens <= 2048:
+            activations = tokens / 2048 * small
+        elif tokens >= 8192:
+            activations = large + (tokens - 8192) * 13.2 * activation_width
+        else:
+            activations = small + fraction * (large - small)
+        activations += logits
+    if engine == "vllm":
+        communication = 1.0 if hopper else 0.65 if fast else 0.1
+    else:
+        communication = (1.35 if n >= 4 and not hopper else 1.0) if fast else 0.5
+    communication = communication * GIB if n > 1 else 0
+    if engine == "vllm" and hopper and n > 1:
+        communication += 0.5 * GIB * bounded_capacity / 256
+    non_torch = interpolate("non_torch")
+    if not hopper and gpu_type != "rtx-pro-6000":
+        non_torch *= head_factor
+    if moe and n > 1:
+        active = config.get("num_experts_per_tok") or 1
+        if engine == "vllm":
+            communication += (1.0 if hopper else 0.5 if fast else 0.1) * GIB
+            if not hopper:
+                activations += tokens * 4 * hidden * active
+        else:
+            communication += ((0.9 + 0.6 * max(0.0, 1 - 2 / n)) if hopper else 0.15) * GIB
+            activations += tokens * 4 * hidden * active
+    if gdn:
+        if engine == "sglang" and not hopper:
+            heads = config.get("linear_num_key_heads") or config["linear_num_value_heads"]
+            width = config.get("linear_key_head_dim") or 0
+        else:
+            heads = config["linear_num_value_heads"]
+            width = config.get("linear_value_head_dim") or 0
+        local_width = math.ceil(heads / n) * width
+        scratch = tokens * local_width * (24 if engine == "vllm" else 96)
+        activations += scratch
+        if n > 1 and not moe:
+            if engine == "vllm":
+                communication += (0.5 if hopper else 0.1 if fast else 0) * GIB
+            elif hopper:
+                communication += (0.5 + 0.5 * max(0.0, 1 - 2 / n)) * GIB
+    return Overhead(
+        int(activations),
+        encoder_bytes,
+        int(max(0, graphs)),
+        int(non_torch + context + communication + (capacity + 1) * context_length * 4 * (engine == "sglang")),
+        int(context),
+        capacity,
+        engine,
+        gpu_type_name(gpu_type) if gpu_type is not None else None,
+    )
 
 
 def _clip_bytes(positions: int, hidden: int, ffn: int | None, gated: bool) -> int:
@@ -182,9 +419,41 @@ def mmproj_encoder(metadata: dict[str, Any]) -> int:
     return total
 
 
-def llama_cpp(projector: dict[str, Any] | None = None) -> Overhead:
+def llama_cpp(
+    projector: dict[str, Any] | None = None,
+    gpu_memory: str | None = None,
+    decoder: dict[str, Any] | None = None,
+    context_length: int = 0,
+    base_memory: int | None = None,
+    utilization: float = 0.90,
+) -> Overhead:
     encoder = mmproj_encoder(projector) if projector else 0
-    return Overhead(int(0.15 * GIB), encoder, 0, int(0.47 * GIB), int(0.47 * GIB))
+    compute = 0.15 * GIB
+    if decoder:
+        arch = decoder.get("general.architecture")
+        hidden = decoder.get(f"{arch}.embedding_length") or 0
+        intermediate = decoder.get(f"{arch}.feed_forward_length") or 4 * hidden
+        if isinstance(intermediate, list):
+            intermediate = max(intermediate, default=4 * hidden)
+        if hidden:
+            compute = 0.04 * GIB + 4 * 512 * (4 * hidden + intermediate) + 2 * 512 * context_length
+
+    def profile(size: float) -> Overhead:
+        runtime = 0.13 if size <= 16 else 0.24 if size <= 24 else 0.60 if size >= 120 else 0.47
+        return Overhead(
+            int(compute), encoder, 0, int(runtime * GIB), int(runtime * GIB), reference_engine="llama.cpp"
+        )
+
+    if gpu_memory is not None:
+        return profile(parse_gpu_memory(gpu_memory)[1] / GIB)
+    if base_memory is not None:
+        for capacity in (16, 24, 48, 80, 141):
+            overhead = profile(capacity)
+            required = recommended_memory(base_memory + overhead.bytes, utilization)
+            if required <= capacity * GIB * (0.9 if capacity <= 48 else 0.98):
+                break
+        return overhead
+    return profile(80)
 
 
 @dataclass
@@ -195,13 +464,16 @@ class Fit:
     gpus: int | None
     needed: int | None
     max_model_len: int
+    overhead_per_gpu: int | None = None
+    cache_bytes: int | None = None
+    startup_required: int | None = None
 
     @property
     def fits(self) -> bool:
-        return self.required <= (self.gpus or 1) * self.usable
+        return max(self.required, self.startup_required or 0) <= (self.gpus or 1) * self.usable
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out = {
             "gpu_memory": self.gpu_memory,
             "usable": self.usable,
             "required": self.required,
@@ -210,6 +482,13 @@ class Fit:
             "fits": self.fits,
             "max_model_len": self.max_model_len,
         }
+        if self.overhead_per_gpu is not None:
+            out["overhead_per_gpu"] = self.overhead_per_gpu
+        if self.cache_bytes is not None:
+            out["cache_bytes"] = self.cache_bytes
+        if self.startup_required is not None:
+            out["startup_required"] = self.startup_required
+        return out
 
 
 def mxfp4_padding(experts: int, intermediate: int, hidden: int) -> Callable[[int], int]:
@@ -224,14 +503,20 @@ def mxfp4_padding(experts: int, intermediate: int, hidden: int) -> Callable[[int
 
 
 def parse_gpu_memory(value: str) -> tuple[int | None, int]:
-    count, sep, size = value.lower().removesuffix("gib").removesuffix("gb").rpartition("x")
+    value_lower = value.strip().lower()
+    unit = 10**9 if value_lower.endswith("gb") and not value_lower.endswith("gib") else GIB
+    count, sep, size = value_lower.removesuffix("gib").removesuffix("gb").rpartition("x")
     try:
-        gpus, memory = (int(count) if sep else None), int(float(size) * GIB)
+        gpus, memory = (int(count) if sep else None), int(float(size) * unit)
     except (ValueError, OverflowError):
         gpus = memory = 0
     if (gpus is not None and gpus < 1) or memory <= 0:
         raise RuntimeError(f"`--gpu-memory={value}` must look like `80` or `8x80` (GiB per GPU).")
     return gpus, memory
+
+
+def recommended_memory(allocation: int, utilization: float) -> int:
+    return math.ceil(allocation / utilization)
 
 
 def fit(
@@ -240,16 +525,28 @@ def fit(
     kv_per_token: float,
     max_model_len: int,
     context_length: int,
-    overhead: int,
+    overhead: int | Callable[[int], int],
     gpu_memory: str,
     utilization: float,
     kv_heads: int | None = None,
-    context: int = 0,
     padding: Callable[[int], int] | None = None,
     kv_bytes: Callable[[int, int], int] | None = None,
+    overhead_at_context: Callable[[int, int], int] | None = None,
+    startup_reserve: int | Callable[[int], int] = 0,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
-    usable = min(size * utilization, size - context) - (overhead - context)
+
+    def rank_overhead(n: int, length: int = max_model_len) -> int:
+        if overhead_at_context is not None:
+            return overhead_at_context(n, length)
+        return overhead if isinstance(overhead, int) else overhead(n)
+
+    def initialization(n: int) -> int:
+        return startup_reserve if isinstance(startup_reserve, int) else startup_reserve(n)
+
+    def usable(n: int, length: int = max_model_len) -> float:
+        return size * utilization - rank_overhead(n, length) - initialization(n)
+
     base = weights
 
     def cache(length: int, n: int) -> float:
@@ -265,32 +562,35 @@ def fit(
         (
             n
             for n in sorted({1, 2, 4, 8, 16, 32, 64, gpus or 1})
-            if padded(n) + cache(max_model_len, n) <= n * usable
+            if padded(n) + cache(max_model_len, n) <= n * usable(n)
         ),
         None,
     )
     n = gpus or 1
     weights = padded(n)
-    if kv_bytes is not None:
+    if kv_bytes is not None or overhead_at_context is not None:
         # Search the actual allocation: cache pages, sliding windows and recurrent state make it non-linear.
         low, high = 0, context_length
         while low < high:
             middle = (low + high + 1) // 2
-            if weights + cache(middle, n) <= n * usable:
+            if weights + cache(middle, n) <= n * usable(n, middle):
                 low = middle
             else:
                 high = middle - 1
         longest = low
     else:
-        budget = n * usable - weights - kv_fixed
+        budget = n * usable(n) - weights - kv_fixed
         per_token = kv_per_token * (max(1.0, n / kv_heads) if kv_heads else 1.0)
         longest = math.floor(budget / per_token) if per_token > 0 and budget > 0 else 0
-    required = weights + cache(max_model_len, n) + n * overhead
+    required = weights + cache(max_model_len, n) + n * rank_overhead(n)
     return Fit(
         size,
-        int(min(size * utilization, size - context) + context),
+        int(size * utilization),
         int(required),
         gpus,
         needed,
         min(longest, context_length),
+        rank_overhead(n) if callable(overhead) else None,
+        int(cache(max_model_len, n)),
+        int(required + n * initialization(n)) if initialization(n) else None,
     )
