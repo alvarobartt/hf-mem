@@ -65,9 +65,7 @@ class Overhead:
     graphs: int
     runtime: int
     context: int
-    # Tensors other than the weights kept for the model's lifetime (e.g. the ALiBi biases of eager attention)
     buffers: int = 0
-    # What loading needs on top of the rest, while it holds a tensor both as stored and as cast
     loading: int = 0
 
     @property
@@ -167,7 +165,6 @@ def vllm(config: dict[str, Any], moe: bool, hybrid: bool, tokens: int, encoder_b
 
 
 def encoder_eager(config: dict[str, Any], size: int) -> bool:
-    # Memory-efficient attention kernels only run in half precision, so F32 activations materialize the scores
     if size >= 4:
         return True
     implementation = config.get("_attn_implementation") or config.get("attn_implementation")
@@ -177,14 +174,8 @@ def encoder_eager(config: dict[str, Any], size: int) -> bool:
 
 
 def encoder_attention_tensors(config: dict[str, Any], sequences: int) -> int:
-    # Tensors of every query and key pair per head that an eager layer keeps at once: the scores and the
-    # probabilities, a bias per position term (relative positions, ALiBi, or the disentangled terms of
-    # DeBERTa), which also carries the padding, and the masks: one per attention pattern when the layers
-    # alternate between full and sliding window attention, a causal mask, or else a padding mask once
-    # sequences of different lengths share a batch
     terms = config.get("pos_att_type") or ()
     biases = (
-        # MPNet always adds relative positions (`MPNetConfig` defaults to 32 buckets)
         bool(config.get("relative_attention_num_buckets") or config.get("model_type") == "mpnet")
         + (config.get("position_embedding_type") == "alibi")
         + (
@@ -204,12 +195,10 @@ def encoder_attention_tensors(config: dict[str, Any], sequences: int) -> int:
         masks = 1
     else:
         masks = int(sequences > 1 and not biases)
-    return 2 + biases + masks
+    return 3 + biases + masks
 
 
 def encoder_buffers(config: dict[str, Any], size: int) -> int:
-    # Eager ALiBi attention keeps the bias of every pair of positions, while memory-efficient kernels only keep
-    # a slope per head
     if config.get("position_embedding_type") != "alibi":
         return 0
     return (config.get("num_attention_heads") or 1) * (config.get("max_position_embeddings") or 0) ** 2 * size

@@ -249,7 +249,6 @@ def test_encoder_attention_workspace_tracks_sequence_boundaries() -> None:
 
 
 def test_encoder_attention_runs_eager_in_f32() -> None:
-    # Memory-efficient attention kernels only run in half precision, so F32 materializes the scores
     gemma = {
         "model_type": "gemma3_text",
         "hidden_size": 768,
@@ -282,17 +281,13 @@ MODERNBERT = {
 @pytest.mark.parametrize(
     "config,single,batched",
     [
-        # The scores and the probabilities, plus a padding mask once sequences of different lengths are batched
-        ({"model_type": "bert", "num_hidden_layers": 12}, 2, 3),
-        # A position bias that also carries the padding: relative positions, ALiBi or disentangled attention
-        ({"model_type": "mpnet", "relative_attention_num_buckets": 32}, 3, 3),
-        ({"model_type": "bert", "position_embedding_type": "alibi"}, 3, 3),
-        ({"model_type": "deberta-v2", "relative_attention": True, "pos_att_type": ["p2c", "c2p"]}, 4, 4),
-        ({"model_type": "deberta-v2", "relative_attention": True, "pos_att_type": "p2c|c2p"}, 4, 4),
-        # A causal mask, which also carries the padding
-        ({"model_type": "qwen3", "rms_norm_eps": 1e-6, "num_hidden_layers": 28}, 3, 3),
-        # A mask per attention pattern when the layers alternate between full and sliding window attention
-        (MODERNBERT, 4, 4),
+        ({"model_type": "bert", "num_hidden_layers": 12}, 3, 4),
+        ({"model_type": "mpnet", "relative_attention_num_buckets": 32}, 4, 4),
+        ({"model_type": "bert", "position_embedding_type": "alibi"}, 4, 4),
+        ({"model_type": "deberta-v2", "relative_attention": True, "pos_att_type": ["p2c", "c2p"]}, 5, 5),
+        ({"model_type": "deberta-v2", "relative_attention": True, "pos_att_type": "p2c|c2p"}, 5, 5),
+        ({"model_type": "qwen3", "rms_norm_eps": 1e-6, "num_hidden_layers": 28}, 4, 4),
+        (MODERNBERT, 5, 5),
         (
             {
                 "model_type": "gemma3_text",
@@ -301,8 +296,8 @@ MODERNBERT = {
                 "num_hidden_layers": 2,
                 "layer_types": ["sliding_attention", "full_attention"],
             },
-            4,
-            4,
+            5,
+            5,
         ),
     ],
 )
@@ -316,14 +311,13 @@ def test_encoder_attention_tensors_follow_the_architecture(
 def test_encoder_eager_warmup_keeps_the_attention_tensors_of_each_sequence() -> None:
     per_token = 7 * 768 + 5 * 1152
     single = _overhead.encoder_warmup(MODERNBERT, {}, 4096, 4096, 4)
-    assert single.activations == (4096 * per_token + 4 * 12 * 4096**2) * 4
+    assert single.activations == (4096 * per_token + 5 * 12 * 4096**2) * 4
     bert = {"model_type": "bert", "hidden_size": 768, "intermediate_size": 3072, "num_attention_heads": 12}
     batched = _overhead.encoder_warmup(bert, {}, 1024, 512, 4)
-    assert batched.activations == (1024 * (7 * 768 + 2 * 3072) + 3 * 12 * 2 * 512**2) * 4
+    assert batched.activations == (1024 * (7 * 768 + 2 * 3072) + 4 * 12 * 2 * 512**2) * 4
 
 
 def test_eager_alibi_keeps_the_bias_of_every_position_pair() -> None:
-    # Eager ALiBi keeps the bias for every pair of positions, while memory-efficient kernels keep a slope per head
     jina = {
         "model_type": "bert",
         "position_embedding_type": "alibi",

@@ -160,7 +160,7 @@ To estimate a Text Embeddings Inference deployment, use its configured `--dtype`
 uvx hf-mem BAAI/bge-base-en-v1.5 --dtype float16 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
 ```
 
-Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Casting while loading holds the largest tensor both as stored and as cast, so F32 checkpoints with large vocabularies loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
+Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Loading allows for a temporary tensor in its stored dtype alongside the converted weights, so F32 checkpoints loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
 
 ### GGUF
 
@@ -385,7 +385,7 @@ Decoder KV cache and overhead follow vLLM for Safetensors models and llama.cpp f
 
 Encoder warmup uses model dimensions, activation precision and the token budget, with a 0.32 GiB allowance for the device context and library workspaces. It includes masked-language-model logits unless the model supplies embedding pooling, and includes SPLADE logits and transformations. MoE, recurrent and latent-attention encoders have no warmup estimate. Text Embeddings Inference is a validation reference; its loading policies and warmup scheduling are not assumed.
 
-With eager attention, each sequence keeps tensors of attention scores (heads x length x length) at once, counted from the architecture: the scores and the probabilities; a bias per position term (MPNet's relative positions, ALiBi, or DeBERTa's two disentangled terms), which also carries the padding; and the masks: one per attention pattern when the layers alternate between full and sliding window attention (ModernBERT, Gemma 3), a causal mask, or else a padding mask once several sequences share a batch. Eager ALiBi attention also keeps the biases of every pair of positions for the model's lifetime (`buffers` in the overhead), and `--dtype` casts that change the stored dtype add the loading peak of the largest tensor, assumed to be the token embeddings, which load first (`loading`, only what exceeds the warmup). Against the startup peak of Text Embeddings Inference 1.9 with `--dtype float32` on an L4, this is within 6% for a single input of 2048 tokens with ModernBERT, NomicBERT, JinaBERT, Gemma 3 and Qwen3. At 4096 tokens it is 14% and 16% below for ModernBERT and NomicBERT, which keep the tensors their architecture needs while CUDA's memory pool fragments and reserves about one more attention tensor, and 9% below for Qwen3, whose causal mask takes one more tensor while it is built in Text Embeddings Inference 1.9.4 (fixed on its main branch).
+With eager attention, storage grows with heads × sequence length² for attention scores, probabilities, temporary workspace, position biases and masks. Persistent ALiBi tables are counted separately as `buffers`. Casting reserves a temporary tensor in its stored dtype alongside the converted weights, without assuming the loading order; `loading` is the amount by which that peak exceeds warmup.
 
 ## Limitations
 

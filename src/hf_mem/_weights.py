@@ -10,7 +10,6 @@ class Weights:
     params: int = 0
     bytes: int = 0
     dtypes: dict[str, "Weights"] = field(default_factory=dict)
-    # Parameters of the largest tensor, as engines that cast while loading hold it twice
     largest: int = field(default=0, compare=False)
 
     def add(self, dtype: str, params: int, nbytes: int, largest: int = 0) -> None:

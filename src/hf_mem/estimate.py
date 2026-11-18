@@ -401,12 +401,10 @@ async def _encoder_length(source: Any, config: dict[str, Any], override: int | N
 
 
 def _loading_transient(components: dict[str, Weights], dtype: str) -> int:
-    # Engines that cast while loading upload each tensor as stored and cast it on the device, so loading peaks
-    # with the largest tensor held both ways, the token embeddings of encoders, which load first
-    target, size = DTYPES[dtype]
+    target, _ = DTYPES[dtype]
     return max(
         (
-            entry.largest * (FLOAT_BYTES[name] + size)
+            entry.largest * FLOAT_BYTES[name]
             for component in components.values()
             for name, entry in component.dtypes.items()
             if name in FLOAT_BYTES and name != target
@@ -542,7 +540,7 @@ async def _estimate_safetensors(
             estimate.overhead = overhead = _overhead.encoder_warmup(encoder_config, files, tokens, length, size)
             if dtype:
                 transient = _loading_transient(components, dtype)
-                overhead.loading = max(0, transient - weights.bytes - overhead.activations - overhead.buffers)
+                overhead.loading = max(0, transient - overhead.activations - overhead.buffers)
             full, remaining = divmod(tokens, min(tokens, length))
             if _overhead.encoder_eager(encoder_config, size):
                 tensors = _overhead.encoder_attention_tensors(encoder_config, full + bool(remaining))
@@ -568,9 +566,9 @@ async def _estimate_safetensors(
                 )
             if overhead.loading:
                 warnings.append(
-                    f"Casting to {dtype} while loading holds the largest tensor both as stored and as cast, "
+                    f"Casting to {dtype} while loading reserves the largest tensor in its stored precision, "
                     f"peaking at {(overhead.bytes + weights.bytes) / _overhead.GIB:.2f} GiB while loading, "
-                    "assuming tensors are cast on the device and the token embeddings load first."
+                    "assuming tensors are cast on the device."
                 )
         if gpu_memory and (_overhead.parse_gpu_memory(gpu_memory)[0] or 1) > 1:
             warnings.append("Encoder fit assumes one replica per GPU, without tensor parallelism.")
