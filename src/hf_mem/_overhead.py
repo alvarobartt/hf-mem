@@ -387,7 +387,21 @@ def decoder(
     if engine == "vllm" and not hopper:
         graphs -= 0.14 * GIB * bounded_capacity / 256 * (1 - fraction)
     logits = 4 * vocab * bounded_capacity
-    query_width = (config.get("num_attention_heads") or 0) * (config.get("head_dim") or 0)
+    query_width = max(
+        (
+            (layer.get("num_attention_heads") or 0)
+            * (
+                (layer.get("global_head_dim") if kind == "full" else layer.get("swa_head_dim"))
+                or layer.get("head_dim")
+                or (layer.get("hidden_size") or 0) // max(1, layer.get("num_attention_heads") or 1)
+            )
+            for layer, kind in zip(
+                _config._layer_configs(config), _config.layer_kinds(config, include_shared=True)
+            )
+            if kind in {"full", "sliding"}
+        ),
+        default=hidden,
+    )
     activation_width = (hidden + max(hidden, query_width / n)) / 2
     gdn = hybrid and bool(config.get("linear_num_value_heads"))
     if engine == "sglang" and (not hopper or gdn):

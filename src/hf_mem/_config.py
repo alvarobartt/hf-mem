@@ -242,7 +242,7 @@ def _downcast_f32(dtype: str) -> str:
     return "F16" if dtype == "F32" else dtype
 
 
-def layer_kinds(config: dict[str, Any]) -> list[str]:
+def layer_kinds(config: dict[str, Any], include_shared: bool = False) -> list[str]:
     layers: int = config["num_hidden_layers"]
     types = config.get("layer_types") or config.get("layers_block_type")
     if isinstance(types, list) and types:
@@ -271,6 +271,8 @@ def layer_kinds(config: dict[str, Any]) -> list[str]:
             else "full"
             for layer in _layer_configs(config)
         ]
+    if include_shared:
+        return kinds
     modes = config.get("kv_sharing_modes")
     if modes is None and isinstance(sources := config.get("kv_source_layers"), list):
         modes = [None if i == source else "reuse" for i, source in enumerate(sources)]

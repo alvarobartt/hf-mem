@@ -462,3 +462,39 @@ def test_position_tables_are_shared_by_matching_dimensions_and_parameters() -> N
         {**config, "num_hidden_layers": 8, "layer_types": config["layer_types"] * 2}
     ) == _overhead.position_buffers(config)
     assert _overhead.position_buffers({**config, "rope_parameters": {}, "global_head_dim": None}) == 0
+
+
+@pytest.mark.parametrize("engine", ["vllm", "sglang"])
+@pytest.mark.parametrize("ranks", [1, 2, 4])
+def test_decoder_activations_use_the_widest_attention_projection(engine: str, ranks: int) -> None:
+    config: dict[str, Any] = {
+        "hidden_size": 512,
+        "num_hidden_layers": 2,
+        "num_attention_heads": 32,
+        "head_dim": 64,
+        "global_head_dim": 128,
+        "layer_types": ["sliding_attention", "full_attention"],
+        "num_kv_shared_layers": 1,
+    }
+    settings: dict[str, Any] = {"engine": engine, "tensor_parallel_size": ranks, "gpu_type": "nvidia-h200"}
+    mixed = _overhead.decoder(config, False, False, 8192, **settings)
+    wide = _overhead.decoder({**config, "head_dim": 128}, False, False, 8192, **settings)
+    narrow = _overhead.decoder({**config, "global_head_dim": None}, False, False, 8192, **settings)
+    sliding = _overhead.decoder(
+        {**config, "layer_types": ["sliding_attention"] * 2}, False, False, 8192, **settings
+    )
+    assert mixed.activations == wide.activations > narrow.activations
+    assert sliding.activations == narrow.activations
+
+
+def test_decoder_activations_include_per_layer_projection_dimensions() -> None:
+    config: dict[str, Any] = {
+        "hidden_size": 512,
+        "num_hidden_layers": 2,
+        "num_attention_heads": 32,
+        "head_dim": 64,
+        "per_layer_config": {"1": {"num_attention_heads": 64, "head_dim": 128}},
+    }
+    mixed = _overhead.decoder(config, False, False, 8192)
+    wide = _overhead.decoder({**config, "num_attention_heads": 64, "head_dim": 128}, False, False, 8192)
+    assert mixed.activations == wide.activations
