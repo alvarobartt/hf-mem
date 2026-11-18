@@ -114,7 +114,7 @@ def test_inkling_defaults_to_its_calibrated_engine(tmp_path: Path) -> None:
     assert default.overhead is not None and default.overhead.reference_engine == "sglang"
     assert default.total == selected.total
     assert default.recommended_gpu_memory == selected.recommended_gpu_memory
-    assert "SGLANG REFERENCE" in table(default)
+    assert "SGLANG REFERENCE" not in table(default)
     other = estimate(str(tmp_path), max_model_len=128, engine="vllm")
     assert any("vLLM layout is not validated" in w for w in other.warnings)
 
@@ -143,5 +143,7 @@ def test_selected_topology_breakdown_matches_the_fit(
     assert result.kv_cache.bytes == result.fit.cache_bytes
     assert result.fit.overhead_per_gpu is not None
     assert result.overhead.bytes == ranks * result.fit.overhead_per_gpu
-    assert f"| Engine reference | {engine} |" in markdown(result)
+    assert "Engine reference" not in markdown(result)
+    assert f"{engine.upper()} REFERENCE" not in table(result)
+    assert "ALLOCATION BUDGET" not in table(result)
     assert result.to_dict()["total"] == result.fit.required

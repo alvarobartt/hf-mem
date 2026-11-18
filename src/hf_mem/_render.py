@@ -219,10 +219,6 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
             )
         sections[0][1].append(("GPU MEMORY", text, verdict, requirement / capacity))
     titles = _titles(estimate.url, estimate.revision, estimate.file, kv)
-    if estimate.overhead and estimate.overhead.reference_engine:
-        titles.append(
-            f"{estimate.overhead.reference_engine.upper()} REFERENCE, {estimate.gpu_memory_utilization:.0%} ALLOCATION BUDGET"
-        )
     return _color(_draw(titles, sections, NAME_WIDTH), color)
 
 
@@ -260,8 +256,6 @@ def markdown(estimate: Estimate | Listing) -> str:
         return "\n".join([f"Memory estimate for {where}", "", *rows])
 
     rows = ["| | Memory | Params |", "|---|--:|--:|"]
-    if estimate.overhead and estimate.overhead.reference_engine:
-        rows.append(f"| Engine reference | {estimate.overhead.reference_engine} | |")
     if (recommended := estimate.recommended_gpu_memory) is not None:
         rows.append(
             f"| **Recommended GPU capacity** | **{gib(recommended)} GiB ({recommended / 10**9:.2f} GB)** | |"

@@ -8,8 +8,6 @@ The estimate covers the model weights, the KV cache for generative models, and t
 
 Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, where `<model>` is a Hugging Face Hub model ID (optionally with `@revision`, and with `:<quantization>` for GGUF), an URL, or a local path.
 
-For generative models, **GPU CAPACITY** is the recommended physical capacity with budget headroom and an initialization allowance. **TOTAL MEMORY / ALLOCATIONS** shows weights, workload cache and modeled overhead. A model ID alone estimates one sequence at the configured context; neither `--gpu-type` nor `--gpu-memory` is required. Serving engines can reserve spare VRAM for extra caches, so their observed usage can exceed the workload estimate.
-
 ### Transformers
 
 ```console
@@ -19,7 +17,6 @@ $ uvx hf-mem zai-org/GLM-5.3-Flash
 │                     INFERENCE MEMORY ESTIMATE FOR                     │
 │              https://hf.co/zai-org/GLM-5.3-Flash @ main               │
 │                w/ max-model-len=1048576, batch-size=1                 │
-│                 VLLM REFERENCE, 90% ALLOCATION BUDGET                 │
 ├─────────────────┬─────────────────────────────────────────────────────┤
 │ GPU CAPACITY    │ 361.67 GiB (388.34 GB) ON ONE GPU                   │
 │ RECOMMENDED     │ ███████████████████████████████████████████████████ │
@@ -76,7 +73,6 @@ $ uvx hf-mem Qwen/Qwen3.8-27B --max-model-len 32768 --batch-size 4
 │                    INFERENCE MEMORY ESTIMATE FOR                    │
 │                https://hf.co/Qwen/Qwen3.8-27B @ main                │
 │                w/ max-model-len=32768, batch-size=4                 │
-│                VLLM REFERENCE, 90% ALLOCATION BUDGET                │
 ├─────────────────┬───────────────────────────────────────────────────┤
 │ GPU CAPACITY    │ 73.71 GiB (79.14 GB) ON ONE GPU                   │
 │ RECOMMENDED     │ █████████████████████████████████████████████████ │
@@ -214,7 +210,6 @@ $ uvx hf-mem unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M
 │            https://hf.co/unsloth/Qwen3.8-27B-GGUF @ main            │
 │                  FOR `Qwen3.8-27B-UD-Q4_K_M.gguf`                   │
 │                w/ max-model-len=262144, batch-size=1                │
-│             LLAMA.CPP REFERENCE, 90% ALLOCATION BUDGET              │
 ├─────────────────┬───────────────────────────────────────────────────┤
 │ GPU CAPACITY    │ 36.74 GiB (39.45 GB) ON ONE GPU                   │
 │ RECOMMENDED     │ █████████████████████████████████████████████████ │
@@ -358,36 +353,7 @@ For llama.cpp, `--ctx-size`/`-c` sets the total context pool, divided by `--para
 uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 ```
 
-```json
-{
-  "version": "hf-mem@1.0.0",
-  "model": "Qwen/Qwen3-8B",
-  "revision": "main",
-  "file": null,
-  "format": "safetensors",
-  "total": 22921527048,
-  "recommended_gpu_memory": 26080294865,
-  "gpu_memory_utilization": 0.9,
-  "startup_reserve_per_gpu": 550738330,
-  "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
-  "offloaded": null,
-  "components": null,
-  "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 1708218120, "activations": 523003494, "encoder": 0, "graphs": 326472826, "runtime": 848256040, "buffers": 10485760, "loading": 0, "max_num_seqs": 256, "reference_engine": "vllm"},
-  "moe": null,
-  "fit": null,
-  "warnings": []
-}
-```
-
-- `recommended_gpu_memory` is the physical GPU capacity recommendation in bytes, including initialization and the allocation budget. With `--gpu-memory NxSIZE`, it is the aggregate for that topology.
-- `startup_reserve_per_gpu`, when present, is initialization storage beyond the modeled runtime allocations. `fit.startup_required` includes it in the fit decision.
-- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` is `null` for non-generative models; text encoders include warmup `overhead`, while other non-generative models have no overhead estimate.
-- `file`, `offloaded` (weights in CPU memory, not in `total`), `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
-- With `--gpu-memory NxSIZE`, all memory totals include the requested topology. `total` equals `fit.required`, before startup memory and budget headroom.
-- `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
-- `format` is `safetensors`, `gguf` or `onnx`.
-- GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
+`recommended_gpu_memory` is the suggested GPU capacity, `total` is the modeled allocation, and `fit` checks the capacity supplied with `--gpu-memory`. All sizes in JSON are bytes.
 
 ### Python
 
@@ -400,7 +366,7 @@ print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead
 print(result.to_dict())
 ```
 
-`run` takes the same options as the CLI (`revision`, `file`, `format`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization`, `max_num_batched_tokens`, `max_num_seqs`, `dtype`, `engine`, `gpu_type`, `language_model_only` and `full_sliding_window_cache`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF and ONNX repositories.
+`run` accepts the CLI options as keyword arguments. Use `await arun(...)` in async applications. Both return an `Estimate`, or a `Listing` for repositories with several GGUF or ONNX variants.
 
 ### Agents
 
@@ -418,9 +384,9 @@ hf extensions add alvarobartt/hf-mem
 
 `hf-mem` only reads the metadata of the weight files (the Safetensors headers, the GGUF metadata or the ONNX graph) with HTTP Range requests, and adds up the memory an inference engine needs on the GPU:
 
-- **Weights**: tensor storage at the selected serving precision, per dtype and component. Weights that the engine keeps in CPU memory are reported apart, as vLLM does with the DeepSeek-V4.1 Engram tables and llama.cpp with the token embeddings.
-- **KV cache**: what the engine allocates for `--max-model-len` tokens and `--batch-size` sequences, following the model's attention: full attention caches every token, sliding window layers only the window, latent and compressed attention (e.g. DeepSeek, GLM) a smaller record per token, and linear attention or Mamba layers a fixed state per sequence.
-- **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, persistent buffers, CUDA graphs, and the runtime (the CUDA context and library workspaces).
+- **Weights**: model tensors at the selected precision. Weights offloaded to CPU memory are reported separately.
+- **KV cache**: memory for the context length and batch size, accounting for full attention, sliding windows and recurrent state.
+- **Overhead**: activations, vision/audio encoders, persistent buffers, CUDA graphs and runtime workspaces.
 
 Estimates depend on the engine and workload settings. Kernels and other runtime optimizations can change memory use.
 
@@ -428,7 +394,7 @@ Estimates depend on the engine and workload settings. Kernels and other runtime 
 
 - The fit check models memory for the stated workload; engine compatibility and automatic spare-cache reservations are separate. Different backends and non-default optimizations can change the footprint.
 - ONNX models have no overhead estimate, and GGUF and ONNX listings estimate each file from its size, so a single file (`:<quantization>` or `--file`) gives the most accurate numbers.
-- vLLM profiles the vision encoder of some models (e.g. Qwen2.5-VL) with a video when it has more tokens than an image, which can reserve a few GiB more (`hf-mem` warns about it).
+- Vision and audio memory depends on the input size, so actual use can differ from the estimate.
 - PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, and encoder-decoder models (e.g. Whisper) have no KV cache estimate.
 
 ## References
