@@ -8,7 +8,7 @@ from typing import Any
 from hf_mem import _config, _gguf, _onnx, _overhead, _safetensors
 from hf_mem._source import HubError, Progress, open_source
 from hf_mem._version import __version__
-from hf_mem._weights import Weights
+from hf_mem._weights import DTYPES, FLOAT_BYTES, Weights
 
 FORMATS = ("safetensors", "gguf", "onnx")
 
@@ -174,6 +174,7 @@ def _fit(
     kv_bytes: Callable[[int, int], int] | None = None,
     rank_overhead: Callable[[int], int] | None = None,
     overhead_at_context: Callable[[int, int], int] | None = None,
+    max_gpus: int | None = None,
     startup_reserve: Callable[[int], int] | None = None,
 ) -> None:
     estimate.gpu_memory_utilization = utilization
@@ -201,6 +202,7 @@ def _fit(
         kv_bytes=kv_bytes,
         overhead_at_context=overhead_at_context,
         startup_reserve=startup_reserve or estimate.startup_reserve_per_gpu,
+        max_gpus=max_gpus,
     )
 
 
@@ -444,6 +446,62 @@ async def _estimate_onnx(
     return Listing(source.name, source.revision, source.url, files, warnings)
 
 
+_ENCODER_DTYPE_ONLY = (
+    "`--dtype` only supports unquantized Safetensors text encoders; other models keep their stored dtypes."
+)
+
+_SENTENCE_TRANSFORMERS_CONFIGS = (
+    "sentence_bert_config.json",
+    "sentence_roberta_config.json",
+    "sentence_distilbert_config.json",
+    "sentence_camembert_config.json",
+    "sentence_albert_config.json",
+    "sentence_xlm-roberta_config.json",
+    "sentence_xlnet_config.json",
+)
+
+
+async def _encoder_length(source: Any, config: dict[str, Any], override: int | None) -> int | None:
+    if override is not None:
+        return override
+    for name in _SENTENCE_TRANSFORMERS_CONFIGS:
+        if name in source.files:
+            try:
+                if isinstance(length := (await source.json(name)).get("max_seq_length"), int) and length > 0:
+                    return length
+            except (RuntimeError, ValueError):
+                pass
+    positions = config.get("max_position_embeddings")
+    if not isinstance(positions, int) or positions <= 0:
+        return None
+    roberta = config.get("model_type") in ("roberta", "xlm-roberta", "camembert", "mpnet")
+    length = positions - ((config.get("pad_token_id") or 0) + 1 if roberta else 0)
+    return length if length > 0 else None
+
+
+def _loading_transient(components: dict[str, Weights], dtype: str) -> int:
+    target, _ = DTYPES[dtype]
+    return max(
+        (
+            entry.largest * FLOAT_BYTES[name]
+            for component in components.values()
+            for name, entry in component.dtypes.items()
+            if name in FLOAT_BYTES and name != target
+        ),
+        default=0,
+    )
+
+
+def _float_size(config: dict[str, Any], weights: Weights) -> int:
+    dtype = config.get("dtype") or config.get("torch_dtype")
+    sizes = {"float64": 8, "float32": 4, "float16": 2, "bfloat16": 2}
+    if isinstance(dtype, str) and dtype.removeprefix("torch.") in sizes:
+        return sizes[dtype.removeprefix("torch.")]
+    floats = {d: w.params for d, w in weights.dtypes.items() if d in ("F64", "F32", "F16", "BF16") and w.params}
+    largest = max(floats, key=floats.__getitem__) if floats else "BF16"
+    return {"F64": 8, "F32": 4, "F16": 2, "BF16": 2}[largest]
+
+
 async def _estimate_safetensors(
     source: Any,
     file: str | None,
@@ -461,6 +519,7 @@ async def _estimate_safetensors(
     gpu_type: str | None,
     text_only: bool,
     language_model_only: bool,
+    dtype: str | None,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -547,6 +606,101 @@ async def _estimate_safetensors(
             "KV cache estimation skipped, as Mistral `params.json` configs are not supported, estimate a version of "
             "the model with a Transformers `config.json` for the KV cache."
         )
+    text_encoder = bool(config) and _config.is_text_encoder(config, files)
+    if dtype is not None:
+        if (
+            not text_encoder
+            or quantization
+            or any(d not in ("F64", "F32", "F16", "BF16", "I64", "I32", "I16", "BOOL") for d in weights.dtypes)
+        ):
+            raise RuntimeError(_ENCODER_DTYPE_ONLY)
+    weight_dtype = dtype
+    if (
+        not text_encoder
+        and config
+        and _config.is_generative(config, files)
+        and not quantization
+        and _float_size(_config.text_config(config) or config, weights) == 4
+    ):
+        weight_dtype = "float16"
+        warnings.append(
+            "FP32 decoder weights use a 16-bit CUDA serving reference; engines may select F16 or BF16."
+        )
+    if weight_dtype is not None:
+        estimate.components = {name: component.cast(weight_dtype) for name, component in components.items()}
+        estimate.weights = weights = Weights()
+        for component in estimate.components.values():
+            weights.merge(component)
+        experts = {
+            name: {index: expert.cast(weight_dtype) for index, expert in group.items()}
+            for name, group in experts.items()
+        }
+    if text_encoder:
+        encoder_config = _config.normalize(config)
+        length = await _encoder_length(source, encoder_config, max_model_len)
+        tokens = _overhead.batched_tokens(gpu_memory, max_num_batched_tokens)
+        if not encoder_config.get("hidden_size") or not encoder_config.get("num_attention_heads"):
+            warnings.append(
+                "Encoder warmup estimation skipped, as the model dimensions are missing from `config.json`."
+            )
+        elif (
+            any(experts.values())
+            or any(
+                encoder_config.get(k)
+                for k in (
+                    "num_local_experts",
+                    "n_routed_experts",
+                    "num_experts",
+                    "moe_num_experts",
+                    "kv_lora_rank",
+                )
+            )
+            or "state" in _config.layer_kinds(encoder_config)
+        ):
+            warnings.append("Encoder warmup estimation skipped for MoE, recurrent or latent-attention models.")
+        elif length is None:
+            warnings.append(
+                "Encoder warmup estimation skipped, as the sequence length is unknown, set `--max-model-len`."
+            )
+        else:
+            size = DTYPES[dtype][1] if dtype else _float_size(encoder_config, weights)
+            estimate.overhead = overhead = _overhead.encoder_warmup(encoder_config, files, tokens, length, size)
+            if dtype:
+                transient = _loading_transient(components, dtype)
+                overhead.loading = max(0, transient - overhead.activations - overhead.buffers)
+            full, remaining = divmod(tokens, min(tokens, length))
+            if _overhead.encoder_eager(encoder_config, size):
+                tensors = _overhead.encoder_attention_tensors(encoder_config, full + bool(remaining))
+                attention = f"eager attention, keeping {tensors} tensors of attention scores per sequence" + (
+                    ", as memory-efficient attention kernels need half precision" if size >= 4 else ""
+                )
+            else:
+                attention = "memory-efficient attention"
+            warnings.append(
+                f"Encoder warmup assumes {tokens} tokens in sequences of up to {length} tokens with {attention}. "
+                + (
+                    f"Floating-point parameters and activations use {dtype}. "
+                    if dtype
+                    else "Weights are estimated as stored. "
+                )
+                + "Engine kernels, padding and workspaces can change memory use."
+            )
+            if overhead.buffers:
+                positions = encoder_config.get("max_position_embeddings")
+                warnings.append(
+                    f"Eager ALiBi attention keeps the biases of {positions} x {positions} positions per head, "
+                    f"{overhead.buffers / _overhead.GIB:.2f} GiB for the model's lifetime."
+                )
+            if overhead.loading:
+                warnings.append(
+                    f"Casting to {dtype} while loading reserves the largest tensor in its stored precision, "
+                    f"peaking at {(overhead.bytes + weights.bytes) / _overhead.GIB:.2f} GiB while loading, "
+                    "assuming tensors are cast on the device."
+                )
+        if gpu_memory and (_overhead.parse_gpu_memory(gpu_memory)[0] or 1) > 1:
+            warnings.append("Encoder fit assumes one replica per GPU, without tensor parallelism.")
+        _fit(estimate, 0, 0.0, gpu_memory, utilization, max_gpus=1)
+        return estimate
     if not config or "config_sentence_transformers.json" in files or not _config.is_generative(config, files):
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
@@ -568,7 +722,9 @@ async def _estimate_safetensors(
 
     if len(components) == 1:
         name = next(iter(components))
-        estimate.moe = _safetensors.moe_breakdown(components[name], experts.get(name, {}), text, warnings)
+        estimate.moe = _safetensors.moe_breakdown(
+            estimate.components[name], experts.get(name, {}), text, warnings
+        )
     length = max_model_len or text.get("max_position_embeddings")
     if not isinstance(length, int):
         warnings.append(
@@ -598,7 +754,7 @@ async def _estimate_safetensors(
     state_capacity = max_num_seqs or batch_size
     dedicated_state = engine == "sglang" and bool(text.get("linear_num_value_heads"))
 
-    def attention_cache(length: int, n: int = 1) -> tuple[int, dict[str, int]]:
+    def cache(length: int, n: int = 1) -> tuple[int, dict[str, int]]:
         if dedicated_state:
             return _config.sglang_kv_cache(
                 text,
@@ -619,9 +775,6 @@ async def _estimate_safetensors(
             _safetensors.language_model_prefixes(config),
             marlin=_overhead.hardware(profile_memory, gpu_type)[2],
         )
-
-    def cache(length: int, n: int = 1) -> tuple[int, dict[str, int]]:
-        return attention_cache(length, n)
 
     size, layers = cache(length)
     half = cache(max(1, length // 2))[0]
@@ -657,7 +810,7 @@ async def _estimate_safetensors(
         capacity = max_num_seqs
         if capacity is None and (profile_memory is not None or gpu_type is not None or engine == "sglang"):
             capacity = max(batch_size, _overhead.default_sequences(profile_memory, gpu_type, engine))
-        result = _overhead.vllm(
+        result = _overhead.decoder(
             text,
             moe=is_moe,
             hybrid=layers["state"] > 0,
@@ -760,6 +913,7 @@ async def arun(
     max_num_batched_tokens: int | None = None,
     progress: Progress | None = None,
     format: str | None = None,
+    dtype: str | None = None,
     max_num_seqs: int | None = None,
     full_sliding_window_cache: bool = False,
     engine: str | None = None,
@@ -787,6 +941,8 @@ async def arun(
             _overhead.validate_gpu_memory(gpu_memory, gpu_type)
     if format not in (None, *FORMATS):
         raise RuntimeError(f"`--format={format}` is not valid, use one of {', '.join(FORMATS)}.")
+    if dtype is not None and dtype not in DTYPES:
+        raise RuntimeError(f"`--dtype={dtype}` is not valid, use one of {', '.join(DTYPES)}.")
     source, url_file = await open_source(model_id, revision, hf_token, progress)
     file = file or url_file
     warnings: list[str] = []
@@ -810,6 +966,8 @@ async def arun(
         )
         only_onnx = onnx and not any(p.endswith(".safetensors") for p in source.files) and not gguf
         if format == "onnx" or (format is None and ((wants_onnx and not wants_gguf) or only_onnx)):
+            if dtype is not None:
+                raise RuntimeError(_ENCODER_DTYPE_ONLY)
             return await _estimate_onnx(
                 source,
                 file,
@@ -821,6 +979,8 @@ async def arun(
                 gpu_memory_utilization,
             )
         if format == "gguf" or (format is None and gguf and (wants_gguf or not has_safetensors)):
+            if dtype is not None:
+                raise RuntimeError(_ENCODER_DTYPE_ONLY)
             return await _estimate_gguf(
                 source,
                 file,
@@ -850,6 +1010,7 @@ async def arun(
             gpu_type,
             text_only,
             language_model_only,
+            dtype,
         ):
             for other, found in (("GGUF", gguf), ("ONNX", onnx)):
                 if found and format is None and file is None:
@@ -859,6 +1020,8 @@ async def arun(
                     )
             return estimate
         if onnx and format is None:
+            if dtype is not None:
+                raise RuntimeError(_ENCODER_DTYPE_ONLY)
             return await _estimate_onnx(
                 source,
                 file,
@@ -886,6 +1049,7 @@ def run(
     gpu_memory_utilization: float = 0.90,
     max_num_batched_tokens: int | None = None,
     format: str | None = None,
+    dtype: str | None = None,
     max_num_seqs: int | None = None,
     full_sliding_window_cache: bool = False,
     engine: str | None = None,
@@ -915,6 +1079,7 @@ def run(
                 gpu_type=gpu_type,
                 text_only=text_only,
                 language_model_only=language_model_only,
+                dtype=dtype,
             )
         )
     raise RuntimeError(

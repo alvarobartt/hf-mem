@@ -76,6 +76,13 @@ _ENCODER_ARCHS = (
     "Embedding",
 )
 _GENERATIVE_ARCHS = ("ForCausalLM", "ForConditionalGeneration", "LMHeadModel")
+_TEXT_HEADS = (
+    "ForMaskedLM",
+    "ForSequenceClassification",
+    "ForTokenClassification",
+    "ForQuestionAnswering",
+    "ForMultipleChoice",
+)
 _STATE = ("linear", "conv", "mamba", "ssm", "recurrent", "delta", "rwkv", "lightning")
 _NO_CACHE = ("mlp", "moe", "dummy")
 _SLIDING = ("sliding", "local", "chunked", "swa")
@@ -148,6 +155,26 @@ def is_generative(config: dict[str, Any], files: dict[str, int]) -> bool:
     return "generation_config.json" in files or any(a.endswith(_GENERATIVE_ARCHS) for a in architectures)
 
 
+def is_text_encoder(config: dict[str, Any], files: dict[str, int]) -> bool:
+    if (
+        config.get("is_encoder_decoder")
+        or any(
+            hint in str(config.get("model_type") or "").lower()
+            for hint in ("vision", "audio", "wav2vec", "dinov", "vit", "clip")
+        )
+        or "preprocessor_config.json" in files
+        or any(isinstance(config.get(k), dict) for k in ("vision_config", "audio_config", *_TEXT_KEYS))
+        or not _is_text(config)
+    ):
+        return False
+    architectures = [str(a) for a in config.get("architectures") or []]
+    return (
+        "config_sentence_transformers.json" in files
+        or any(a.endswith(_TEXT_HEADS) for a in architectures)
+        or (not is_generative(config, files) and any(a.endswith("Model") for a in architectures))
+    )
+
+
 def text_config(config: dict[str, Any]) -> dict[str, Any] | None:
     if any(hint in arch for arch in config.get("architectures") or [] for hint in _ENCODER_ARCHS):
         return None
@@ -200,15 +227,19 @@ def kv_dtype(config: dict[str, Any], requested: str, weights: Weights, warnings:
         return "F8_E4M3"
     dtype = config.get("dtype") or config.get("torch_dtype")
     if isinstance(dtype, str):
-        return _TORCH.get(dtype.removeprefix("torch."), "F16")
+        return _downcast_f32(_TORCH.get(dtype.removeprefix("torch."), "F16"))
 
     counts = {d: w.params for d, w in weights.dtypes.items() if d in {"BF16", "F16", "F32"}}
-    dtype = max(counts, key=counts.__getitem__) if counts else "BF16"
+    dtype = _downcast_f32(max(counts, key=counts.__getitem__) if counts else "BF16")
     warnings.append(
         f"The KV cache dtype could not be inferred from `config.json`, so it defaults to {dtype}, set "
         "`--kv-cache-dtype` to override it."
     )
     return dtype
+
+
+def _downcast_f32(dtype: str) -> str:
+    return "F16" if dtype == "F32" else dtype
 
 
 def layer_kinds(config: dict[str, Any]) -> list[str]:

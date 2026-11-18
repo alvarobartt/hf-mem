@@ -67,7 +67,7 @@ $ uvx hf-mem zai-org/GLM-5.3-Flash
 └─────────────────┴─────────────────────────────────────────────────────┘
 ```
 
-For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, which as in vLLM is the model dtype unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
+For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, using model precision unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
 
 ```console
 $ uvx hf-mem Qwen/Qwen3.8-27B --max-model-len 32768 --batch-size 4
@@ -157,6 +157,24 @@ $ uvx hf-mem google/embeddinggemma-2
 │ 744.37M PARAMS  │ ████████████████████████████████ │
 └─────────────────┴──────────────────────────────────┘
 ```
+
+Text encoders, rerankers and Sentence Transformers include a warmup estimate over `--max-num-batched-tokens` tokens, using `--max-model-len` as the sequence length (otherwise the Sentence Transformers or model configuration). The batch can contain several sequences. No KV cache or decoding graphs are added.
+
+```bash
+uvx hf-mem BAAI/bge-base-en-v1.5 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
+```
+
+By default, weights keep their stored dtypes, including mixed precision and quantization buffers. Activations use the configured dtype or the dominant floating-point weight dtype. For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` explicitly casts floating-point parameters and activations; integer tensors remain unchanged. Other model types reject this option. Warmup assumes memory-efficient attention in half precision, and eager attention for MPNet, DeBERTa, configurations selecting it, and F32 activations, as memory-efficient attention kernels need half precision. Fit checks assume one replica per GPU.
+
+To estimate a Text Embeddings Inference deployment, use its configured `--dtype` (`float16` or `float32`) and the actual number of warmup tokens, which may be smaller than its batch limit:
+
+```bash
+uvx hf-mem BAAI/bge-base-en-v1.5 --dtype float16 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
+```
+
+Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Loading allows for a temporary tensor in its stored dtype alongside the converted weights, so F32 checkpoints loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
+
+FP32 decoder checkpoints use a 16-bit CUDA serving reference for floating-point weights and automatic KV cache precision. The estimate labels that reference F16; an engine may choose BF16 with the same memory width. Encoder defaults preserve their stored precision, and quantized checkpoints keep their declared representation.
 
 ### GGUF
 
@@ -363,7 +381,7 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
   "offloaded": null,
   "components": null,
   "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 1697732360, "activations": 523003494, "encoder": 0, "graphs": 326472826, "runtime": 848256040, "max_num_seqs": 256, "reference_engine": "vllm"},
+  "overhead": {"bytes": 1697732360, "activations": 523003494, "encoder": 0, "graphs": 326472826, "runtime": 848256040, "buffers": 0, "loading": 0, "max_num_seqs": 256, "reference_engine": "vllm"},
   "moe": null,
   "fit": null,
   "warnings": []
@@ -372,8 +390,9 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 
 - `recommended_gpu_memory` is the physical GPU capacity recommendation in bytes, including initialization and the allocation budget. With `--gpu-memory NxSIZE`, it is the aggregate for that topology.
 - `startup_reserve_per_gpu`, when present, is initialization storage beyond the modeled runtime allocations. `fit.startup_required` includes it in the fit decision.
-- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` and `overhead` are `null` for non-generative models.
+- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` is `null` for non-generative models; text encoders include warmup `overhead`, while other non-generative models have no overhead estimate.
 - `file`, `offloaded` (weights in CPU memory, not in `total`), `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
+- For multiple GPUs, `fit.required` includes topology replication and per-GPU overhead; `total` remains the component reference sum.
 - `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
 - `format` is `safetensors`, `gguf` or `onnx`.
 - GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
@@ -389,7 +408,7 @@ print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead
 print(result.to_dict())
 ```
 
-`run` takes the same options as the CLI (`revision`, `file`, `format`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization`, `max_num_batched_tokens`, `max_num_seqs`, `engine`, `gpu_type`, `language_model_only` and `full_sliding_window_cache`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF and ONNX repositories.
+`run` takes the same options as the CLI (`revision`, `file`, `format`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization`, `max_num_batched_tokens`, `max_num_seqs`, `dtype`, `engine`, `gpu_type`, `language_model_only` and `full_sliding_window_cache`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF and ONNX repositories.
 
 ### Agents
 
@@ -407,7 +426,7 @@ hf extensions add alvarobartt/hf-mem
 
 `hf-mem` only reads the metadata of the weight files (the Safetensors headers, the GGUF metadata or the ONNX graph) with HTTP Range requests, and adds up the memory an inference engine needs on the GPU:
 
-- **Weights**: the exact size of every tensor, per dtype and component. Weights that the engine keeps in CPU memory are reported apart, as vLLM does with the DeepSeek-V4.1 Engram tables and llama.cpp with the token embeddings.
+- **Weights**: tensor storage at the selected serving precision, per dtype and component. Weights that the engine keeps in CPU memory are reported apart, as vLLM does with the DeepSeek-V4.1 Engram tables and llama.cpp with the token embeddings.
 - **KV cache**: what the engine allocates for `--max-model-len` tokens and `--batch-size` sequences, following the model's attention: full attention caches every token, sliding window layers only the window, latent and compressed attention (e.g. DeepSeek, GLM) a smaller record per token, and linear attention or Mamba layers a fixed state per sequence.
 - **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, the CUDA graphs, and the runtime (the CUDA context and library workspaces).
 

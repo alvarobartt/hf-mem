@@ -165,7 +165,7 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
             title = heading(name if many else "MODEL", component)
             if component.dtypes:
                 sections.append((title, _dtype_items(component, total)))
-            elif many or kv:
+            elif many or kv or estimate.overhead:
                 sections.append(
                     (
                         title,
@@ -194,6 +194,8 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
                 ("GRAPHS", overhead.graphs),
                 ("RUNTIME", overhead.runtime),
                 ("REPACK/REPLICA", overhead.weight_adjustment),
+                ("BUFFERS", overhead.buffers),
+                ("LOADING", overhead.loading),
             )
             if value
         ]
@@ -284,7 +286,7 @@ def markdown(estimate: Estimate | Listing) -> str:
     if overhead := estimate.overhead:
         parts = ", ".join(
             n
-            for n in ("activations", "encoder", "graphs", "runtime", "weight_adjustment")
+            for n in ("activations", "encoder", "graphs", "runtime", "buffers", "loading", "weight_adjustment")
             if getattr(overhead, n)
         )
         rows.append(f"| Overhead ({parts}) | {gib(overhead.bytes)} GiB | |")

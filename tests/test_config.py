@@ -245,6 +245,30 @@ def test_is_generative() -> None:
 
 
 @pytest.mark.parametrize(
+    "architectures, files, expected",
+    [
+        (["BertForMaskedLM"], {}, True),
+        (["XLMRobertaForSequenceClassification"], {}, True),
+        (["BertForTokenClassification"], {}, True),
+        (["BertModel"], {}, True),
+        (["Qwen3ForCausalLM"], {"config_sentence_transformers.json": 1, "generation_config.json": 1}, True),
+        (["LlamaForSequenceClassification"], {"generation_config.json": 1}, True),
+        (["LlamaModel"], {"generation_config.json": 1}, False),
+        (["LlamaForCausalLM"], {}, False),
+        (["Dinov2Model"], {"preprocessor_config.json": 1}, False),
+        (["Wav2Vec2ForSequenceClassification"], {"preprocessor_config.json": 1}, False),
+    ],
+)
+def test_is_text_encoder(architectures: list[str], files: dict[str, int], expected: bool) -> None:
+    assert _config.is_text_encoder(llama_config(architectures=architectures), files) is expected
+
+
+def test_is_text_encoder_needs_a_top_level_text_config() -> None:
+    clip = {"architectures": ["CLIPModel"], "text_config": llama_config()}
+    assert not _config.is_text_encoder(clip, {"config_sentence_transformers.json": 1})
+
+
+@pytest.mark.parametrize(
     "config, requested, expected",
     [
         ({"torch_dtype": "bfloat16"}, "auto", "BF16"),
@@ -479,3 +503,11 @@ def test_short_conv_state_retains_local_kv_and_replicated_hidden_streams(
     local_heads = -(-config["num_key_value_heads"] // ranks)
     per_layer = (4 * local_heads * 32 + 2 * config["hidden_size"]) * 3 * 2
     assert actual - attention == config["num_hidden_layers"] * per_layer * ranks * batch
+
+
+@pytest.mark.parametrize("config", [{"dtype": "float32"}, {"torch_dtype": "float32"}, {}])
+def test_fp32_auto_cache_uses_a_shared_16_bit_reference(config: dict[str, Any]) -> None:
+    weights = Weights()
+    weights.add("F32", 10, 40)
+    assert _config.kv_dtype(config, "auto", weights, []) == "F16"
+    assert _config.kv_dtype(config, "bfloat16", weights, []) == "BF16"

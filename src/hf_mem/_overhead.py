@@ -3,6 +3,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from hf_mem import _config
+
 GIB = 1 << 30
 MIB = 1 << 20
 LARGE_GPU = 70 * GIB
@@ -93,14 +95,9 @@ def default_sequences(gpu_memory: str | None, gpu_type: str | None, engine: str)
     return 1024 if hardware(gpu_memory, name)[2] or name == "rtx-pro-6000" else 256
 
 
-# Fitted on vLLM 0.33 memory profiles (A100 for "small", H200 for "large"), see the README.
 _PROFILES = {
     "small": {
         "seqs": 256,
-        "vocab": 5004,
-        "inter": 6.6,
-        "hidden": 77.2,
-        "act": 0,
         "graph": 0.16 * GIB,
         "graph_layer": 5.4 * MIB,
         "graph_moe": 5.6 * MIB,
@@ -108,14 +105,9 @@ _PROFILES = {
         "graph_lh": 0,
         "graph_width": 6174,
         "non_torch": 0.27 * GIB,
-        "context": 0.83 * GIB,
     },
     "large": {
         "seqs": 1024,
-        "vocab": 12702,
-        "inter": 0,
-        "hidden": 13.2,
-        "act": 0.93 * GIB,
         "graph": 0.29 * GIB,
         "graph_layer": 0,
         "graph_moe": 12.9 * MIB,
@@ -123,10 +115,17 @@ _PROFILES = {
         "graph_lh": 248.8,
         "graph_width": 23908,
         "non_torch": 0.87 * GIB,
-        "context": 1.01 * GIB,
     },
 }
 _GATED = ("silu", "swiglu", "swish")
+_GLU = ("modernbert", "new", "gte", "gemma3_text")
+_ENCODER = {
+    "encoder": 7,
+    "decoder": 10,
+    "mlp": 2,
+    "gated_mlp": 5,
+    "runtime": 0.32 * GIB,
+}
 
 
 @dataclass
@@ -136,6 +135,8 @@ class Overhead:
     graphs: int
     runtime: int
     context: int
+    buffers: int = 0
+    loading: int = 0
     max_num_seqs: int | None = None
     reference_engine: str | None = None
     gpu_type: str | None = None
@@ -143,7 +144,15 @@ class Overhead:
 
     @property
     def bytes(self) -> int:
-        return self.activations + self.encoder + self.graphs + self.runtime + self.weight_adjustment
+        return (
+            self.activations
+            + self.encoder
+            + self.graphs
+            + self.runtime
+            + self.buffers
+            + self.loading
+            + self.weight_adjustment
+        )
 
     def to_dict(self) -> dict[str, Any]:
         out = {
@@ -152,6 +161,8 @@ class Overhead:
             "encoder": self.encoder,
             "graphs": self.graphs,
             "runtime": self.runtime,
+            "buffers": self.buffers,
+            "loading": self.loading,
         }
         if self.max_num_seqs is not None:
             out["max_num_seqs"] = self.max_num_seqs
@@ -262,7 +273,7 @@ def supports_video(config: dict[str, Any], files: Any) -> bool:
     )
 
 
-def vllm(
+def decoder(
     config: dict[str, Any],
     moe: bool,
     hybrid: bool,
@@ -381,10 +392,80 @@ def vllm(
         int(max(0, graphs)),
         int(non_torch + context + communication + (capacity + 1) * context_length * 4 * (engine == "sglang")),
         int(context),
-        capacity,
-        engine,
-        gpu_type_name(gpu_type) if gpu_type is not None else None,
+        max_num_seqs=capacity,
+        reference_engine=engine,
+        gpu_type=gpu_type_name(gpu_type) if gpu_type is not None else None,
     )
+
+
+def encoder_eager(config: dict[str, Any], size: int) -> bool:
+    if size >= 4:
+        return True
+    implementation = config.get("_attn_implementation") or config.get("attn_implementation")
+    if implementation is not None:
+        return implementation == "eager"
+    return config.get("model_type") in ("mpnet", "deberta", "deberta-v2")
+
+
+def encoder_attention_tensors(config: dict[str, Any], sequences: int) -> int:
+    terms = config.get("pos_att_type") or ()
+    biases = (
+        bool(config.get("relative_attention_num_buckets") or config.get("model_type") == "mpnet")
+        + (config.get("position_embedding_type") == "alibi")
+        + (
+            len(terms.split("|") if isinstance(terms, str) else terms)
+            if config.get("relative_attention")
+            else 0
+        )
+    )
+    kinds = set(_config.layer_kinds(config)) if config.get("num_hidden_layers") else set()
+    if (
+        config.get("local_attention")
+        and config.get("global_attn_every_n_layers")
+        or {"full", "sliding"} <= kinds
+    ):
+        masks = 2
+    elif config.get("rms_norm_eps") and not config.get("use_bidirectional_attention"):
+        masks = 1
+    else:
+        masks = int(sequences > 1 and not biases)
+    return 3 + biases + masks
+
+
+def encoder_buffers(config: dict[str, Any], size: int) -> int:
+    if config.get("position_embedding_type") != "alibi":
+        return 0
+    return (config.get("num_attention_heads") or 1) * (config.get("max_position_embeddings") or 0) ** 2 * size
+
+
+def encoder_warmup(config: dict[str, Any], files: Any, tokens: int, length: int, size: int) -> Overhead:
+    p = _ENCODER
+    hidden = config.get("hidden_size") or 0
+    heads = config.get("num_attention_heads") or 1
+    inter = config.get("intermediate_size") or config.get("n_inner") or 4 * hidden
+    act = str(config.get("hidden_act") or config.get("activation_function") or "")
+    gated = (
+        any(a in act for a in _GATED)
+        or config.get("model_type") in _GLU
+        or "glu" in str(config.get("feed_forward_type") or "")
+    )
+    masked = any(str(a).endswith("ForMaskedLM") for a in config.get("architectures") or [])
+    sparse = any(str(f).endswith("SpladePooling/config.json") for f in files)
+    pooled = "config_sentence_transformers.json" in files and not sparse
+    per_token = (p["decoder"] if config.get("rms_norm_eps") else p["encoder"]) * hidden
+    per_token += (p["gated_mlp"] if gated else p["mlp"]) * inter
+    head_dim = config.get("head_dim") or hidden // heads
+    kv_heads = config.get("num_key_value_heads") or heads
+    per_token += max(0, (heads + 2 * kv_heads) * head_dim - 3 * hidden)
+    per_token += (3 if sparse else 1) * (config.get("vocab_size") or 0) if masked and not pooled else 0
+    sequence = min(tokens, length)
+    full, remaining = divmod(tokens, sequence)
+    eager = encoder_eager(config, size)
+    scores = heads * (full * sequence**2 + remaining**2) if eager else 0
+    tensors = encoder_attention_tensors(config, full + bool(remaining))
+    runtime = int(p["runtime"])
+    buffers = encoder_buffers(config, size) if eager else 0
+    return Overhead(int(tokens * per_token + tensors * scores) * size, 0, 0, runtime, runtime, buffers)
 
 
 def _clip_bytes(positions: int, hidden: int, ffn: int | None, gated: bool) -> int:
@@ -533,8 +614,11 @@ def fit(
     kv_bytes: Callable[[int, int], int] | None = None,
     overhead_at_context: Callable[[int, int], int] | None = None,
     startup_reserve: int | Callable[[int], int] = 0,
+    max_gpus: int | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
+    if max_gpus is not None and gpus is not None:
+        gpus = min(gpus, max_gpus)
 
     def rank_overhead(n: int, length: int = max_model_len) -> int:
         if overhead_at_context is not None:
@@ -562,7 +646,7 @@ def fit(
         (
             n
             for n in sorted({1, 2, 4, 8, 16, 32, 64, gpus or 1})
-            if padded(n) + cache(max_model_len, n) <= n * usable(n)
+            if n <= (max_gpus or n) and padded(n) + cache(max_model_len, n) <= n * usable(n)
         ),
         None,
     )

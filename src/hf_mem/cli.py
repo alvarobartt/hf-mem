@@ -10,6 +10,7 @@ from hf_mem._gguf import CACHE_TYPES
 from hf_mem._render import markdown, table
 from hf_mem._source import HubError, Progress
 from hf_mem._version import __version__
+from hf_mem._weights import DTYPES
 from hf_mem.estimate import FORMATS, arun
 
 
@@ -94,7 +95,7 @@ def main() -> None:
     parser.add_argument(
         "--kv-cache-dtype",
         default="auto",
-        help="KV cache dtype, `auto` uses the model dtype (Safetensors) or F16 (GGUF). "
+        help="KV cache dtype, `auto` uses model precision (16-bit for FP32 decoders) or F16 for GGUF. "
         f"Safetensors: {', '.join(KV_CACHE_DTYPES)}. GGUF: {', '.join(t.lower() for t in CACHE_TYPES)}. ONNX: set by the graph.",
     )
     parser.add_argument(
@@ -127,7 +128,7 @@ def main() -> None:
         "--chunked-prefill-size",
         dest="max_num_batched_tokens",
         type=int,
-        help="Prefill token budget. vLLM defaults: 2048 below 70 GiB or on named A100, 8192 otherwise (16384 at 160 GiB). SGLang defaults: 2048 below 20 GiB, 4096 below 60 GiB, 8192 below 160 GiB, 16384 otherwise.",
+        help="Prefill or encoder warmup token budget. vLLM defaults: 2048 below 70 GiB or on named A100, 8192 otherwise (16384 at 160 GiB). SGLang defaults: 2048 below 20 GiB, 4096 below 60 GiB, 8192 below 160 GiB, 16384 otherwise.",
     )
     parser.add_argument(
         "--max-num-seqs",
@@ -171,6 +172,12 @@ def main() -> None:
         "--cache-type-v",
         "-ctv",
         help="llama.cpp value-cache dtype; this estimator requires matching K/V types.",
+    )
+    parser.add_argument(
+        "--dtype",
+        choices=DTYPES,
+        help="Floating-point weight and activation dtype for unquantized Safetensors text encoders only. "
+        "Defaults to checkpoint weights and configured activation dtype. Integer tensors are unchanged.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--color", action="store_true", help="Enable color in terminal tables.")
@@ -246,6 +253,7 @@ def main() -> None:
                 language_model_only=args.language_model_only,
                 progress=Progress(status),
                 format=args.format,
+                dtype=args.dtype,
             )
         )
     except (RuntimeError, HubError) as e:
