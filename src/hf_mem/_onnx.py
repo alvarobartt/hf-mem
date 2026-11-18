@@ -36,7 +36,10 @@ TYPES = {
 }
 _VARIANT = re.compile(r"_(fp16|q8|int8|uint8|q4|q4f16|bnb4|quantized)$")
 _DATA = re.compile(r"(?<=\.onnx)[._]data(?:_\d+)?$")
-_PAST_INPUT = re.compile(rb"\x5a[\x80-\xff]{0,3}[\x00-\x7f]\x0a[\x00-\x7f]past_")
+# New Transformers exporters flatten Cache objects as `cache.layers.0.keys`, sometimes
+# prefixed with `input.` to disambiguate graph inputs from outputs.
+_CACHE_NAME = rb"(?:input\.)?(?:past_|cache\.|cache_params\.)"
+_CACHE_INPUT = re.compile(rb"\x5a[\x80-\xff]{0,3}[\x00-\x7f]\x0a[\x00-\x7f]" + _CACHE_NAME)
 _PARTS = ("embed_tokens", "vision_encoder", "audio_encoder", "speech_encoder", "encoder_model")
 _DECODERS = ("decoder_model_merged", "decoder_model", "decoder_with_past_model")
 # Weight input of the ONNX Runtime ops that pack sub-byte weights into UINT8 blobs
@@ -198,7 +201,7 @@ async def _input(reader: _Reader, start: int, end: int, graph: Graph) -> None:
     async for number, _, a, b in reader.fields(start, end):
         if number == 1:
             name = (await reader.read(a, b - a)).decode(errors="replace")
-        elif number == 2 and name.startswith("past_"):
+        elif number == 2 and re.match(_CACHE_NAME, name.encode()):
             async for kind, _, c, d in reader.fields(a, b):
                 if kind == 1:
                     async for key, _, e, f in reader.fields(c, d):
@@ -206,10 +209,11 @@ async def _input(reader: _Reader, start: int, end: int, graph: Graph) -> None:
                             dtype = e
                         elif key == 2:
                             dims = await _dims(reader, e, f)
-    if name.startswith("past_"):
+    if re.match(_CACHE_NAME, name.encode()) and dims:
         dtype_name, bits = TYPES.get(dtype, ("F32", 32))
         static = math.prod(d for d in dims if d)
-        graph.cache.append((dtype_name, static * bits // 8, sum(not d for d in dims), ".encoder." in name))
+        encoder = ".encoder." in name or ".cross_attention_cache." in name
+        graph.cache.append((dtype_name, static * bits // 8, sum(not d for d in dims), encoder))
 
 
 async def _walk(reader: _Reader, graph: Graph) -> None:
@@ -231,7 +235,7 @@ async def _tail(reader: _Reader, graph: Graph) -> None:
     start = max(0, reader.size - TAIL_SIZE)
     tail = await reader.read(start, reader.size - start)
     seen = set()
-    for match in _PAST_INPUT.finditer(tail):
+    for match in _CACHE_INPUT.finditer(tail):
         length, pos = await reader.varint(start + match.start() + 1)
         if pos + length <= reader.size and (key := tail[match.start() : pos - start + length]) not in seen:
             seen.add(key)

@@ -147,7 +147,7 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
         many = len(estimate.components) > 1
         headed = many or kv is not None or estimate.overhead is not None
         for name, component in (estimate.components or {"MODEL": weights}).items():
-            title = heading(name if many else "MODEL", component) if headed else None
+            title = heading(name if many else "MODEL", component)
             if component.dtypes:
                 sections.append((title, _dtype_items(component, total)))
             elif headed:
