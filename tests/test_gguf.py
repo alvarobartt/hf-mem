@@ -42,6 +42,8 @@ def test_single_file(tmp_path: Path) -> None:
     assert result.weights.dtypes["Q8_0"].bytes == 256 * 256 // 32 * 34
     assert some(result.kv_cache).bytes == 4 * 2 * (32 + 32) * 2048 * 2
     assert some(result.kv_cache).dtype == "F16"
+    with pytest.raises(RuntimeError, match="only supports unquantized Safetensors text encoders"):
+        estimate(str(tmp_path), dtype="float16")
 
 
 def test_listing_uses_file_sizes_and_per_file_metadata(tmp_path: Path) -> None:

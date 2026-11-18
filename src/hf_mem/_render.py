@@ -149,7 +149,7 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
             title = heading(name if many else "MODEL", component)
             if component.dtypes:
                 sections.append((title, _dtype_items(component, total)))
-            elif many or kv:
+            elif many or kv or estimate.overhead:
                 sections.append(
                     (
                         title,
@@ -177,6 +177,8 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
                 ("ENCODER", overhead.encoder),
                 ("GRAPHS", overhead.graphs),
                 ("RUNTIME", overhead.runtime),
+                ("BUFFERS", overhead.buffers),
+                ("LOADING", overhead.loading),
             )
             if value
         ]
