@@ -10,6 +10,7 @@ from hf_mem._gguf import CACHE_TYPES
 from hf_mem._render import markdown, table
 from hf_mem._source import HubError, Progress
 from hf_mem._version import __version__
+from hf_mem._weights import DTYPES
 from hf_mem.estimate import FORMATS, arun
 
 
@@ -74,7 +75,13 @@ def main() -> None:
     parser.add_argument(
         "--max-num-batched-tokens",
         type=int,
-        help="Tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
+        help="Warmup tokens for text encoders, or tokens per batch as in vLLM, defaults to 8192 (16384 with `--gpu-memory` of 160 GiB or more, 2048 under 70 GiB), use 2048 for A100.",
+    )
+    parser.add_argument(
+        "--dtype",
+        choices=DTYPES,
+        help="Floating-point weight and activation dtype for unquantized Safetensors text encoders only. "
+        "Defaults to checkpoint weights and configured activation dtype. Integer tensors are unchanged.",
     )
     parser.add_argument("--hf-token", help="Hub token, defaults to `HF_TOKEN` or the `hf auth login` token.")
     parser.add_argument("--color", action="store_true", help="Enable color in terminal tables.")
@@ -111,6 +118,7 @@ def main() -> None:
                 max_num_batched_tokens=args.max_num_batched_tokens,
                 progress=Progress(status),
                 format=args.format,
+                dtype=args.dtype,
             )
         )
     except (RuntimeError, HubError) as e:
