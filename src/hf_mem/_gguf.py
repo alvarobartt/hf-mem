@@ -1,4 +1,3 @@
-import asyncio
 import math
 import os
 import re
@@ -6,6 +5,7 @@ import struct
 from dataclasses import dataclass, field
 from typing import Any
 
+from hf_mem._source import gather
 from hf_mem._weights import Weights, choices
 
 FIRST_READ = 1 << 20
@@ -347,7 +347,7 @@ def kv_cache(
 
 
 async def read_group(source: Any, paths: list[str]) -> Header:
-    headers = await asyncio.gather(*(read_header(source, p) for p in paths))
+    headers = await gather(*(read_header(source, p) for p in paths))
     weights, offloaded = Weights(), Weights()
     for header in headers:
         weights.merge(header.weights)

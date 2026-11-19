@@ -1,4 +1,3 @@
-import asyncio
 import math
 import os
 import re
@@ -6,6 +5,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from hf_mem._source import gather
 from hf_mem._weights import Weights, choices
 
 CHUNK = 1 << 20
@@ -254,7 +254,7 @@ async def read_group(source: Any, paths: list[str]) -> Graph:
         return graph
 
     merged = Graph()
-    for graph in await asyncio.gather(*(read(p) for p in paths if p.endswith(".onnx"))):
+    for graph in await gather(*(read(p) for p in paths if p.endswith(".onnx"))):
         merged.weights.merge(graph.weights)
         merged.cache.extend(graph.cache)
     return merged

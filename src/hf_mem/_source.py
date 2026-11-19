@@ -2,9 +2,9 @@ import asyncio
 import json
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
-from urllib.parse import quote, unquote, urlparse
+from urllib.parse import quote, unquote, urljoin, urlparse
 from uuid import uuid4
 
 from hf_mem._version import __version__
@@ -22,6 +22,25 @@ class HubError(RuntimeError):
     def __init__(self, message: str, status: int | None = None) -> None:
         super().__init__(message)
         self.status = status
+
+
+async def gather(*awaitables: Awaitable[Any], return_exceptions: bool = False) -> list[Any]:
+    async def run(awaitable: Awaitable[Any]) -> Any:
+        try:
+            return await awaitable
+        except Exception as error:
+            if not return_exceptions or isinstance(error, HubError) and error.status in {401, 403}:
+                raise
+            return error
+
+    tasks = [asyncio.create_task(run(awaitable)) for awaitable in awaitables]
+    try:
+        return await asyncio.gather(*tasks)
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 _AUTH = "authenticate with `--hf-token`, `HF_TOKEN` or `hf auth login`"
@@ -158,6 +177,12 @@ class HubSource:
         self.url = f"https://hf.co/{model_id}"
         self.files: dict[str, int] = {}
         self._oids: dict[str, str] = {}
+        self._lfs: set[str] = set()
+        self._redirects: dict[str, str] = {}
+        self._redirect_locks: dict[str, asyncio.Lock] = {}
+        self._read_lock = asyncio.Lock()
+        self._read_ready = False
+        self._denied: HubError | None = None
         self._snapshot: str | None = None
         self._base = f"{ENDPOINT}/{model_id}/resolve/{quote(revision, safe='')}"
         self._headers = {
@@ -175,32 +200,103 @@ class HubSource:
         )
 
     async def _get(self, url: str, headers: dict[str, str] | None = None) -> Any:
-        httpx2 = self._httpx2
+        if self._denied:
+            raise self._denied
         self.progress.start()
-        async with self._semaphore:
-            try:
-                for attempt in range(RETRIES):
-                    try:
-                        response = await self._client.get(url, headers={**self._headers, **(headers or {})})
-                    except httpx2.TransportError as e:
-                        if attempt == RETRIES - 1:
-                            raise HubError(
-                                f"Could not reach {ENDPOINT} ({type(e).__name__}: {e}), check the connection, or set "
-                                "`HF_HUB_OFFLINE=1` to read models from the local cache."
-                            ) from e
-                    else:
-                        if response.status_code not in {429, 500, 502, 503, 504} or attempt == RETRIES - 1:
-                            if response.is_error:
-                                raise self._error(response)
+        try:
+            if headers and "Range" in headers:
+                if not self._read_ready:
+                    async with self._read_lock:
+                        if not self._read_ready:
+                            response = await self._range(url, headers)
+                            self._read_ready = True
                             return response
-                    await asyncio.sleep(0.5 * 2**attempt)
-            finally:
-                self.progress.finish()
+                return await self._range(url, headers)
+            return await self._request(url, headers)
+        finally:
+            self.progress.finish()
+
+    def _is_hub(self, url: Any) -> bool:
+        parsed, endpoint = self._httpx2.URL(url), self._httpx2.URL(ENDPOINT)
+        return (parsed.scheme, parsed.host, parsed.port) == (endpoint.scheme, endpoint.host, endpoint.port)
+
+    async def _request(
+        self,
+        url: str,
+        headers: dict[str, str] | None = None,
+        method: str = "GET",
+        redirects: bool = True,
+    ) -> Any:
+        request_headers = {**self._headers, **(headers or {})}
+        if not self._is_hub(url):
+            request_headers = {
+                key: value for key, value in request_headers.items() if key.lower() != "authorization"
+            }
+        async with self._semaphore:
+            for attempt in range(RETRIES):
+                if self._denied:
+                    raise self._denied
+                try:
+                    response = await self._client.request(
+                        method, url, headers=request_headers, follow_redirects=redirects
+                    )
+                except self._httpx2.TransportError as error:
+                    if attempt == RETRIES - 1:
+                        raise HubError(
+                            f"Could not reach {ENDPOINT} ({type(error).__name__}: {error}), check the connection, or set "
+                            "`HF_HUB_OFFLINE=1` to read models from the local cache."
+                        ) from error
+                else:
+                    if response.status_code not in {429, 500, 502, 503, 504} or attempt == RETRIES - 1:
+                        if response.is_error:
+                            error = self._error(response)
+                            if response.status_code in {401, 403} and self._is_hub(response.url):
+                                self._denied = error
+                            raise error
+                        return response
+                await asyncio.sleep(0.5 * 2**attempt)
+
+    async def _resolve(self, url: str) -> str:
+        if url not in self._lfs:
+            return url
+        async with self._redirect_locks.setdefault(url, asyncio.Lock()):
+            if url not in self._redirects:
+                target = url
+                for _ in range(self._client.max_redirects):
+                    try:
+                        response = await self._request(target, method="HEAD", redirects=False)
+                    except HubError as error:
+                        if error.status not in {405, 501}:
+                            raise
+                        break
+                    location = response.headers.get("location")
+                    if not response.is_redirect or not location:
+                        break
+                    target = urljoin(target, location)
+                    if not self._is_hub(target):
+                        break
+                else:
+                    raise HubError(f"Too many redirects for `{self.name}`.")
+                self._redirects[url] = target
+            return self._redirects[url]
+
+    async def _range(self, url: str, headers: dict[str, str]) -> Any:
+        target = await self._resolve(url)
+        try:
+            return await self._request(target, headers)
+        except HubError as error:
+            if target == url or error.status not in {401, 403} or self._denied:
+                raise
+            if self._redirects.get(url) == target:
+                self._redirects.pop(url)
+            return await self._request(await self._resolve(url), headers)
 
     def _error(self, response: Any) -> HubError:
         status, message = response.status_code, response.headers.get("x-error-message") or ""
         page = f"https://hf.co/{self.name}"
-        if status == 404 and "rev" in message.lower():
+        if status in {401, 403} and not self._is_hub(response.url):
+            text = f"The download server returned HTTP {status} for `{self.name}`."
+        elif status == 404 and "rev" in message.lower():
             text = (
                 f"Revision `{self.revision}` not found for `{self.name}`, see the branches and tags at {page}."
             )
@@ -231,6 +327,8 @@ class HubSource:
                     lfs = entry.get("lfs") or {}
                     self.files[entry["path"]] = lfs.get("size", entry.get("size", 0))
                     self._oids[entry["path"]] = lfs.get("oid") or entry.get("oid", "")
+                    if lfs:
+                        self._lfs.add(f"{self._base}/{entry['path']}")
             url = response.links.get("next", {}).get("url")
         self._snapshot = _cache_snapshot(self.name, commit or self.revision)
 
@@ -243,12 +341,16 @@ class HubSource:
         return None
 
     async def json(self, path: str) -> Any:
+        if self._denied:
+            raise self._denied
         if cached := self._cached(path):
             with open(cached, "rb") as f:
                 return json.loads(f.read())
         return json.loads((await self._get(f"{self._base}/{path}")).content)
 
     async def read(self, path: str, start: int, end: int) -> bytes:
+        if self._denied:
+            raise self._denied
         end = min(end, self.files.get(path, end))
         if start >= end:
             return b""
