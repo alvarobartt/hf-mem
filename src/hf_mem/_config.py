@@ -568,10 +568,12 @@ def partitioned_kv_cache(
     ratio: float,
 ) -> tuple[int, dict[str, int]]:
     config = normalize(config)
-    kinds = layer_kinds(config)
+    kinds = layer_kinds(config, include_shared=True)
     layers = {kind: kinds.count(kind) for kind in ("full", "sliding", "state", "none")}
     if not layers["full"] or not layers["sliding"] or layers["state"]:
         return kv_cache(config, dtype, max_model_len, batch_size, batched_tokens, tensor_parallel_size)
+    for key in ("num_kv_shared_layers", "kv_sharing_modes", "kv_source_layers"):
+        config.pop(key, None)
     window = config.get("sliding_window") or config.get("attention_chunk_size") or max_model_len
     live = min(window - 1 + 2 * batched_tokens, max_model_len)
     sliding = (_cdiv(live, BLOCK_SIZE) + (live < max_model_len)) * BLOCK_SIZE * batch_size

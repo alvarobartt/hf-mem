@@ -68,7 +68,7 @@ def test_partitioned_cache_protects_the_sliding_prefill_capacity() -> None:
     assert _config.partitioned_kv_cache(config, "BF16", 0, 1, 512, 1, 0.5)[0] == 0
 
 
-def test_partitioned_cache_does_not_allocate_shared_layers_twice() -> None:
+def test_partitioned_cache_reserves_slots_for_each_attention_layer() -> None:
     config = llama_config(
         num_hidden_layers=4,
         sliding_window=128,
@@ -77,7 +77,7 @@ def test_partitioned_cache_does_not_allocate_shared_layers_twice() -> None:
     )
     shared, layers = _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 2, 0.5)
     separate = _config.partitioned_kv_cache(
-        {**config, "num_hidden_layers": 2, "num_kv_shared_layers": 0, "layer_types": config["layer_types"][:2]},
+        {**config, "num_kv_shared_layers": 0},
         "BF16",
         8192,
         1,
@@ -86,7 +86,15 @@ def test_partitioned_cache_does_not_allocate_shared_layers_twice() -> None:
         0.5,
     )[0]
     assert shared == separate
-    assert layers == {"full": 1, "sliding": 1, "state": 0, "none": 2}
+    assert shared > _config.kv_cache(config, "BF16", 8192, 1, 512, 2)[0]
+    assert layers == {"full": 2, "sliding": 2, "state": 0, "none": 0}
+
+
+def test_pool_ratio_does_not_change_single_attention_cache() -> None:
+    config = llama_config(num_kv_shared_layers=2)
+    assert _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 2, 0.5) == _config.kv_cache(
+        config, "BF16", 8192, 1, 512, 2
+    )
 
 
 def test_gemma3_defaults() -> None:
