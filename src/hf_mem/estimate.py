@@ -779,6 +779,14 @@ async def _estimate_safetensors(
 
     state_capacity = max_num_seqs or batch_size
     dedicated_state = engine == "sglang" and bool(text.get("linear_num_value_heads"))
+    cache_text = text
+    kinds = _config.layer_kinds(text, include_shared=True)
+    if engine == "sglang" and "full" in kinds and "sliding" in kinds and "state" not in kinds:
+        cache_text = {
+            key: value
+            for key, value in text.items()
+            if key not in {"num_kv_shared_layers", "kv_sharing_modes", "kv_source_layers"}
+        }
 
     def cache(length: int, n: int = 1) -> tuple[int, dict[str, int]]:
         if dedicated_state:
@@ -794,9 +802,9 @@ async def _estimate_safetensors(
             )
         if swa_full_tokens_ratio is not None and not full_sliding_window_cache:
             return _config.partitioned_kv_cache(
-                text, dtype, length, batch_size, tokens, n, swa_full_tokens_ratio
+                cache_text, dtype, length, batch_size, tokens, n, swa_full_tokens_ratio
             )
-        return _config.kv_cache(text, dtype, length, batch_size, tokens, n, full_sliding_window_cache)
+        return _config.kv_cache(cache_text, dtype, length, batch_size, tokens, n, full_sliding_window_cache)
 
     def weight_adjustment(n: int) -> int:
         return _safetensors.inkling_weight_adjustment(

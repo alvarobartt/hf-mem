@@ -95,6 +95,24 @@ def test_explicit_cache_pool_ratio_changes_fit_without_changing_weights(tmp_path
     assert any("mem-fraction-static" in warning for warning in partitioned.warnings)
 
 
+def test_sglang_reserves_shared_layer_slots_without_a_ratio_override(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            num_kv_shared_layers=2,
+            sliding_window=128,
+            layer_types=["full_attention", "sliding_attention"] * 2,
+        ),
+    )
+    common = estimate(str(tmp_path), engine="vllm")
+    pooled = estimate(str(tmp_path), engine="sglang")
+    assert common.kv_cache is not None and pooled.kv_cache is not None
+    assert common.kv_cache.layers == {"full": 1, "sliding": 1, "state": 0, "none": 2}
+    assert pooled.kv_cache.layers == {"full": 2, "sliding": 2, "state": 0, "none": 0}
+    assert pooled.kv_cache.bytes == 2 * common.kv_cache.bytes
+
+
 @pytest.mark.parametrize("ratio", [0, -1, 1.1, float("nan"), float("inf")])
 def test_invalid_cache_pool_ratios_are_rejected(ratio: float) -> None:
     with pytest.raises(RuntimeError, match="swa-full-tokens-ratio"):
