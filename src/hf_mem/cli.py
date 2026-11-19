@@ -139,6 +139,16 @@ def main() -> None:
         "Defaults depend on the engine and GPU.",
     )
     parser.add_argument(
+        "--swa-full-tokens-ratio",
+        type=float,
+        help="SGLang sliding/full cache token ratio in (0, 1]. Selects the SGLang reference.",
+    )
+    parser.add_argument(
+        "--mem-fraction-static",
+        type=float,
+        help="SGLang budget for weights and cache in (0, 1], separate from overall GPU headroom.",
+    )
+    parser.add_argument(
         "--disable-hybrid-kv-cache-manager",
         "--disable-hybrid-swa-memory",
         "--swa-full",
@@ -253,6 +263,8 @@ def main() -> None:
                 progress=Progress(status),
                 format=args.format,
                 dtype=args.dtype,
+                swa_full_tokens_ratio=args.swa_full_tokens_ratio,
+                mem_fraction_static=args.mem_fraction_static,
             )
         )
     except (RuntimeError, HubError) as e:

@@ -38,6 +38,57 @@ def test_sliding_window_layers_reserve_the_window_plus_batched_tokens() -> None:
     assert kv(hybrid, length=1024)[0] == 4 * 1024 * 2 * 2 * 32 * 2
 
 
+@pytest.mark.parametrize("ranks", [1, 2, 4])
+@pytest.mark.parametrize("batch", [1, 4])
+@pytest.mark.parametrize("dtype,width", [("BF16", 2), ("F8_E4M3", 1)])
+def test_partitioned_cache_reserves_both_pools(ranks: int, batch: int, dtype: str, width: int) -> None:
+    config = llama_config(
+        num_hidden_layers=3,
+        num_attention_heads=8,
+        num_key_value_heads=8,
+        num_global_key_value_heads=1,
+        head_dim=32,
+        global_head_dim=64,
+        sliding_window=128,
+        layer_types=["full_attention", "sliding_attention", "sliding_attention"],
+    )
+    size, layers = _config.partitioned_kv_cache(config, dtype, 8192, batch, 512, ranks, 0.5)
+    full = 8192 * batch * 2 * 64 * width * ranks
+    sliding = 4096 * batch * 2 * 2 * (8 // ranks) * 32 * width * ranks
+    assert size == full + sliding
+    assert layers == {"full": 1, "sliding": 2, "state": 0, "none": 0}
+
+
+def test_partitioned_cache_protects_the_sliding_prefill_capacity() -> None:
+    config = llama_config(sliding_window=128, layer_types=["full_attention"] + ["sliding_attention"] * 3)
+    logical = _config.kv_cache(config, "BF16", 8192, 1, 512)[0]
+    balanced = _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 1, 0.5)[0]
+    small_window_pool = _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 1, 0.01)[0]
+    assert small_window_pool > balanced > logical
+    assert _config.partitioned_kv_cache(config, "BF16", 0, 1, 512, 1, 0.5)[0] == 0
+
+
+def test_partitioned_cache_does_not_allocate_shared_layers_twice() -> None:
+    config = llama_config(
+        num_hidden_layers=4,
+        sliding_window=128,
+        layer_types=["full_attention", "sliding_attention"] * 2,
+        num_kv_shared_layers=2,
+    )
+    shared, layers = _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 2, 0.5)
+    separate = _config.partitioned_kv_cache(
+        {**config, "num_hidden_layers": 2, "num_kv_shared_layers": 0, "layer_types": config["layer_types"][:2]},
+        "BF16",
+        8192,
+        1,
+        512,
+        2,
+        0.5,
+    )[0]
+    assert shared == separate
+    assert layers == {"full": 1, "sliding": 1, "state": 0, "none": 2}
+
+
 def test_gemma3_defaults() -> None:
     config = {
         "model_type": "gemma3_text",

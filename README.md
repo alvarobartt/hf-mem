@@ -321,6 +321,8 @@ uvx hf-mem thinkingmachines/Inkling-2-Small --engine sglang --gpu-memory 8x141 -
 
 Use `--engine sglang` for SGLang estimates. Safetensors default to vLLM, except Inkling 2 defaults to SGLang. GGUF uses llama.cpp.
 
+For SGLang, `--swa-full-tokens-ratio` and `--mem-fraction-static` match the server's cache split and weights/cache budget. The latter is separate from `--gpu-memory-utilization`, which controls overall headroom.
+
 Use `--language-model-only` to exclude identified vision/audio encoders and projectors when deploying a multimodal model for language tasks only.
 
 | Meaning | Options |

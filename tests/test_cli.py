@@ -116,6 +116,22 @@ def test_json(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str
     assert data["total"] == data["weights"]["bytes"] + data["kv_cache"]["bytes"] + data["overhead"]["bytes"]
 
 
+def test_sglang_cache_pool_option(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str
+) -> None:
+    write_json(
+        str(Path(model) / "config.json"),
+        llama_config(sliding_window=128, layer_types=["full_attention"] + ["sliding_attention"] * 3),
+    )
+    code, out, err = cli(monkeypatch, capsys, model, "--swa-full-tokens-ratio", "0.8", "-o", "json")
+    assert code == 0 and err == ""
+    data = json.loads(out)
+    assert data["kv_cache"]["swa_full_tokens_ratio"] == 0.8
+    assert data["overhead"]["reference_engine"] == "sglang"
+    code, _, err = cli(monkeypatch, capsys, model, "--swa-full-tokens-ratio", "0.8", "--engine", "vllm")
+    assert code == 1 and "require SGLang and Safetensors" in err
+
+
 def test_gpu_fit(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], model: str) -> None:
     code, out, _ = cli(monkeypatch, capsys, model, "--gpu-memory", "2x4", "-o", "json")
     fit = json.loads(out)["fit"]

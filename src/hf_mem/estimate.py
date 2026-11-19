@@ -22,6 +22,7 @@ class KVCache:
     layers: dict[str, int]
     full_sliding_window_cache: bool = False
     state_capacity: int | None = None
+    swa_full_tokens_ratio: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -35,6 +36,8 @@ class KVCache:
             out["full_sliding_window_cache"] = True
         if self.state_capacity is not None:
             out["state_capacity"] = self.state_capacity
+        if self.swa_full_tokens_ratio is not None:
+            out["swa_full_tokens_ratio"] = self.swa_full_tokens_ratio
         return out
 
 
@@ -57,6 +60,7 @@ class Estimate:
     language_model_only: bool = False
     gpu_memory_utilization: float = 0.90
     startup_reserve_per_gpu: int = 0
+    mem_fraction_static: float | None = None
 
     @property
     def total(self) -> int:
@@ -69,7 +73,14 @@ class Estimate:
             return None
         allocation = self.fit.required if self.fit else self.total
         allocation += self.startup_reserve_per_gpu * ((self.fit.gpus or 1) if self.fit else 1)
-        return _overhead.recommended_memory(allocation, self.gpu_memory_utilization)
+        recommended = _overhead.recommended_memory(allocation, self.gpu_memory_utilization)
+        if self.fit is not None and self.fit.capacity_required is not None:
+            return max(recommended, self.fit.capacity_required)
+        if self.mem_fraction_static is not None:
+            static = self.weights.bytes + (self.kv_cache.bytes if self.kv_cache else 0)
+            static += self.overhead.buffers + self.overhead.weight_adjustment
+            recommended = max(recommended, math.ceil(static / self.mem_fraction_static) + self.overhead.context)
+        return recommended
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -86,6 +97,8 @@ class Estimate:
         out["total"] = self.total
         out["recommended_gpu_memory"] = self.recommended_gpu_memory
         out["gpu_memory_utilization"] = self.gpu_memory_utilization
+        if self.mem_fraction_static is not None:
+            out["mem_fraction_static"] = self.mem_fraction_static
         if self.startup_reserve_per_gpu:
             out["startup_reserve_per_gpu"] = self.startup_reserve_per_gpu
         out["weights"] = self.weights.to_dict()
@@ -176,6 +189,7 @@ def _fit(
     overhead_at_context: Callable[[int, int], int] | None = None,
     max_gpus: int | None = None,
     startup_reserve: Callable[[int], int] | None = None,
+    capacity_at_context: Callable[[int, int], int] | None = None,
 ) -> None:
     estimate.gpu_memory_utilization = utilization
     if startup_reserve is not None:
@@ -203,6 +217,7 @@ def _fit(
         overhead_at_context=overhead_at_context,
         startup_reserve=startup_reserve or estimate.startup_reserve_per_gpu,
         max_gpus=max_gpus,
+        capacity_at_context=capacity_at_context,
     )
     ranks = estimate.fit.gpus or 1
     if estimate.overhead is not None:
@@ -528,6 +543,8 @@ async def _estimate_safetensors(
     text_only: bool,
     language_model_only: bool,
     dtype: str | None,
+    swa_full_tokens_ratio: float | None,
+    mem_fraction_static: float | None,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -742,6 +759,7 @@ async def _estimate_safetensors(
         return estimate
     dtype = _config.kv_dtype(text, kv_dtype, weights, warnings)
     profile_memory = gpu_memory
+    estimate.mem_fraction_static = mem_fraction_static
     tokens = _overhead.batched_tokens(profile_memory, max_num_batched_tokens, gpu_type, engine)
     if (
         max_num_batched_tokens is None
@@ -774,6 +792,10 @@ async def _estimate_safetensors(
                 full_sliding_window_cache,
                 state_capacity,
             )
+        if swa_full_tokens_ratio is not None and not full_sliding_window_cache:
+            return _config.partitioned_kv_cache(
+                text, dtype, length, batch_size, tokens, n, swa_full_tokens_ratio
+            )
         return _config.kv_cache(text, dtype, length, batch_size, tokens, n, full_sliding_window_cache)
 
     def weight_adjustment(n: int) -> int:
@@ -795,6 +817,9 @@ async def _estimate_safetensors(
         layers,
         full_sliding_window_cache,
         state_capacity if dedicated_state else None,
+        swa_full_tokens_ratio
+        if layers["full"] and layers["sliding"] and not layers["state"] and not full_sliding_window_cache
+        else None,
     )
     if dedicated_state and max_num_seqs is None:
         warnings.append(
@@ -850,6 +875,13 @@ async def _estimate_safetensors(
     def startup(n: int = 1) -> int:
         return max(encoder_reserve, _overhead.GIB - overhead(n).activations, 0)
 
+    def static_capacity(n: int, context_length: int) -> int:
+        reserved = overhead(n, context_length)
+        padding = _mxfp4_padding(config, text, weights)
+        static = weights.bytes + cache(context_length, n)[0] + (padding(n) if padding else 0)
+        static += n * (reserved.buffers + reserved.weight_adjustment)
+        return math.ceil(static / (mem_fraction_static or 1)) + n * reserved.context
+
     if gpu_memory is None and gpu_type is None:
         for capacity in (16, 24, 48, 80, 141):
             profile_memory = str(capacity)
@@ -858,6 +890,8 @@ async def _estimate_safetensors(
             candidate = overhead()
             allocation = weights.bytes + size + candidate.bytes + startup()
             recommended = _overhead.recommended_memory(allocation, utilization)
+            if mem_fraction_static is not None:
+                recommended = max(recommended, static_capacity(1, length))
             if recommended <= capacity * _overhead.GIB * (0.9 if capacity <= 48 else 0.98):
                 break
         estimate.kv_cache.bytes = size
@@ -876,6 +910,7 @@ async def _estimate_safetensors(
         overhead,
         lambda n, length: overhead(n, length).bytes,
         startup_reserve=startup,
+        capacity_at_context=static_capacity if mem_fraction_static is not None else None,
     )
     return estimate
 
@@ -928,11 +963,26 @@ async def arun(
     gpu_type: str | None = None,
     text_only: bool = False,
     language_model_only: bool = False,
+    swa_full_tokens_ratio: float | None = None,
+    mem_fraction_static: float | None = None,
 ) -> Estimate | Listing:
     engine = engine.lower() if engine is not None else None
     gpu_type = _overhead.normalize_gpu_type(gpu_type) if gpu_type is not None else None
     if engine not in {None, "vllm", "sglang"}:
         raise RuntimeError("`--engine` must be vllm or sglang for Safetensors overhead.")
+    for name, value in (
+        ("swa-full-tokens-ratio", swa_full_tokens_ratio),
+        ("mem-fraction-static", mem_fraction_static),
+    ):
+        if value is not None and not 0 < value <= 1:
+            raise RuntimeError(f"`--{name}` must be in (0, 1].")
+    if swa_full_tokens_ratio is not None or mem_fraction_static is not None:
+        if engine not in {None, "sglang"} or format not in {None, "safetensors"}:
+            raise RuntimeError(
+                "`--swa-full-tokens-ratio` and `--mem-fraction-static` require SGLang and Safetensors."
+            )
+        engine = "sglang"
+        format = "safetensors"
     if batch_size < 1 or any(
         v is not None and v < 1 for v in (max_model_len, max_num_batched_tokens, max_num_seqs)
     ):
@@ -1019,6 +1069,8 @@ async def arun(
             text_only,
             language_model_only,
             dtype,
+            swa_full_tokens_ratio,
+            mem_fraction_static,
         ):
             for other, found in (("GGUF", gguf), ("ONNX", onnx)):
                 if found and format is None and file is None:
@@ -1064,6 +1116,8 @@ def run(
     gpu_type: str | None = None,
     text_only: bool = False,
     language_model_only: bool = False,
+    swa_full_tokens_ratio: float | None = None,
+    mem_fraction_static: float | None = None,
 ) -> Estimate | Listing:
     try:
         asyncio.get_running_loop()
@@ -1088,6 +1142,8 @@ def run(
                 text_only=text_only,
                 language_model_only=language_model_only,
                 dtype=dtype,
+                swa_full_tokens_ratio=swa_full_tokens_ratio,
+                mem_fraction_static=mem_fraction_static,
             )
         )
     raise RuntimeError(

@@ -616,10 +616,13 @@ class Fit:
     overhead_per_gpu: int | None = None
     cache_bytes: int | None = None
     startup_required: int | None = None
+    capacity_required: int | None = None
 
     @property
     def fits(self) -> bool:
-        return max(self.required, self.startup_required or 0) <= (self.gpus or 1) * self.usable
+        return max(self.required, self.startup_required or 0) <= (self.gpus or 1) * self.usable and (
+            self.capacity_required is None or self.capacity_required <= (self.gpus or 1) * self.gpu_memory
+        )
 
     def to_dict(self) -> dict[str, Any]:
         out = {
@@ -637,6 +640,8 @@ class Fit:
             out["cache_bytes"] = self.cache_bytes
         if self.startup_required is not None:
             out["startup_required"] = self.startup_required
+        if self.capacity_required is not None:
+            out["capacity_required"] = self.capacity_required
         return out
 
 
@@ -683,6 +688,7 @@ def fit(
     overhead_at_context: Callable[[int, int], int] | None = None,
     startup_reserve: int | Callable[[int], int] = 0,
     max_gpus: int | None = None,
+    capacity_at_context: Callable[[int, int], int] | None = None,
 ) -> Fit:
     gpus, size = parse_gpu_memory(gpu_memory)
     if max_gpus is not None and gpus is not None:
@@ -710,22 +716,27 @@ def fit(
     def padded(n: int) -> int:
         return base + (padding(n) if padding else 0)
 
+    def within_budget(n: int, length: int) -> bool:
+        return padded(n) + cache(length, n) <= n * usable(n, length) and (
+            capacity_at_context is None or capacity_at_context(n, length) <= n * size
+        )
+
     needed = next(
         (
             n
             for n in sorted({1, 2, 4, 8, 16, 32, 64, gpus or 1})
-            if n <= (max_gpus or n) and padded(n) + cache(max_model_len, n) <= n * usable(n)
+            if n <= (max_gpus or n) and within_budget(n, max_model_len)
         ),
         None,
     )
     n = gpus or 1
     weights = padded(n)
-    if kv_bytes is not None or overhead_at_context is not None:
+    if kv_bytes is not None or overhead_at_context is not None or capacity_at_context is not None:
         # Search the actual allocation: cache pages, sliding windows and recurrent state make it non-linear.
         low, high = 0, context_length
         while low < high:
             middle = (low + high + 1) // 2
-            if weights + cache(middle, n) <= n * usable(n, middle):
+            if within_budget(n, middle):
                 low = middle
             else:
                 high = middle - 1
@@ -745,4 +756,5 @@ def fit(
         rank_overhead(n) if callable(overhead) else None,
         int(cache(max_model_len, n)),
         int(required + n * initialization(n)) if initialization(n) else None,
+        capacity_at_context(n, max_model_len) if capacity_at_context else None,
     )

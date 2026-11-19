@@ -1,4 +1,4 @@
-from math import lcm
+from math import ceil, lcm
 from typing import Any
 
 from hf_mem._weights import Weights
@@ -556,6 +556,38 @@ def kv_cache(
     size += _cdiv(sliding, group) * (_cdiv(sliding_tokens, block) + (sliding_tokens < max_model_len)) * token
     size += _cdiv(state, group) * state_pages * token
     return group * size * block * batch_size + indexer, layers
+
+
+def partitioned_kv_cache(
+    config: dict[str, Any],
+    dtype: str,
+    max_model_len: int,
+    batch_size: int,
+    batched_tokens: int,
+    tensor_parallel_size: int,
+    ratio: float,
+) -> tuple[int, dict[str, int]]:
+    config = normalize(config)
+    kinds = layer_kinds(config)
+    layers = {kind: kinds.count(kind) for kind in ("full", "sliding", "state", "none")}
+    if not layers["full"] or not layers["sliding"] or layers["state"]:
+        return kv_cache(config, dtype, max_model_len, batch_size, batched_tokens, tensor_parallel_size)
+    window = config.get("sliding_window") or config.get("attention_chunk_size") or max_model_len
+    live = min(window - 1 + 2 * batched_tokens, max_model_len)
+    sliding = (_cdiv(live, BLOCK_SIZE) + (live < max_model_len)) * BLOCK_SIZE * batch_size
+    full = max(_cdiv(max_model_len, BLOCK_SIZE) * BLOCK_SIZE * batch_size, ceil(sliding / ratio))
+    size = 0
+    for kind, tokens in (("full", full), ("sliding", ceil(full * ratio))):
+        selected = {
+            **config,
+            "layer_types": [f"{kind}_attention" if item == kind else "mlp" for item in kinds],
+        }
+        if isinstance(indexer_types := config.get("indexer_types"), list):
+            selected["indexer_types"] = [
+                index if item == kind else "none" for index, item in zip(indexer_types, kinds)
+            ]
+        size += kv_cache(selected, dtype, tokens, 1, batched_tokens, tensor_parallel_size, True)[0]
+    return size, layers
 
 
 def sglang_kv_cache(

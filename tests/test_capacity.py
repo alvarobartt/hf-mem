@@ -72,6 +72,72 @@ def test_model_only_selects_small_gpu_defaults_without_a_hardware_flag(tmp_path:
     assert inferred.total < large_gpu.total
 
 
+def test_explicit_cache_pool_ratio_changes_fit_without_changing_weights(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            max_position_embeddings=131072,
+            sliding_window=128,
+            layer_types=["full_attention"] + ["sliding_attention"] * 3,
+        ),
+    )
+    logical = estimate(str(tmp_path), engine="sglang", gpu_memory="24", max_num_batched_tokens=512)
+    partitioned = estimate(
+        str(tmp_path), gpu_memory="24", max_num_batched_tokens=512, swa_full_tokens_ratio=0.8
+    )
+    assert partitioned.weights == logical.weights
+    assert partitioned.overhead == logical.overhead
+    assert partitioned.total > logical.total
+    assert partitioned.to_dict()["kv_cache"]["swa_full_tokens_ratio"] == 0.8
+    assert partitioned.fit is not None and partitioned.fit.required == partitioned.total
+
+
+@pytest.mark.parametrize("ratio", [0, -1, 1.1, float("nan"), float("inf")])
+def test_invalid_cache_pool_ratios_are_rejected(ratio: float) -> None:
+    with pytest.raises(RuntimeError, match="swa-full-tokens-ratio"):
+        estimate("unused/model", swa_full_tokens_ratio=ratio)
+
+
+def test_static_budget_changes_capacity_without_changing_allocations(tmp_path: Path) -> None:
+    tensors = llama_tensors()
+    tensors["model.embed_tokens.weight"] = ("BF16", [262144, 32768])
+    write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    write_json(str(tmp_path / "config.json"), llama_config())
+    regular = estimate(str(tmp_path), engine="sglang", gpu_memory="2x16")
+    limited = estimate(str(tmp_path), gpu_memory="2x16", mem_fraction_static=0.5)
+    assert regular.total == limited.total
+    assert regular.overhead == limited.overhead
+    assert regular.fit is not None and regular.fit.fits
+    assert limited.fit is not None and not limited.fit.fits
+    assert limited.fit.required == limited.total
+    assert limited.fit.capacity_required == limited.recommended_gpu_memory
+    assert limited.to_dict()["mem_fraction_static"] == 0.5
+
+
+def test_static_budget_is_checked_during_context_search() -> None:
+    result = _overhead.fit(
+        weights=GIB,
+        kv_fixed=0,
+        kv_per_token=0,
+        max_model_len=4096,
+        context_length=4096,
+        overhead=0,
+        gpu_memory="4",
+        utilization=0.9,
+        capacity_at_context=lambda n, length: 2 * GIB + length * (1 << 20),
+    )
+    assert not result.fits and result.needed == 2
+    assert result.required == GIB
+    assert result.max_model_len == 2048
+
+
+@pytest.mark.parametrize("fraction", [0, -1, 1.1, float("nan"), float("inf")])
+def test_invalid_static_budgets_are_rejected(fraction: float) -> None:
+    with pytest.raises(RuntimeError, match="mem-fraction-static"):
+        estimate("unused/model", mem_fraction_static=fraction)
+
+
 def test_fused_experts_still_require_moe_workspaces(tmp_path: Path) -> None:
     write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
     write_json(str(tmp_path / "config.json"), llama_config())
