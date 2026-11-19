@@ -91,6 +91,8 @@ def test_explicit_cache_pool_ratio_changes_fit_without_changing_weights(tmp_path
     assert partitioned.total > logical.total
     assert partitioned.to_dict()["kv_cache"]["swa_full_tokens_ratio"] == 0.8
     assert partitioned.fit is not None and partitioned.fit.required == partitioned.total
+    assert any("swa-full-tokens-ratio" in warning for warning in logical.warnings)
+    assert any("mem-fraction-static" in warning for warning in partitioned.warnings)
 
 
 @pytest.mark.parametrize("ratio", [0, -1, 1.1, float("nan"), float("inf")])

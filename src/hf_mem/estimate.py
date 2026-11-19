@@ -807,6 +807,25 @@ async def _estimate_safetensors(
         )
 
     size, layers = cache(length)
+    if (
+        engine == "sglang"
+        and layers["full"]
+        and layers["sliding"]
+        and not layers["state"]
+        and not full_sliding_window_cache
+    ):
+        missing = [
+            f"`--{name}`"
+            for name, value in (
+                ("swa-full-tokens-ratio", swa_full_tokens_ratio),
+                ("mem-fraction-static", mem_fraction_static),
+            )
+            if value is None
+        ]
+        if missing:
+            warnings.append(
+                "To include SGLang's cache allocation limits, set " + " and ".join(missing) + " to match the server."
+            )
     half = cache(max(1, length // 2))[0]
     slope = (size - half) / (length - max(1, length // 2)) if length > 1 else 0.0
     estimate.kv_cache = KVCache(

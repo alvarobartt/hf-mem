@@ -123,10 +123,13 @@ def test_sglang_cache_pool_option(
         str(Path(model) / "config.json"),
         llama_config(sliding_window=128, layer_types=["full_attention"] + ["sliding_attention"] * 3),
     )
-    code, out, err = cli(monkeypatch, capsys, model, "--swa-full-tokens-ratio", "0.8", "-o", "json")
+    code, out, err = cli(
+        monkeypatch, capsys, model, "--swa-full-tokens-ratio", "0.8", "--mem-fraction-static", "0.85", "-o", "json"
+    )
     assert code == 0 and err == ""
     data = json.loads(out)
     assert data["kv_cache"]["swa_full_tokens_ratio"] == 0.8
+    assert data["mem_fraction_static"] == 0.85
     assert data["overhead"]["reference_engine"] == "sglang"
     code, _, err = cli(monkeypatch, capsys, model, "--swa-full-tokens-ratio", "0.8", "--engine", "vllm")
     assert code == 1 and "require SGLang and Safetensors" in err
