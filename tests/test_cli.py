@@ -124,7 +124,15 @@ def test_sglang_cache_pool_option(
         llama_config(sliding_window=128, layer_types=["full_attention"] + ["sliding_attention"] * 3),
     )
     code, out, err = cli(
-        monkeypatch, capsys, model, "--swa-full-tokens-ratio", "0.8", "--mem-fraction-static", "0.85", "-o", "json"
+        monkeypatch,
+        capsys,
+        model,
+        "--swa-full-tokens-ratio",
+        "0.8",
+        "--mem-fraction-static",
+        "0.85",
+        "-o",
+        "json",
     )
     assert code == 0 and err == ""
     data = json.loads(out)
