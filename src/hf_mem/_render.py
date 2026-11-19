@@ -116,13 +116,22 @@ def _dtype_items(weights: Weights, total: int) -> list[Item]:
 def table(estimate: Estimate | Listing, color: bool = False) -> str:
     if isinstance(estimate, Listing):
         return _listing(estimate, color)
-    total, kv, weights = estimate.total or 1, estimate.kv_cache, estimate.weights
+    recommended = estimate.recommended_gpu_memory
+    total, kv, weights = recommended or estimate.total or 1, estimate.kv_cache, estimate.weights
     offloaded = estimate.offloaded
     all_params = weights.params + (offloaded.params if offloaded else 0)
     params = f"{short(all_params)} PARAMS" if weights.params else "FROM FILE SIZES"
     parts = [params] + (["KV CACHE"] if kv else []) + (["OVERHEAD"] if estimate.overhead else [])
     summary = f"{gib(estimate.total)} GiB ({' + '.join(parts)})"
-    sections: list[Section] = [(None, [("TOTAL MEMORY", summary, "REQUIREMENTS", 1.0)])]
+    requirements: list[Item] = []
+    if recommended is not None:
+        ranks = (estimate.fit.gpus or 1) if estimate.fit else 1
+        topology = f" ACROSS {ranks} GPUS" if ranks > 1 else " ON ONE GPU"
+        capacity = f"{gib(recommended)} GiB ({recommended / 10**9:.2f} GB){topology}"
+        requirements.append(("GPU CAPACITY", capacity, "RECOMMENDED", 1.0))
+    else:
+        requirements.append(("TOTAL MEMORY", summary, "", 1.0))
+    sections: list[Section] = [(None, requirements)]
     if offloaded:
         cpu = f"{gib(offloaded.bytes)} GiB ({short(offloaded.params)} PARAMS OFFLOADED, NOT ON GPU)"
         sections[0][1].append(
@@ -177,6 +186,7 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
                 ("ENCODER", overhead.encoder),
                 ("GRAPHS", overhead.graphs),
                 ("RUNTIME", overhead.runtime),
+                ("REPACK/REPLICA", overhead.weight_adjustment),
                 ("BUFFERS", overhead.buffers),
                 ("LOADING", overhead.loading),
             )
@@ -185,8 +195,9 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
         sections.append((f"OVERHEAD ({gib(overhead.bytes)} GiB)", items))
     if fit := estimate.fit:
         gpus = fit.gpus or 1
-        capacity = gpus * fit.usable
-        text = f"{gib(fit.required)} / {gib(capacity)} GiB [{fit.required / capacity:.0%}] ON {gpus} x {gib(fit.gpu_memory)} GiB"
+        capacity = gpus * (fit.gpu_memory if recommended is not None else fit.usable)
+        requirement = recommended if recommended is not None else max(fit.required, fit.startup_required or 0)
+        text = f"{gib(requirement)} / {gib(capacity)} GiB [{requirement / capacity:.0%}] ON {gpus} x {gib(fit.gpu_memory)} GiB"
         if kv and fit.max_model_len:
             text += f", UP TO {fit.max_model_len} TOKENS"
         if fit.fits and fit.needed and fit.needed < gpus:
@@ -199,24 +210,24 @@ def table(estimate: Estimate | Listing, color: bool = False) -> str:
                 if fit.needed and fit.needed > gpus
                 else "⚠ DOES NOT FIT"
             )
-        sections[0][1].append(("GPU MEMORY", text, verdict, fit.required / capacity))
-    return _color(
-        _draw(_titles(estimate.url, estimate.revision, estimate.file, kv), sections, NAME_WIDTH), color
-    )
+        sections[0][1].append(("GPU MEMORY", text, verdict, requirement / capacity))
+    titles = _titles(estimate.url, estimate.revision, estimate.file, kv)
+    return _color(_draw(titles, sections, NAME_WIDTH), color)
 
 
 def _listing(listing: Listing, color: bool = False) -> str:
     kv = next((f.kv_cache for f in listing.files if f.kv_cache), None)
-    largest = max(f.total for f in listing.files) or 1
+    largest = max(f.recommended_gpu_memory or f.total for f in listing.files) or 1
     name_width = min(max(len(f.file or "") for f in listing.files), MAX_FILE_WIDTH)
     items: list[Item] = []
     for f in listing.files:
-        text = f"{gib(f.total)} GiB"
+        required = f.recommended_gpu_memory or f.total
+        text = f"{gib(required)} GiB" + (" GPU CAPACITY" if f.recommended_gpu_memory else " WEIGHTS")
         if f.kv_cache:
             parts = [f"{gib(f.weights.bytes)} GiB WEIGHTS", f"{gib(f.kv_cache.bytes)} GiB KV"]
             parts += [f"{gib(f.overhead.bytes)} GiB OVERHEAD"] if f.overhead else []
             text += f" ({' + '.join(parts)})"
-        items.append(("", text, f.file or "", f.total / largest))
+        items.append(("", text, f.file or "", required / largest))
     titles = _titles(listing.url, listing.revision, None, kv)
     return _color(_draw(titles, [("FILES", items)], name_width), color)
 
@@ -230,16 +241,23 @@ def _color(lines: list[str], enabled: bool = False) -> str:
 def markdown(estimate: Estimate | Listing) -> str:
     where = f"[`{estimate.model}`]({estimate.url})" + (f" @ `{estimate.revision}`" if estimate.revision else "")
     if isinstance(estimate, Listing):
-        rows = ["| File | Total | Weights | KV cache |", "|---|--:|--:|--:|"]
+        label = "GPU capacity" if any(f.recommended_gpu_memory for f in estimate.files) else "Memory"
+        rows = [f"| File | {label} | Weights | KV cache |", "|---|--:|--:|--:|"]
         for f in estimate.files:
             kv = f"{gib(f.kv_cache.bytes)} GiB" if f.kv_cache else "-"
-            rows.append(f"| `{f.file}` | {gib(f.total)} GiB | {gib(f.weights.bytes)} GiB | {kv} |")
+            capacity = f"{gib(f.recommended_gpu_memory or f.total)} GiB"
+            rows.append(f"| `{f.file}` | {capacity} | {gib(f.weights.bytes)} GiB | {kv} |")
         return "\n".join([f"Memory estimate for {where}", "", *rows])
 
     rows = ["| | Memory | Params |", "|---|--:|--:|"]
-    rows.append(
-        f"| **Total** | **{gib(estimate.total)} GiB** | {short(estimate.weights.params) if estimate.weights.params else '-'} |"
-    )
+    if (recommended := estimate.recommended_gpu_memory) is not None:
+        rows.append(
+            f"| **Recommended GPU capacity** | **{gib(recommended)} GiB ({recommended / 10**9:.2f} GB)** | |"
+        )
+    else:
+        rows.append(
+            f"| **Total** | **{gib(estimate.total)} GiB** | {short(estimate.weights.params) if estimate.weights.params else '-'} |"
+        )
     for name, component in (
         estimate.components if len(estimate.components) > 1 else {"Weights": estimate.weights}
     ).items():
@@ -255,7 +273,11 @@ def markdown(estimate: Estimate | Listing) -> str:
             f"| KV cache ({cache.dtype}, {cache.max_model_len} tokens x {cache.batch_size}) | {gib(cache.bytes)} GiB | |"
         )
     if overhead := estimate.overhead:
-        parts = ", ".join(n for n, v in overhead.to_dict().items() if v and n != "bytes")
+        parts = ", ".join(
+            n
+            for n in ("activations", "encoder", "graphs", "runtime", "buffers", "loading", "weight_adjustment")
+            if getattr(overhead, n)
+        )
         rows.append(f"| Overhead ({parts}) | {gib(overhead.bytes)} GiB | |")
     title = f"Memory estimate for {where}" + (f", file `{estimate.file}`" if estimate.file else "")
     lines = [title, "", *rows]

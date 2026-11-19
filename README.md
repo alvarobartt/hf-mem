@@ -12,92 +12,92 @@ Run it with [`uv`](https://github.com/astral-sh/uv) as `uvx hf-mem <model>`, whe
 
 ```console
 $ uvx hf-mem zai-org/GLM-5.3-Flash
-┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
-├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
-│                     INFERENCE MEMORY ESTIMATE FOR                     │
-│              https://hf.co/zai-org/GLM-5.3-Flash @ main               │
-│                w/ max-model-len=1048576, batch-size=1                 │
-├─────────────────┬─────────────────────────────────────────────────────┤
-│ TOTAL MEMORY    │ 329.36 GiB (321.34B PARAMS + KV CACHE + OVERHEAD)   │
-│ REQUIREMENTS    │ ███████████████████████████████████████████████████ │
-├─────────────────┴─────────────────────────────────────────────────────┤
-│                    MODEL (9.67B PARAMS, 15.46 GiB)                    │
-├─────────────────┬─────────────────────────────────────────────────────┤
-│ BF16            │ 12.90 / 329.36 GiB                                  │
-│ 6.93B PARAMS    │ ██░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼─────────────────────────────────────────────────────┤
-│ F8_E4M3         │ 2.55 / 329.36 GiB                                   │
-│ 2.74B PARAMS    │ ▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼─────────────────────────────────────────────────────┤
-│ F32             │ 0.00 / 329.36 GiB                                   │
-│ 462.94K PARAMS  │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴─────────────────────────────────────────────────────┤
-│               EXPERTS (288 x 1.08B PARAMS, 290.32 GiB)                │
-├─────────────────┬─────────────────────────────────────────────────────┤
-│ F8_E4M3         │ 290.25 / 329.36 GiB                                 │
-│ 311.65B PARAMS  │ █████████████████████████████████████████████░░░░░░ │
-├─────────────────┼─────────────────────────────────────────────────────┤
-│ F32             │ 0.07 / 329.36 GiB                                   │
-│ 19.02M PARAMS   │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴─────────────────────────────────────────────────────┤
-│                 KV CACHE (1048576 TOKENS, 16.80 GiB)                  │
-├─────────────────┬─────────────────────────────────────────────────────┤
-│ BF16            │ 16.80 / 329.36 GiB                                  │
-│ 1048576 TOKENS  │ ██▋░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴─────────────────────────────────────────────────────┤
-│                          OVERHEAD (6.78 GiB)                          │
-├─────────────────┬─────────────────────────────────────────────────────┤
-│ ACTIVATIONS     │ 3.17 / 329.36 GiB                                   │
-│                 │ ▌░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼─────────────────────────────────────────────────────┤
-│ ENCODER         │ 0.03 / 329.36 GiB                                   │
-│                 │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼─────────────────────────────────────────────────────┤
-│ GRAPHS          │ 1.69 / 329.36 GiB                                   │
-│                 │ ▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼─────────────────────────────────────────────────────┤
-│ RUNTIME         │ 1.88 / 329.36 GiB                                   │
-│                 │ ▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-└─────────────────┴─────────────────────────────────────────────────────┘
+┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
+├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
+│             INFERENCE MEMORY ESTIMATE FOR             │
+│      https://hf.co/zai-org/GLM-5.3-Flash @ main       │
+│        w/ max-model-len=1048576, batch-size=1         │
+├─────────────────┬─────────────────────────────────────┤
+│ GPU CAPACITY    │ 361.67 GiB (388.34 GB) ON ONE GPU   │
+│ RECOMMENDED     │ ███████████████████████████████████ │
+├─────────────────┴─────────────────────────────────────┤
+│            MODEL (9.67B PARAMS, 15.46 GiB)            │
+├─────────────────┬─────────────────────────────────────┤
+│ BF16            │ 12.90 / 361.67 GiB                  │
+│ 6.93B PARAMS    │ █▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────┤
+│ F8_E4M3         │ 2.55 / 361.67 GiB                   │
+│ 2.74B PARAMS    │ ▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────┤
+│ F32             │ 0.00 / 361.67 GiB                   │
+│ 295.52K PARAMS  │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴─────────────────────────────────────┤
+│       EXPERTS (288 x 1.08B PARAMS, 290.32 GiB)        │
+├─────────────────┬─────────────────────────────────────┤
+│ F8_E4M3         │ 290.25 / 361.67 GiB                 │
+│ 311.65B PARAMS  │ ████████████████████████████▏░░░░░░ │
+├─────────────────┼─────────────────────────────────────┤
+│ F32             │ 0.07 / 361.67 GiB                   │
+│ 0 PARAMS        │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴─────────────────────────────────────┤
+│         KV CACHE (1048576 TOKENS, 16.81 GiB)          │
+├─────────────────┬─────────────────────────────────────┤
+│ BF16            │ 16.81 / 361.67 GiB                  │
+│ 1048576 TOKENS  │ █▋░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴─────────────────────────────────────┤
+│                  OVERHEAD (2.91 GiB)                  │
+├─────────────────┬─────────────────────────────────────┤
+│ ACTIVATIONS     │ 1.46 / 361.67 GiB                   │
+│                 │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────┤
+│ ENCODER         │ 0.05 / 361.67 GiB                   │
+│                 │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────┤
+│ GRAPHS          │ 0.49 / 361.67 GiB                   │
+│                 │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────┤
+│ RUNTIME         │ 0.92 / 361.67 GiB                   │
+│                 │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+└─────────────────┴─────────────────────────────────────┘
 ```
 
 For generative models (LLMs, VLMs, omni and speech models) the KV cache is estimated for the context length in `config.json` and a single sequence, which can be changed with `--max-model-len` and `--batch-size`. The KV cache dtype defaults to `auto`, using model precision unless the `quantization_config` declares a quantized KV cache, and can be set with `--kv-cache-dtype` (e.g. `fp8`).
 
 ```console
 $ uvx hf-mem Qwen/Qwen3.8-27B --max-model-len 32768 --batch-size 4
-┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
-├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
-│                    INFERENCE MEMORY ESTIMATE FOR                    │
-│                https://hf.co/Qwen/Qwen3.8-27B @ main                │
-│                w/ max-model-len=32768, batch-size=4                 │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ TOTAL MEMORY    │ 70.15 GiB (27.78B PARAMS + KV CACHE + OVERHEAD)   │
-│ REQUIREMENTS    │ █████████████████████████████████████████████████ │
-├─────────────────┴───────────────────────────────────────────────────┤
-│                  MODEL (27.78B PARAMS, 51.75 GiB)                   │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ BF16            │ 51.75 / 70.15 GiB                                 │
-│ 27.78B PARAMS   │ ████████████████████████████████████▏░░░░░░░░░░░░ │
-├─────────────────┴───────────────────────────────────────────────────┤
-│                 KV CACHE (131072 TOKENS, 9.19 GiB)                  │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ BF16            │ 9.19 / 70.15 GiB                                  │
-│ 131072 TOKENS   │ ██████▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴───────────────────────────────────────────────────┤
-│                         OVERHEAD (9.22 GiB)                         │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ ACTIVATIONS     │ 4.38 / 70.15 GiB                                  │
-│                 │ ███░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ ENCODER         │ 1.61 / 70.15 GiB                                  │
-│                 │ █▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ GRAPHS          │ 1.34 / 70.15 GiB                                  │
-│                 │ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ RUNTIME         │ 1.88 / 70.15 GiB                                  │
-│                 │ █▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-└─────────────────┴───────────────────────────────────────────────────┘
+┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
+├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
+│            INFERENCE MEMORY ESTIMATE FOR            │
+│        https://hf.co/Qwen/Qwen3.8-27B @ main        │
+│        w/ max-model-len=32768, batch-size=4         │
+├─────────────────┬───────────────────────────────────┤
+│ GPU CAPACITY    │ 73.71 GiB (79.14 GB) ON ONE GPU   │
+│ RECOMMENDED     │ █████████████████████████████████ │
+├─────────────────┴───────────────────────────────────┤
+│          MODEL (27.36B PARAMS, 50.96 GiB)           │
+├─────────────────┬───────────────────────────────────┤
+│ BF16            │ 50.96 / 73.71 GiB                 │
+│ 27.36B PARAMS   │ ██████████████████████▉░░░░░░░░░░ │
+├─────────────────┴───────────────────────────────────┤
+│         KV CACHE (131072 TOKENS, 9.19 GiB)          │
+├─────────────────┬───────────────────────────────────┤
+│ BF16            │ 9.19 / 73.71 GiB                  │
+│ 131072 TOKENS   │ ████▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴───────────────────────────────────┤
+│                 OVERHEAD (6.19 GiB)                 │
+├─────────────────┬───────────────────────────────────┤
+│ ACTIVATIONS     │ 2.65 / 73.71 GiB                  │
+│                 │ █▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼───────────────────────────────────┤
+│ ENCODER         │ 2.42 / 73.71 GiB                  │
+│                 │ █▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼───────────────────────────────────┤
+│ GRAPHS          │ 0.39 / 73.71 GiB                  │
+│                 │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼───────────────────────────────────┤
+│ RUNTIME         │ 0.74 / 73.71 GiB                  │
+│                 │ ▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+└─────────────────┴───────────────────────────────────┘
 ```
 
 ### Diffusers
@@ -110,7 +110,7 @@ $ uvx hf-mem Qwen/Qwen-Image-2.1
 │    https://hf.co/Qwen/Qwen-Image-2.1 @ main    │
 ├─────────────────┬──────────────────────────────┤
 │ TOTAL MEMORY    │ 30.84 GiB (16.22B PARAMS)    │
-│ REQUIREMENTS    │ ████████████████████████████ │
+│                 │ ████████████████████████████ │
 ├─────────────────┴──────────────────────────────┤
 │     TEXT_ENCODER (8.77B PARAMS, 16.33 GiB)     │
 ├─────────────────┬──────────────────────────────┤
@@ -139,30 +139,22 @@ $ uvx hf-mem google/embeddinggemma-2
 │    https://hf.co/google/embeddinggemma-2 @ main    │
 ├─────────────────┬──────────────────────────────────┤
 │ TOTAL MEMORY    │ 1.39 GiB (744.37M PARAMS)        │
-│ REQUIREMENTS    │ ████████████████████████████████ │
-├─────────────────┼──────────────────────────────────┤
+│                 │ ████████████████████████████████ │
+├─────────────────┴──────────────────────────────────┤
+│          MODEL (744.37M PARAMS, 1.39 GiB)          │
+├─────────────────┬──────────────────────────────────┤
 │ BF16            │ 1.39 / 1.39 GiB                  │
 │ 744.37M PARAMS  │ ████████████████████████████████ │
 └─────────────────┴──────────────────────────────────┘
 ```
 
-Text encoders, rerankers and Sentence Transformers include a warmup estimate over `--max-num-batched-tokens` tokens, using `--max-model-len` as the sequence length (otherwise the Sentence Transformers or model configuration). The batch can contain several sequences. No KV cache or decoding graphs are added.
+Text encoders, rerankers and Sentence Transformers include warmup memory. Use `--max-num-batched-tokens` for the warmup token budget and `--max-model-len` for the sequence length.
 
 ```bash
 uvx hf-mem BAAI/bge-base-en-v1.5 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
 ```
 
-By default, weights keep their stored dtypes, including mixed precision and quantization buffers. Activations use the configured dtype or the dominant floating-point weight dtype. For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` explicitly casts floating-point parameters and activations; integer tensors remain unchanged. Other model types reject this option. Warmup assumes memory-efficient attention in half precision, and eager attention for MPNet, DeBERTa, configurations selecting it, and F32 activations, as memory-efficient attention kernels need half precision. Fit checks assume one replica per GPU.
-
-To estimate a Text Embeddings Inference deployment, use its configured `--dtype` (`float16` or `float32`) and the actual number of warmup tokens, which may be smaller than its batch limit:
-
-```bash
-uvx hf-mem BAAI/bge-base-en-v1.5 --dtype float16 --max-num-batched-tokens 2048 --max-model-len 512 --gpu-memory 24
-```
-
-Changing `--dtype` changes weight and activation precision, and `float32` runs eager attention; it does not change the token budget or sequence length. Loading allows for a temporary tensor in its stored dtype alongside the converted weights, so F32 checkpoints loaded in F16 can peak while loading rather than at warmup (`loading` in the overhead). Engine padding and workspaces can still change observed memory use.
-
-FP32 decoder checkpoints use a 16-bit CUDA serving reference for floating-point weights and automatic KV cache precision. The estimate labels that reference F16; an engine may choose BF16 with the same memory width. Encoder defaults preserve their stored precision, and quantized checkpoints keep their declared representation.
+For unquantized Safetensors text encoders, `--dtype float16`, `--dtype bfloat16` or `--dtype float32` sets weight and activation precision. Encoder fit checks assume one replica per GPU.
 
 ### GGUF
 
@@ -170,108 +162,108 @@ GGUF repositories list every file, and a quantization tag as in llama.cpp (`<mod
 
 ```console
 $ uvx hf-mem LiquidAI/LFM3-1.7B-GGUF
-┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
-├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
-│                               INFERENCE MEMORY ESTIMATE FOR                               │
-│                       https://hf.co/LiquidAI/LFM3-1.7B-GGUF @ main                        │
-│                           w/ max-model-len=262144, batch-size=1                           │
-├───────────────────────────────────────────────────────────────────────────────────────────┤
-│                                           FILES                                           │
-├─────────────────────────┬─────────────────────────────────────────────────────────────────┤
-│                         │ 6.85 GiB (3.22 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-BF16.gguf     │ ███████████████████████████████████████████████████████████████ │
-├─────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│                         │ 6.85 GiB (3.22 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-F16.gguf      │ ███████████████████████████████████████████████████████████████ │
-├─────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│                         │ 4.81 GiB (1.18 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-NVFP4.gguf    │ ████████████████████████████████████████████▎░░░░░░░░░░░░░░░░░░ │
-├─────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│                         │ 4.64 GiB (1.02 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-Q4_K_M.gguf   │ ██████████████████████████████████████████▊░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│                         │ 4.79 GiB (1.16 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-Q5_K_M.gguf   │ ████████████████████████████████████████████▏░░░░░░░░░░░░░░░░░░ │
-├─────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│                         │ 4.95 GiB (1.32 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-Q6_K.gguf     │ █████████████████████████████████████████████▌░░░░░░░░░░░░░░░░░ │
-├─────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│                         │ 5.34 GiB (1.71 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-Q8_0.gguf     │ █████████████████████████████████████████████████▏░░░░░░░░░░░░░ │
-├─────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│                         │ 4.60 GiB (0.97 GiB WEIGHTS + 3.01 GiB KV + 0.62 GiB OVERHEAD)   │
-│ LFM3-1.7B-QAD-Q4_0.gguf │ ██████████████████████████████████████████▎░░░░░░░░░░░░░░░░░░░░ │
-└─────────────────────────┴─────────────────────────────────────────────────────────────────┘
+┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
+├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
+│                                     INFERENCE MEMORY ESTIMATE FOR                                      │
+│                              https://hf.co/LiquidAI/LFM3-1.7B-GGUF @ main                              │
+│                                 w/ max-model-len=262144, batch-size=1                                  │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                 FILES                                                  │
+├─────────────────────────┬──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 7.42 GiB GPU CAPACITY (3.22 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-BF16.gguf     │ ████████████████████████████████████████████████████████████████████████████ │
+├─────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 7.42 GiB GPU CAPACITY (3.22 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-F16.gguf      │ ████████████████████████████████████████████████████████████████████████████ │
+├─────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 5.16 GiB GPU CAPACITY (1.18 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-NVFP4.gguf    │ ████████████████████████████████████████████████████▉░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 4.97 GiB GPU CAPACITY (1.02 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-Q4_K_M.gguf   │ ██████████████████████████████████████████████████▉░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 5.14 GiB GPU CAPACITY (1.16 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-Q5_K_M.gguf   │ ████████████████████████████████████████████████████▋░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 5.31 GiB GPU CAPACITY (1.32 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-Q6_K.gguf     │ ██████████████████████████████████████████████████████▍░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 5.74 GiB GPU CAPACITY (1.71 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-Q8_0.gguf     │ ██████████████████████████████████████████████████████████▉░░░░░░░░░░░░░░░░░ │
+├─────────────────────────┼──────────────────────────────────────────────────────────────────────────────┤
+│                         │ 4.92 GiB GPU CAPACITY (0.97 GiB WEIGHTS + 3.01 GiB KV + 0.45 GiB OVERHEAD)   │
+│ LFM3-1.7B-QAD-Q4_0.gguf │ ██████████████████████████████████████████████████▍░░░░░░░░░░░░░░░░░░░░░░░░░ │
+└─────────────────────────┴──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ```console
 $ uvx hf-mem unsloth/Qwen3.8-27B-GGUF:UD-Q4_K_M
-┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
-├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
-│                    INFERENCE MEMORY ESTIMATE FOR                    │
-│            https://hf.co/unsloth/Qwen3.8-27B-GGUF @ main            │
-│                  FOR `Qwen3.8-27B-UD-Q4_K_M.gguf`                   │
-│                w/ max-model-len=262144, batch-size=1                │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ TOTAL MEMORY    │ 32.76 GiB (27.78B PARAMS + KV CACHE + OVERHEAD)   │
-│ REQUIREMENTS    │ █████████████████████████████████████████████████ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ CPU MEMORY      │ 0.67 GiB (1.27B PARAMS OFFLOADED, NOT ON GPU)     │
-│ HOST MEMORY     │ █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴───────────────────────────────────────────────────┤
-│                  MODEL (26.05B PARAMS, 14.66 GiB)                   │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ Q5_K            │ 4.50 / 32.76 GiB                                  │
-│ 7.03B PARAMS    │ ██████▊░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ IQ4_XS          │ 4.43 / 32.76 GiB                                  │
-│ 8.96B PARAMS    │ ██████▋░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ Q4_K            │ 3.25 / 32.76 GiB                                  │
-│ 6.20B PARAMS    │ ████▉░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ Q6_K            │ 1.69 / 32.76 GiB                                  │
-│ 2.21B PARAMS    │ ██▌░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ IQ4_NL          │ 0.31 / 32.76 GiB                                  │
-│ 587.20M PARAMS  │ ▌░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ Q3_K            │ 0.25 / 32.76 GiB                                  │
-│ 623.90M PARAMS  │ ▍░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ IQ3_S           │ 0.14 / 32.76 GiB                                  │
-│ 356.52M PARAMS  │ ▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ Q8_0            │ 0.08 / 32.76 GiB                                  │
-│ 76.02M PARAMS   │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ F32             │ 0.01 / 32.76 GiB                                  │
-│ 2.67M PARAMS    │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴───────────────────────────────────────────────────┤
-│                  MMPROJ (460.73M PARAMS, 0.86 GiB)                  │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ F16             │ 0.85 / 32.76 GiB                                  │
-│ 457.67M PARAMS  │ █▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ F32             │ 0.01 / 32.76 GiB                                  │
-│ 3.06M PARAMS    │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴───────────────────────────────────────────────────┤
-│                 KV CACHE (262144 TOKENS, 16.15 GiB)                 │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ F16             │ 16.15 / 32.76 GiB                                 │
-│ 262144 TOKENS   │ ████████████████████████▏░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┴───────────────────────────────────────────────────┤
-│                         OVERHEAD (1.09 GiB)                         │
-├─────────────────┬───────────────────────────────────────────────────┤
-│ ACTIVATIONS     │ 0.15 / 32.76 GiB                                  │
-│                 │ ▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ ENCODER         │ 0.47 / 32.76 GiB                                  │
-│                 │ ▊░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-├─────────────────┼───────────────────────────────────────────────────┤
-│ RUNTIME         │ 0.47 / 32.76 GiB                                  │
-│                 │ ▊░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
-└─────────────────┴───────────────────────────────────────────────────┘
+┌┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬┬ hf-mem v1.0.0 ┐
+├┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┴┤
+│                   INFERENCE MEMORY ESTIMATE FOR                   │
+│           https://hf.co/unsloth/Qwen3.8-27B-GGUF @ main           │
+│                 FOR `Qwen3.8-27B-UD-Q4_K_M.gguf`                  │
+│               w/ max-model-len=262144, batch-size=1               │
+├─────────────────┬─────────────────────────────────────────────────┤
+│ GPU CAPACITY    │ 36.74 GiB (39.45 GB) ON ONE GPU                 │
+│ RECOMMENDED     │ ███████████████████████████████████████████████ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ CPU MEMORY      │ 0.67 GiB (1.27B PARAMS OFFLOADED, NOT ON GPU)   │
+│ HOST MEMORY     │ ▉░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴─────────────────────────────────────────────────┤
+│                 MODEL (26.05B PARAMS, 14.75 GiB)                  │
+├─────────────────┬─────────────────────────────────────────────────┤
+│ IQ4_XS          │ 5.30 / 36.74 GiB                                │
+│ 10.72B PARAMS   │ ██████▊░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ Q5_K            │ 4.87 / 36.74 GiB                                │
+│ 7.61B PARAMS    │ ██████▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ Q4_K            │ 2.26 / 36.74 GiB                                │
+│ 4.31B PARAMS    │ ██▉░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ Q6_K            │ 1.68 / 36.74 GiB                                │
+│ 2.20B PARAMS    │ ██▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ IQ4_NL          │ 0.40 / 36.74 GiB                                │
+│ 765.46M PARAMS  │ ▌░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ Q8_0            │ 0.08 / 36.74 GiB                                │
+│ 81.26M PARAMS   │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ Q3_K            │ 0.07 / 36.74 GiB                                │
+│ 178.26M PARAMS  │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ IQ3_S           │ 0.07 / 36.74 GiB                                │
+│ 178.26M PARAMS  │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ F32             │ 0.01 / 36.74 GiB                                │
+│ 2.67M PARAMS    │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴─────────────────────────────────────────────────┤
+│                 MMPROJ (460.73M PARAMS, 0.86 GiB)                 │
+├─────────────────┬─────────────────────────────────────────────────┤
+│ F16             │ 0.85 / 36.74 GiB                                │
+│ 457.67M PARAMS  │ █▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ F32             │ 0.01 / 36.74 GiB                                │
+│ 3.06M PARAMS    │ ▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴─────────────────────────────────────────────────┤
+│                KV CACHE (262144 TOKENS, 16.15 GiB)                │
+├─────────────────┬─────────────────────────────────────────────────┤
+│ F16             │ 16.15 / 36.74 GiB                               │
+│ 262144 TOKENS   │ ████████████████████▋░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┴─────────────────────────────────────────────────┤
+│                        OVERHEAD (1.31 GiB)                        │
+├─────────────────┬─────────────────────────────────────────────────┤
+│ ACTIVATIONS     │ 0.36 / 36.74 GiB                                │
+│                 │ ▌░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ ENCODER         │ 0.47 / 36.74 GiB                                │
+│                 │ ▋░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+├─────────────────┼─────────────────────────────────────────────────┤
+│ RUNTIME         │ 0.47 / 36.74 GiB                                │
+│                 │ ▋░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+└─────────────────┴─────────────────────────────────────────────────┘
 ```
 
 `--file` also selects a single `*.safetensors` file or shard set, e.g. on ComfyUI repositories that ship multiple checkpoints.
@@ -290,7 +282,7 @@ $ uvx hf-mem onnx-community/Qwen3-0.6B-ONNX --file onnx/model_q4f16.onnx
 │           w/ max-model-len=40960, batch-size=1            │
 ├─────────────────┬─────────────────────────────────────────┤
 │ TOTAL MEMORY    │ 4.91 GiB (FROM FILE SIZES + KV CACHE)   │
-│ REQUIREMENTS    │ ███████████████████████████████████████ │
+│                 │ ███████████████████████████████████████ │
 ├─────────────────┴─────────────────────────────────────────┤
 │                     MODEL (0.53 GiB)                      │
 ├─────────────────┬─────────────────────────────────────────┤
@@ -317,6 +309,35 @@ HF_HUB_OFFLINE=1 uvx hf-mem Qwen/Qwen3-8B
 
 Gated and private models need a token, read from `--hf-token`, `HF_TOKEN`, or the token saved by `hf auth login`.
 
+### Deployment sizing
+
+Use `--gpu-memory` to check whether a model fits. Bare sizes and `GiB` are binary; `GB` is decimal: `8x141` means eight GPUs with 141 GiB each. The recommendation includes startup memory and a 90% allocation budget, adjustable with `--gpu-memory-utilization`.
+
+```bash
+uvx hf-mem thinkingmachines/Inkling-2-Small --engine sglang --gpu-memory 8x141 --context-length 1048576
+```
+
+`--gpu-type` is optional. Supported profiles are `nvidia-t4`, `nvidia-a10g`, `nvidia-l4`, `nvidia-l40s`, `nvidia-a100`, `nvidia-h100`, `nvidia-h200` and `nvidia-rtx-pro-6000`. When provided, `--gpu-memory` must match a supported capacity for that GPU, allowing for driver reservations.
+
+Use `--engine sglang` for SGLang estimates. Safetensors default to vLLM, except Inkling 2 defaults to SGLang. GGUF uses llama.cpp.
+
+For SGLang, `--swa-full-tokens-ratio` and `--mem-fraction-static` match the server's cache split and weights/cache budget. The latter is separate from `--gpu-memory-utilization`, which controls overall headroom.
+
+Use `--language-model-only` to exclude identified vision/audio encoders and projectors when deploying a multimodal model for language tasks only.
+
+| Meaning | Options |
+| --- | --- |
+| Model | positional ID, `--model`, `--model-path`, `--hf-repo` |
+| Context per sequence | `--max-model-len`, `--context-length`, `--context-len` |
+| Cached sequences | `--batch-size`, `--parallel`, `-np` |
+| Admitted requests | `--max-num-seqs`, `--max-running-requests` |
+| Prefill tokens | `--max-num-batched-tokens`, `--chunked-prefill-size` |
+| Full sliding-window storage | `--disable-hybrid-kv-cache-manager`, `--disable-hybrid-swa-memory`, `--swa-full`, `--full-sliding-window-cache` |
+
+Match `--max-num-seqs` to the server's admission limit; `--batch-size` is the number of sequences in the workload.
+
+For llama.cpp, `--ctx-size`/`-c` sets the total context pool, divided by `--parallel`, and selects GGUF. `--no-mmproj` omits the projector. `--cache-type-k` and `--cache-type-v` must match. hf-mem's `--batch-size` counts sequences; llama.cpp's counts tokens.
+
 ### JSON and Markdown
 
 `-o json` (or `--output json`) prints the estimate in bytes, and `-o markdown` prints a table to share in model cards, issues or pull requests.
@@ -325,30 +346,7 @@ Gated and private models need a token, read from `--hf-token`, `HF_TOKEN`, or th
 uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 ```
 
-```json
-{
-  "version": "hf-mem@1.0.0",
-  "model": "Qwen/Qwen3-8B",
-  "revision": "main",
-  "file": null,
-  "format": "safetensors",
-  "total": 27343113879,
-  "weights": {"bytes": 16381470720, "params": 8190735360, "dtypes": {"BF16": {"bytes": 16381470720, "params": 8190735360}}},
-  "offloaded": null,
-  "components": null,
-  "kv_cache": {"bytes": 4831838208, "dtype": "BF16", "max_model_len": 32768, "batch_size": 1, "layers": {"full": 36}},
-  "overhead": {"bytes": 6129804951, "activations": 3371389470, "encoder": 0, "graphs": 739780853, "runtime": 2018634628, "buffers": 0, "loading": 0},
-  "moe": null,
-  "fit": null,
-  "warnings": []
-}
-```
-
-- `total` is the sum of `weights`, `kv_cache` and `overhead` in bytes, and the `overhead` parts are described in [How it works](#how-it-works); `kv_cache` is `null` for non-generative models; text encoders include warmup `overhead`, while other non-generative models have no overhead estimate.
-- `file`, `offloaded` (weights in CPU memory, not in `total`), `components` (per Diffusers component, file or GGUF `mmproj`), `moe` (base model and experts breakdown) and `fit` (with `--gpu-memory`) are `null` when they do not apply, and `params` is `null` when the weights come from file sizes (ONNX files with the weights inline).
-- `fit` has the `gpu_memory` and `usable` memory per GPU, the memory `required` on the given GPUs (with the overhead and the replicated KV cache per GPU), the GPUs `needed`, whether it `fits`, and the longest `max_model_len` that fits.
-- `format` is `safetensors`, `gguf` or `onnx`.
-- GGUF and ONNX repositories with several files return a `files` list with the `file`, `total`, `weights`, `kv_cache` and `overhead` of each file instead.
+`recommended_gpu_memory` is the suggested GPU capacity, `total` is the modeled allocation, and `fit` checks the capacity supplied with `--gpu-memory`. All sizes in JSON are bytes.
 
 ### Python
 
@@ -356,12 +354,12 @@ uvx hf-mem Qwen/Qwen3-8B --max-model-len 32768 -o json
 from hf_mem import run
 
 result = run("Qwen/Qwen3-8B", max_model_len=32768)
+print(result.recommended_gpu_memory)
 print(result.total, result.weights.bytes, result.kv_cache.bytes, result.overhead.bytes)
-# 27343113879 16381470720 4831838208 6129804951
 print(result.to_dict())
 ```
 
-`run` takes the same options as the CLI (`revision`, `file`, `format`, `max_model_len`, `batch_size`, `kv_cache_dtype`, `hf_token`, `gpu_memory`, `gpu_memory_utilization`, `max_num_batched_tokens` and `dtype`), and `await arun(...)` can be used within an async application. Both return an `Estimate`, or a `Listing` with one `Estimate` per file for GGUF and ONNX repositories.
+`run` accepts the CLI options as keyword arguments. Use `await arun(...)` in async applications. Both return an `Estimate`, or a `Listing` for repositories with several GGUF or ONNX variants.
 
 ### Agents
 
@@ -379,25 +377,18 @@ hf extensions add alvarobartt/hf-mem
 
 `hf-mem` only reads the metadata of the weight files (the Safetensors headers, the GGUF metadata or the ONNX graph) with HTTP Range requests, and adds up the memory an inference engine needs on the GPU:
 
-- **Weights**: the exact size of every tensor, per dtype and component. Weights that the engine keeps in CPU memory are reported apart, as vLLM does with the DeepSeek-V4.1 Engram tables and llama.cpp with the token embeddings.
-- **KV cache**: what the engine allocates for `--max-model-len` tokens and `--batch-size` sequences, following the model's attention: full attention caches every token, sliding window layers only the window, latent and compressed attention (e.g. DeepSeek, GLM) a smaller record per token, and linear attention or Mamba layers a fixed state per sequence.
-- **Overhead**: the memory used on top of that, i.e. the activations of a forward pass, the vision or audio encoder for the largest input, the CUDA graphs, and the runtime (the CUDA context and library workspaces).
+- **Weights**: model tensors at the selected precision. Weights offloaded to CPU memory are reported separately.
+- **KV cache**: memory for the context length and batch size, accounting for full attention, sliding windows and recurrent state.
+- **Overhead**: activations, vision/audio encoders, persistent buffers, CUDA graphs and runtime workspaces.
 
-Decoder KV cache and overhead follow vLLM for Safetensors models and llama.cpp for GGUF models, as validated on NVIDIA T4 to H200 GPUs with vLLM 0.33, SGLang 0.5 and llama.cpp on 50+ models: the KV cache matches vLLM exactly for most architectures (within 3% for DeepSeek-V4.1, Kimi Linear and Qwen3.8-Flash-Next), the overhead is within 10% of vLLM's on median, and the vision and audio encoders of GGUF models are within 5% of llama.cpp's.
-
-Encoder warmup uses model dimensions, activation precision and the token budget, with a 0.32 GiB allowance for the device context and library workspaces. It includes masked-language-model logits unless the model supplies embedding pooling, and includes SPLADE logits and transformations. MoE, recurrent and latent-attention encoders have no warmup estimate. Text Embeddings Inference is a validation reference; its loading policies and warmup scheduling are not assumed.
-
-With eager attention, storage grows with heads × sequence length² for attention scores, probabilities, temporary workspace, position biases and masks. Persistent ALiBi tables are counted separately as `buffers`. Casting reserves a temporary tensor in its stored dtype alongside the converted weights, without assuming the loading order; `loading` is the amount by which that peak exceeds warmup.
+Estimates depend on the engine and workload settings. Kernels and other runtime optimizations can change memory use.
 
 ## Limitations
 
-- CPU memory is not estimated for text encoders: CPU backends can differ for F32 and F16, and loading peaks on CPUs differ from steady memory.
-- Decoder estimates follow vLLM and llama.cpp with their default settings, so other engines (e.g. SGLang, which reserves a fixed share of the GPU instead) and non-default settings use different amounts of memory.
+- The fit check models memory for the stated workload; engine compatibility and automatic spare-cache reservations are separate. Different backends and non-default optimizations can change the footprint.
 - ONNX models have no overhead estimate, and GGUF and ONNX listings estimate each file from its size, so a single file (`:<quantization>` or `--file`) gives the most accurate numbers.
-- vLLM profiles the vision encoder of some models (e.g. Qwen2.5-VL) with a video when it has more tokens than an image, which can reserve a few GiB more (`hf-mem` warns about it).
+- Vision and audio memory depends on the input size, so actual use can differ from the estimate.
 - PyTorch pickle weights (`.bin`, `.pt`, `.ckpt` or `.nemo`) are not supported, and encoder-decoder models (e.g. Whisper) have no KV cache estimate.
-- Kimi K3.1 defaults to vLLM's `fp8_ds_mla` cache layout on Hopper. Use `--kv-cache-dtype fp8` for the per-tensor FP8 layout used by FlashInfer on Blackwell.
-- AMD and NVIDIA Blackwell GPUs go through the same accounting in vLLM, but have not been validated.
 
 ## References
 

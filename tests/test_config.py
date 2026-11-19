@@ -38,6 +38,65 @@ def test_sliding_window_layers_reserve_the_window_plus_batched_tokens() -> None:
     assert kv(hybrid, length=1024)[0] == 4 * 1024 * 2 * 2 * 32 * 2
 
 
+@pytest.mark.parametrize("ranks", [1, 2, 4])
+@pytest.mark.parametrize("batch", [1, 4])
+@pytest.mark.parametrize("dtype,width", [("BF16", 2), ("F8_E4M3", 1)])
+def test_partitioned_cache_reserves_both_pools(ranks: int, batch: int, dtype: str, width: int) -> None:
+    config = llama_config(
+        num_hidden_layers=3,
+        num_attention_heads=8,
+        num_key_value_heads=8,
+        num_global_key_value_heads=1,
+        head_dim=32,
+        global_head_dim=64,
+        sliding_window=128,
+        layer_types=["full_attention", "sliding_attention", "sliding_attention"],
+    )
+    size, layers = _config.partitioned_kv_cache(config, dtype, 8192, batch, 512, ranks, 0.5)
+    full = 8192 * batch * 2 * 64 * width * ranks
+    sliding = 4096 * batch * 2 * 2 * (8 // ranks) * 32 * width * ranks
+    assert size == full + sliding
+    assert layers == {"full": 1, "sliding": 2, "state": 0, "none": 0}
+
+
+def test_partitioned_cache_protects_the_sliding_prefill_capacity() -> None:
+    config = llama_config(sliding_window=128, layer_types=["full_attention"] + ["sliding_attention"] * 3)
+    logical = _config.kv_cache(config, "BF16", 8192, 1, 512)[0]
+    balanced = _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 1, 0.5)[0]
+    small_window_pool = _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 1, 0.01)[0]
+    assert small_window_pool > balanced > logical
+    assert _config.partitioned_kv_cache(config, "BF16", 0, 1, 512, 1, 0.5)[0] == 0
+
+
+def test_partitioned_cache_reserves_slots_for_each_attention_layer() -> None:
+    config = llama_config(
+        num_hidden_layers=4,
+        sliding_window=128,
+        layer_types=["full_attention", "sliding_attention"] * 2,
+        num_kv_shared_layers=2,
+    )
+    shared, layers = _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 2, 0.5)
+    separate = _config.partitioned_kv_cache(
+        {**config, "num_kv_shared_layers": 0},
+        "BF16",
+        8192,
+        1,
+        512,
+        2,
+        0.5,
+    )[0]
+    assert shared == separate
+    assert shared > _config.kv_cache(config, "BF16", 8192, 1, 512, 2)[0]
+    assert layers == {"full": 2, "sliding": 2, "state": 0, "none": 0}
+
+
+def test_pool_ratio_does_not_change_single_attention_cache() -> None:
+    config = llama_config(num_kv_shared_layers=2)
+    assert _config.partitioned_kv_cache(config, "BF16", 8192, 1, 512, 2, 0.5) == _config.kv_cache(
+        config, "BF16", 8192, 1, 512, 2
+    )
+
+
 def test_gemma3_defaults() -> None:
     config = {
         "model_type": "gemma3_text",
@@ -417,9 +476,115 @@ def test_kimi_dense_cache_keeps_the_prefill_checkpoint() -> None:
     assert _config.kv_cache(config, "BF16", 1048576, 1)[0] == 3822059520
 
 
+def test_full_sliding_window_cache_matches_observed_sglang_gemma_pool_geometry() -> None:
+    config = {
+        "model_type": "gemma3_text",
+        "hidden_size": 2560,
+        "num_hidden_layers": 34,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 4,
+        "head_dim": 256,
+        "sliding_window": 1024,
+        "sliding_window_pattern": 6,
+    }
+    bounded, kinds = _config.kv_cache(config, "BF16", 32768, 1, batched_tokens=8192)
+    full, same_kinds = _config.kv_cache(
+        config, "BF16", 32768, 1, batched_tokens=8192, full_sliding_window_cache=True
+    )
+    assert full == 34 * 32768 * 2 * 4 * 256 * 2
+    assert full > bounded and same_kinds == kinds and kinds["sliding"] == 29
+    assert 4599193600 == 34 * 33025 * 2 * 4 * 256 * 2
+    assert abs(full / 4599193600 - 1) < 0.01
+    assert (
+        _config.kv_cache(config, "BF16", 32768, 2, tensor_parallel_size=8, full_sliding_window_cache=True)[0]
+        == full * 4
+    )
+
+
+def test_full_window_extent_does_not_change_pure_full_attention_or_state_caches() -> None:
+    for config in [llama_config(), llama_config(layer_types=["mamba"] * 4, ssm_state_size=16)]:
+        assert _config.kv_cache(config, "BF16", 10000, 1) == _config.kv_cache(
+            config, "BF16", 10000, 1, full_sliding_window_cache=True
+        )
+
+
+def test_sglang_gdn_state_slots_shard_independently_from_attention_heads() -> None:
+    config = {
+        "model_type": "qwen3_5_text",
+        "num_hidden_layers": 24,
+        "hidden_size": 2048,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 2,
+        "head_dim": 256,
+        "linear_num_key_heads": 16,
+        "linear_num_value_heads": 16,
+        "linear_key_head_dim": 128,
+        "linear_value_head_dim": 128,
+        "linear_conv_kernel_dim": 4,
+        "mamba_ssm_dtype": "float32",
+        "layer_types": ["linear_attention"] * 18 + ["full_attention"] * 6,
+    }
+    for ranks, native_pool in [(1, 435965952), (2, 435965952), (4, 539787264)]:
+        total, kinds = _config.sglang_kv_cache(config, "BF16", 8192, 1, 4096, ranks, state_capacity=16)
+        extra_attention = 257 * 6 * 2 * 2 * 256 * 2 * max(1, ranks // 2)
+        assert total == native_pool - extra_attention
+        assert kinds == {"full": 6, "sliding": 0, "state": 18, "none": 0}
+
+
+def test_explicit_local_layer_ids_and_model_context_aliases() -> None:
+    config = llama_config()
+    del config["max_position_embeddings"]
+    config.update(model_max_length=1048576, local_layer_ids=[0, 1, 3], sliding_window_size=1024)
+    normalized = _config.normalize(config)
+    assert normalized["max_position_embeddings"] == 1048576 and normalized["sliding_window"] == 1024
+    assert _config.layer_kinds(normalized) == ["sliding", "sliding", "full", "sliding"]
+    size, layers = _config.kv_cache(config, "BF16", 262144, 1)
+    assert layers == {"full": 1, "sliding": 3, "state": 0, "none": 0}
+    assert size < _config.kv_cache(config, "BF16", 262144, 1, full_sliding_window_cache=True)[0]
+    assert (
+        _config.layer_kinds(_config.normalize({**config, "layer_types": ["full_attention"] * 4}))
+        == ["full"] * 4
+    )
+    for invalid in [[-1], [4], [True], ["0"]]:
+        assert _config.layer_kinds(_config.normalize({**config, "local_layer_ids": invalid})) == ["full"] * 4
+
+
+@pytest.mark.parametrize("ranks", [1, 2, 4])
+@pytest.mark.parametrize("batch", [1, 3])
+@pytest.mark.parametrize("dtype", ["BF16", "F8_E4M3"])
+def test_short_conv_state_retains_local_kv_and_replicated_hidden_streams(
+    ranks: int, batch: int, dtype: str
+) -> None:
+    config = llama_config(sconv_kernel_size=4, head_dim=32)
+    without = {**config, "sconv_kernel_size": 0}
+    actual = _config.kv_cache(config, dtype, 1024, batch, tensor_parallel_size=ranks)[0]
+    attention = _config.kv_cache(without, dtype, 1024, batch, tensor_parallel_size=ranks)[0]
+    local_heads = -(-config["num_key_value_heads"] // ranks)
+    per_layer = (4 * local_heads * 32 + 2 * config["hidden_size"]) * 3 * 2
+    assert actual - attention == config["num_hidden_layers"] * per_layer * ranks * batch
+
+
 @pytest.mark.parametrize("config", [{"dtype": "float32"}, {"torch_dtype": "float32"}, {}])
 def test_fp32_auto_cache_uses_a_shared_16_bit_reference(config: dict[str, Any]) -> None:
     weights = Weights()
     weights.add("F32", 10, 40)
     assert _config.kv_dtype(config, "auto", weights, []) == "F16"
     assert _config.kv_dtype(config, "bfloat16", weights, []) == "BF16"
+
+
+def test_tensor_parallel_replication_uses_each_attention_types_head_count() -> None:
+    config = llama_config(
+        num_hidden_layers=2,
+        num_attention_heads=16,
+        num_key_value_heads=16,
+        num_global_key_value_heads=4,
+        head_dim=128,
+        global_head_dim=256,
+        layer_types=["full_attention", "sliding_attention"],
+        sliding_window=128,
+    )
+    single = _config.kv_cache(config, "BF16", 4096, 1, 256)[0]
+    parallel = _config.kv_cache(config, "BF16", 4096, 1, 256, tensor_parallel_size=8)[0]
+    full_cache = 4096 * 4 * 256 * 2 * 2
+    assert parallel == single + full_cache
+    assert parallel < 2 * single

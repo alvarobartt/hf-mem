@@ -1,4 +1,5 @@
 import asyncio
+import math
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -19,15 +20,25 @@ class KVCache:
     max_model_len: int
     batch_size: int
     layers: dict[str, int]
+    full_sliding_window_cache: bool = False
+    state_capacity: int | None = None
+    swa_full_tokens_ratio: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "bytes": self.bytes,
             "dtype": self.dtype,
             "max_model_len": self.max_model_len,
             "batch_size": self.batch_size,
             "layers": {k: v for k, v in self.layers.items() if v},
         }
+        if self.full_sliding_window_cache:
+            out["full_sliding_window_cache"] = True
+        if self.state_capacity is not None:
+            out["state_capacity"] = self.state_capacity
+        if self.swa_full_tokens_ratio is not None:
+            out["swa_full_tokens_ratio"] = self.swa_full_tokens_ratio
+        return out
 
 
 @dataclass
@@ -45,11 +56,31 @@ class Estimate:
     fit: _overhead.Fit | None = None
     file: str | None = None
     warnings: list[str] = field(default_factory=list)
+    text_only: bool = False
+    language_model_only: bool = False
+    gpu_memory_utilization: float = 0.90
+    startup_reserve_per_gpu: int = 0
+    mem_fraction_static: float | None = None
 
     @property
     def total(self) -> int:
         kv = self.kv_cache.bytes if self.kv_cache else 0
         return self.weights.bytes + kv + (self.overhead.bytes if self.overhead else 0)
+
+    @property
+    def recommended_gpu_memory(self) -> int | None:
+        if self.overhead is None:
+            return None
+        allocation = self.fit.required if self.fit else self.total
+        allocation += self.startup_reserve_per_gpu * ((self.fit.gpus or 1) if self.fit else 1)
+        recommended = _overhead.recommended_memory(allocation, self.gpu_memory_utilization)
+        if self.fit is not None and self.fit.capacity_required is not None:
+            return max(recommended, self.fit.capacity_required)
+        if self.mem_fraction_static is not None:
+            static = self.weights.bytes + (self.kv_cache.bytes if self.kv_cache else 0)
+            static += self.overhead.buffers + self.overhead.weight_adjustment
+            recommended = max(recommended, math.ceil(static / self.mem_fraction_static) + self.overhead.context)
+        return recommended
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -57,9 +88,19 @@ class Estimate:
             "model": self.model,
             "revision": self.revision,
         }
+        if self.language_model_only:
+            out["workload"] = "language-model-only"
+        elif self.text_only:
+            out["workload"] = "text-only"
         out["file"] = self.file
         out["format"] = self.format
         out["total"] = self.total
+        out["recommended_gpu_memory"] = self.recommended_gpu_memory
+        out["gpu_memory_utilization"] = self.gpu_memory_utilization
+        if self.mem_fraction_static is not None:
+            out["mem_fraction_static"] = self.mem_fraction_static
+        if self.startup_reserve_per_gpu:
+            out["startup_reserve_per_gpu"] = self.startup_reserve_per_gpu
         out["weights"] = self.weights.to_dict()
         out["offloaded"] = self.offloaded.to_dict() if self.offloaded else None
         out["components"] = (
@@ -90,7 +131,10 @@ class Listing:
             "files": [
                 {
                     "file": f.file,
+                    **({"workload": "language-model-only"} if f.language_model_only else {}),
                     "total": f.total,
+                    "recommended_gpu_memory": f.recommended_gpu_memory,
+                    "gpu_memory_utilization": f.gpu_memory_utilization,
                     "weights": {"bytes": f.weights.bytes, "params": f.weights.params or None},
                     "kv_cache": f.kv_cache.to_dict() if f.kv_cache else None,
                     "overhead": f.overhead.to_dict() if f.overhead else None,
@@ -102,7 +146,11 @@ class Listing:
 
 
 def _gguf_kv(
-    metadata: dict[str, Any], max_model_len: int | None, batch_size: int, dtype: str
+    metadata: dict[str, Any],
+    max_model_len: int | None,
+    batch_size: int,
+    dtype: str,
+    full_sliding_window_cache: bool = False,
 ) -> tuple[KVCache, int, float] | None:
     arch = metadata.get("general.architecture")
     context_length = metadata.get(f"{arch}.context_length")
@@ -115,13 +163,17 @@ def _gguf_kv(
             f"`--kv-cache-dtype={requested}` is not a llama.cpp KV cache type, use one of "
             f"{', '.join(t.lower() for t in _gguf.CACHE_TYPES)}."
         )
-    result = _gguf.kv_cache(metadata, length, batch_size, dtype)
+    result = _gguf.kv_cache(metadata, length, batch_size, dtype, full_sliding_window_cache)
     if result is None:
         return None
-    half = _gguf.kv_cache(metadata, max(1, length // 2), batch_size, dtype)
+    half = _gguf.kv_cache(metadata, max(1, length // 2), batch_size, dtype, full_sliding_window_cache)
     assert half is not None
     slope = (result[0] - half[0]) / (length - max(1, length // 2)) if length > 1 else 0.0
-    return KVCache(result[0], dtype, length, batch_size, result[1]), context_length or length, slope
+    return (
+        KVCache(result[0], dtype, length, batch_size, result[1], full_sliding_window_cache),
+        context_length or length,
+        slope,
+    )
 
 
 def _fit(
@@ -133,8 +185,16 @@ def _fit(
     kv_heads: int | None = None,
     padding: Callable[[int], int] | None = None,
     kv_bytes: Callable[[int, int], int] | None = None,
+    rank_overhead: Callable[[int], _overhead.Overhead] | None = None,
+    overhead_at_context: Callable[[int, int], int] | None = None,
     max_gpus: int | None = None,
+    startup_reserve: Callable[[int], int] | None = None,
+    capacity_at_context: Callable[[int, int], int] | None = None,
 ) -> None:
+    estimate.gpu_memory_utilization = utilization
+    if startup_reserve is not None:
+        ranks = (_overhead.parse_gpu_memory(gpu_memory)[0] or 1) if gpu_memory else 1
+        estimate.startup_reserve_per_gpu = startup_reserve(ranks)
     if gpu_memory is None:
         return
     kv = estimate.kv_cache
@@ -144,15 +204,29 @@ def _fit(
         kv_per_token=slope,
         max_model_len=kv.max_model_len if kv else 0,
         context_length=max(context_length, kv.max_model_len if kv else 0),
-        overhead=estimate.overhead.bytes if estimate.overhead else 0,
+        overhead=(lambda n: rank_overhead(n).bytes)
+        if rank_overhead is not None
+        else estimate.overhead.bytes
+        if estimate.overhead
+        else 0,
         gpu_memory=gpu_memory,
         utilization=utilization,
         kv_heads=kv_heads,
-        context=estimate.overhead.context if estimate.overhead else 0,
         padding=padding,
         kv_bytes=kv_bytes,
+        overhead_at_context=overhead_at_context,
+        startup_reserve=startup_reserve or estimate.startup_reserve_per_gpu,
         max_gpus=max_gpus,
+        capacity_at_context=capacity_at_context,
     )
+    ranks = estimate.fit.gpus or 1
+    if estimate.overhead is not None:
+        selected = rank_overhead(ranks) if rank_overhead else estimate.overhead
+        estimate.overhead = selected.scaled(ranks)
+    if kv is not None and estimate.fit.cache_bytes is not None:
+        kv.bytes = estimate.fit.cache_bytes
+    if estimate.overhead is not None:
+        estimate.overhead.weight_adjustment += estimate.fit.required - estimate.total
 
 
 def _mxfp4_padding(
@@ -177,6 +251,8 @@ async def _estimate_gguf(
     warnings: list[str],
     gpu_memory: str | None,
     utilization: float,
+    full_sliding_window_cache: bool,
+    language_model_only: bool,
 ) -> Estimate | Listing:
     groups = _gguf.group_files(_gguf.gguf_paths(source.files))
     if not groups:
@@ -184,11 +260,11 @@ async def _estimate_gguf(
 
     if file is not None or len(groups) == 1:
         name, paths = _gguf.select_file(groups, file) if file is not None else next(iter(groups.items()))
-        projector = _gguf.mmproj(source.files, name)
+        projector = None if language_model_only else _gguf.mmproj(source.files, name)
         header, *extra = await asyncio.gather(
             _gguf.read_group(source, paths), *([_gguf.read_group(source, [projector])] if projector else [])
         )
-        kv = _gguf_kv(header.metadata, max_model_len, batch_size, kv_dtype)
+        kv = _gguf_kv(header.metadata, max_model_len, batch_size, kv_dtype, full_sliding_window_cache)
         components = {"Model": header.weights, "mmproj": extra[0].weights} if extra else {}
         estimate = Estimate(
             model=source.name,
@@ -200,15 +276,29 @@ async def _estimate_gguf(
             components=components,
             offloaded=header.offloaded if header.offloaded.bytes else None,
             kv_cache=kv[0] if kv else None,
-            overhead=_overhead.llama_cpp(extra[0].metadata if extra else None) if kv else None,
             warnings=warnings,
+            language_model_only=language_model_only,
         )
 
         def cache_bytes(length: int, n: int) -> int:
             assert kv is not None
-            result = _gguf.kv_cache(header.metadata, length, batch_size, kv[0].dtype)
+            result = _gguf.kv_cache(header.metadata, length, batch_size, kv[0].dtype, full_sliding_window_cache)
             assert result is not None
             return result[0]
+
+        def overhead(length: int) -> _overhead.Overhead:
+            return _overhead.llama_cpp(
+                extra[0].metadata if extra else None,
+                gpu_memory,
+                header.metadata,
+                length,
+                estimate.weights.bytes + cache_bytes(length, 1),
+                utilization,
+            )
+
+        if kv:
+            estimate.overhead = overhead(kv[0].max_model_len)
+        requested_length = kv[0].max_model_len if kv else 0
 
         _fit(
             estimate,
@@ -217,11 +307,13 @@ async def _estimate_gguf(
             gpu_memory,
             utilization,
             kv_bytes=cache_bytes if kv else None,
+            rank_overhead=(lambda n: overhead(requested_length)) if kv else None,
+            overhead_at_context=(lambda n, length: overhead(length).bytes) if kv else None,
         )
         return estimate
 
     names = list(groups)
-    projectors = {name: _gguf.mmproj(source.files, name) for name in names}
+    projectors = {name: None if language_model_only else _gguf.mmproj(source.files, name) for name in names}
     unique = sorted({p for p in projectors.values() if p})
     first, *results = await asyncio.gather(
         _gguf.read_header(source, groups[names[0]][0]),
@@ -242,7 +334,7 @@ async def _estimate_gguf(
         metadata, tokenizer = result
         header_size = first.data_start if tokenizer and isinstance(first, _gguf.Header) else 0
         paths = groups[name]
-        kv = _gguf_kv(metadata, max_model_len, batch_size, kv_dtype)
+        kv = _gguf_kv(metadata, max_model_len, batch_size, kv_dtype, full_sliding_window_cache)
         files.append(
             Estimate(
                 model=source.name,
@@ -250,15 +342,25 @@ async def _estimate_gguf(
                 url=source.url,
                 format="gguf",
                 file=name,
+                language_model_only=language_model_only,
+                gpu_memory_utilization=utilization,
                 weights=Weights(
                     bytes=sum(source.files[p] for p in paths)
                     - header_size
                     + (source.files[projector] if (projector := projectors[name]) else 0)
                 ),
                 kv_cache=kv[0] if kv else None,
-                overhead=_overhead.llama_cpp(projected.get(projector) if projector else None) if kv else None,
             )
         )
+        if kv:
+            files[-1].overhead = _overhead.llama_cpp(
+                projected.get(projector) if projector else None,
+                gpu_memory,
+                metadata,
+                kv[0].max_model_len,
+                files[-1].weights.bytes + kv[0].bytes,
+                utilization,
+            )
     if not files:
         raise RuntimeError(f"No valid GGUF files found for {source.name}.")
     if gpu_memory is not None:
@@ -434,7 +536,15 @@ async def _estimate_safetensors(
     gpu_memory: str | None,
     utilization: float,
     max_num_batched_tokens: int | None,
+    max_num_seqs: int | None,
+    full_sliding_window_cache: bool,
+    engine: str | None,
+    gpu_type: str | None,
+    text_only: bool,
+    language_model_only: bool,
     dtype: str | None,
+    swa_full_tokens_ratio: float | None,
+    mem_fraction_static: float | None,
 ) -> Estimate | None:
     files = source.files
     config_task = asyncio.ensure_future(source.json("config.json")) if "config.json" in files else None
@@ -452,13 +562,35 @@ async def _estimate_safetensors(
         except (RuntimeError, ValueError) as e:
             warnings.append(f"KV cache estimation skipped, as `config.json` could not be read ({e}).")
             config = {}
+        inkling = config.get("model_type") == "inkling2"
+        if engine is None:
+            engine = "sglang" if inkling else "vllm"
+        elif inkling and engine == "vllm":
+            warnings.append(
+                "Inkling2 runtime storage is calibrated with the pinned SGLang image; "
+                "the vLLM layout is not validated. Use `--engine sglang` for that reference."
+            )
         quantization = (
             config.get("quantization_config")
             or (config.get("text_config") or {}).get("quantization_config")
             or {}
         )
+        prefixes = _safetensors.language_model_prefixes(config) if language_model_only else ()
+        if language_model_only and prefixes:
+            selected = {name: paths for name, paths in selected.items() if name not in _safetensors.AUXILIARY}
+        tensor_metadata: dict[str, Any] | None = {} if engine == "sglang" and inkling else None
+        skipped_weights: dict[str, int] = {}
         components, experts, offloaded = await _safetensors.read_components(
-            source, selected, warnings, quantization
+            source,
+            selected,
+            warnings,
+            quantization,
+            bool((_config.text_config(config) or config).get("tie_word_embeddings")),
+            (_config.text_config(config) or config).get("model_type")
+            in {"qwen3_5", "qwen3_5_text", "qwen3_5_moe", "qwen3_5_moe_text"},
+            prefixes,
+            tensor_metadata,
+            skipped_weights,
         )
         processor: dict[str, Any] = {}
         for result in await asyncio.gather(*processor_tasks, return_exceptions=True):
@@ -483,7 +615,10 @@ async def _estimate_safetensors(
         components=components,
         offloaded=offloaded if offloaded.bytes else None,
         file=file,
+        text_only=text_only,
+        language_model_only=language_model_only,
         warnings=warnings,
+        startup_reserve_per_gpu=skipped_weights.get("encoder", 0) if language_model_only else 0,
     )
     if offloaded.bytes:
         warnings.append(
@@ -623,9 +758,13 @@ async def _estimate_safetensors(
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
     dtype = _config.kv_dtype(text, kv_dtype, weights, warnings)
-    tokens = _overhead.batched_tokens(gpu_memory, max_num_batched_tokens)
+    profile_memory = gpu_memory
+    estimate.mem_fraction_static = mem_fraction_static
+    tokens = _overhead.batched_tokens(profile_memory, max_num_batched_tokens, gpu_type, engine)
     if (
         max_num_batched_tokens is None
+        and engine == "vllm"
+        and gpu_type is None
         and gpu_memory
         and 70 <= _overhead.parse_gpu_memory(gpu_memory)[1] / _overhead.GIB < 90
     ):
@@ -633,23 +772,161 @@ async def _estimate_safetensors(
             "vLLM batches 8192 tokens on GPUs with 70 GiB or more except on A100s, which use 2048, so set "
             "`--max-num-batched-tokens 2048` for an A100."
         )
-    size, layers = _config.kv_cache(text, dtype, length, batch_size, tokens)
-    half = _config.kv_cache(text, dtype, max(1, length // 2), batch_size, tokens)[0]
+
+    full_sliding_window_cache = full_sliding_window_cache or (
+        engine == "sglang" and text.get("model_type") == "gemma3_text"
+    )
+
+    state_capacity = max_num_seqs or batch_size
+    dedicated_state = engine == "sglang" and bool(text.get("linear_num_value_heads"))
+    cache_text = text
+    kinds = _config.layer_kinds(text, include_shared=True)
+    if engine == "sglang" and "full" in kinds and "sliding" in kinds and "state" not in kinds:
+        cache_text = {
+            key: value
+            for key, value in text.items()
+            if key not in {"num_kv_shared_layers", "kv_sharing_modes", "kv_source_layers"}
+        }
+
+    def cache(length: int, n: int = 1) -> tuple[int, dict[str, int]]:
+        if dedicated_state:
+            return _config.sglang_kv_cache(
+                text,
+                dtype,
+                length,
+                batch_size,
+                tokens,
+                n,
+                full_sliding_window_cache,
+                state_capacity,
+            )
+        if swa_full_tokens_ratio is not None and not full_sliding_window_cache:
+            return _config.partitioned_kv_cache(
+                cache_text, dtype, length, batch_size, tokens, n, swa_full_tokens_ratio
+            )
+        return _config.kv_cache(cache_text, dtype, length, batch_size, tokens, n, full_sliding_window_cache)
+
+    def weight_adjustment(n: int) -> int:
+        return _safetensors.inkling_weight_adjustment(
+            tensor_metadata or {},
+            n,
+            _safetensors.language_model_prefixes(config),
+            marlin=_overhead.hardware(profile_memory, gpu_type)[2],
+        )
+
+    size, layers = cache(length)
+    if (
+        engine == "sglang"
+        and layers["full"]
+        and layers["sliding"]
+        and not layers["state"]
+        and not full_sliding_window_cache
+    ):
+        missing = [
+            f"`--{name}`"
+            for name, value in (
+                ("swa-full-tokens-ratio", swa_full_tokens_ratio),
+                ("mem-fraction-static", mem_fraction_static),
+            )
+            if value is None
+        ]
+        if missing:
+            warnings.append(
+                "To include SGLang's cache allocation limits, set "
+                + " and ".join(missing)
+                + " to match the server."
+            )
+    half = cache(max(1, length // 2))[0]
     slope = (size - half) / (length - max(1, length // 2)) if length > 1 else 0.0
-    estimate.kv_cache = KVCache(size, dtype, length, batch_size, layers)
-    if _overhead.supports_video(config, files):
+    estimate.kv_cache = KVCache(
+        size,
+        dtype,
+        length,
+        batch_size,
+        layers,
+        full_sliding_window_cache,
+        state_capacity if dedicated_state else None,
+        swa_full_tokens_ratio
+        if layers["full"] and layers["sliding"] and not layers["state"] and not full_sliding_window_cache
+        else None,
+    )
+    if dedicated_state and max_num_seqs is None:
+        warnings.append(
+            "SGLang automatically reserves recurrent-state cache from available VRAM; "
+            "this estimate includes the minimum state for the requested batch. "
+            "`--max-num-seqs` models a dedicated state pool with radix caching disabled."
+        )
+    if not (text_only or language_model_only) and engine == "vllm" and _overhead.supports_video(config, files):
         warnings.append(
             "The encoder is estimated for the largest image, but vLLM profiles the largest video when it has more "
             "tokens, which can reserve a few GiB more unless videos are disabled with "
             "`--limit-mm-per-prompt '{\"video\": 0}'`."
         )
-    estimate.overhead = _overhead.vllm(
-        text,
-        moe=estimate.moe is not None,
-        hybrid=layers["state"] > 0,
-        tokens=tokens,
-        encoder_bytes=_overhead.encoder(config, processor),
+
+    is_moe = estimate.moe is not None or any(
+        isinstance(text.get(key), int) and text[key] > 1
+        for key in ("num_local_experts", "n_routed_experts", "num_experts", "moe_num_experts")
     )
+
+    def overhead(n: int = 1, context_length: int = length) -> _overhead.Overhead:
+        capacity = max_num_seqs
+        if capacity is None and (profile_memory is not None or gpu_type is not None or engine == "sglang"):
+            capacity = max(batch_size, _overhead.default_sequences(profile_memory, gpu_type, engine))
+        result = _overhead.decoder(
+            text,
+            moe=is_moe,
+            hybrid=layers["state"] > 0,
+            tokens=tokens,
+            encoder_bytes=0
+            if text_only or language_model_only
+            else _overhead.encoder(config, processor, context_length, engine),
+            max_num_seqs=capacity,
+            tensor_parallel_size=n,
+            gpu_memory=profile_memory,
+            gpu_type=gpu_type,
+            engine=engine,
+            batch_size=batch_size,
+            context_length=context_length,
+        )
+        if tensor_metadata is not None:
+            result.weight_adjustment = math.ceil(weight_adjustment(n) / n)
+            if _overhead.hardware(profile_memory, gpu_type)[2]:
+                blocks = math.ceil(text["num_hidden_layers"] / text["n_layers_per_attn_res_block"])
+                routed = text.get("num_experts_per_tok") or 1
+                prefill_pool = 0.30 * _overhead.GIB + tokens * text["hidden_size"] * (
+                    12 * blocks + 24 * routed / n
+                )
+                result.graphs += int(max(0, prefill_pool - result.activations))
+        return result
+
+    encoder_reserve = estimate.startup_reserve_per_gpu
+
+    def startup(n: int = 1) -> int:
+        return max(encoder_reserve, _overhead.GIB - overhead(n).activations, 0)
+
+    def static_capacity(n: int, context_length: int) -> int:
+        reserved = overhead(n, context_length)
+        padding = _mxfp4_padding(config, text, weights)
+        static = weights.bytes + cache(context_length, n)[0] + (padding(n) if padding else 0)
+        static += n * (reserved.buffers + reserved.weight_adjustment)
+        return math.ceil(static / (mem_fraction_static or 1)) + n * reserved.context
+
+    if gpu_memory is None and gpu_type is None:
+        for capacity in (16, 24, 48, 80, 141):
+            profile_memory = str(capacity)
+            tokens = _overhead.batched_tokens(profile_memory, max_num_batched_tokens, None, engine)
+            size, layers = cache(length)
+            candidate = overhead()
+            allocation = weights.bytes + size + candidate.bytes + startup()
+            recommended = _overhead.recommended_memory(allocation, utilization)
+            if mem_fraction_static is not None:
+                recommended = max(recommended, static_capacity(1, length))
+            if recommended <= capacity * _overhead.GIB * (0.9 if capacity <= 48 else 0.98):
+                break
+        estimate.kv_cache.bytes = size
+        half = cache(max(1, length // 2))[0]
+        slope = (size - half) / (length - max(1, length // 2)) if length > 1 else 0.0
+    estimate.overhead = overhead()
     _fit(
         estimate,
         text.get("max_position_embeddings") or length,
@@ -658,7 +935,11 @@ async def _estimate_safetensors(
         utilization,
         _config.kv_heads(text),
         _mxfp4_padding(config, text, weights),
-        lambda length, n: _config.kv_cache(text, dtype, length, batch_size, tokens, n)[0],
+        lambda length, n: cache(length, n)[0],
+        overhead,
+        lambda n, length: overhead(n, length).bytes,
+        startup_reserve=startup,
+        capacity_at_context=static_capacity if mem_fraction_static is not None else None,
     )
     return estimate
 
@@ -700,18 +981,51 @@ async def arun(
     kv_cache_dtype: str = "auto",
     hf_token: str | None = None,
     gpu_memory: str | None = None,
-    gpu_memory_utilization: float = 0.92,
+    gpu_memory_utilization: float = 0.90,
     max_num_batched_tokens: int | None = None,
     progress: Progress | None = None,
     format: str | None = None,
     dtype: str | None = None,
+    max_num_seqs: int | None = None,
+    full_sliding_window_cache: bool = False,
+    engine: str | None = None,
+    gpu_type: str | None = None,
+    text_only: bool = False,
+    language_model_only: bool = False,
+    swa_full_tokens_ratio: float | None = None,
+    mem_fraction_static: float | None = None,
 ) -> Estimate | Listing:
-    if batch_size < 1 or any(v is not None and v < 1 for v in (max_model_len, max_num_batched_tokens)):
-        raise RuntimeError("`--batch-size`, `--max-model-len` and `--max-num-batched-tokens` must be positive.")
+    engine = engine.lower() if engine is not None else None
+    gpu_type = _overhead.normalize_gpu_type(gpu_type) if gpu_type is not None else None
+    if engine not in {None, "vllm", "sglang"}:
+        raise RuntimeError("`--engine` must be vllm or sglang for Safetensors overhead.")
+    for name, value in (
+        ("swa-full-tokens-ratio", swa_full_tokens_ratio),
+        ("mem-fraction-static", mem_fraction_static),
+    ):
+        if value is not None and not 0 < value <= 1:
+            raise RuntimeError(f"`--{name}` must be in (0, 1].")
+    if swa_full_tokens_ratio is not None or mem_fraction_static is not None:
+        if engine not in {None, "sglang"} or format not in {None, "safetensors"}:
+            raise RuntimeError(
+                "`--swa-full-tokens-ratio` and `--mem-fraction-static` require SGLang and Safetensors."
+            )
+        engine = "sglang"
+        format = "safetensors"
+    if batch_size < 1 or any(
+        v is not None and v < 1 for v in (max_model_len, max_num_batched_tokens, max_num_seqs)
+    ):
+        raise RuntimeError(
+            "`--batch-size`, `--max-model-len`, `--max-num-batched-tokens` and `--max-num-seqs` must be positive."
+        )
+    if max_num_seqs is not None and max_num_seqs < batch_size:
+        raise RuntimeError("`--max-num-seqs` must be at least `--batch-size`.")
     if not 0 < gpu_memory_utilization <= 1:
         raise RuntimeError("`--gpu-memory-utilization` must be in (0, 1].")
     if gpu_memory is not None:
         _overhead.parse_gpu_memory(gpu_memory)
+        if gpu_type is not None:
+            _overhead.validate_gpu_memory(gpu_memory, gpu_type)
     if format not in (None, *FORMATS):
         raise RuntimeError(f"`--format={format}` is not valid, use one of {', '.join(FORMATS)}.")
     if dtype is not None and dtype not in DTYPES:
@@ -763,6 +1077,8 @@ async def arun(
                 warnings,
                 gpu_memory,
                 gpu_memory_utilization,
+                full_sliding_window_cache,
+                language_model_only,
             )
         if estimate := await _estimate_safetensors(
             source,
@@ -775,7 +1091,15 @@ async def arun(
             gpu_memory,
             gpu_memory_utilization,
             max_num_batched_tokens,
+            max_num_seqs,
+            full_sliding_window_cache,
+            engine,
+            gpu_type,
+            text_only,
+            language_model_only,
             dtype,
+            swa_full_tokens_ratio,
+            mem_fraction_static,
         ):
             for other, found in (("GGUF", gguf), ("ONNX", onnx)):
                 if found and format is None and file is None:
@@ -811,10 +1135,18 @@ def run(
     kv_cache_dtype: str = "auto",
     hf_token: str | None = None,
     gpu_memory: str | None = None,
-    gpu_memory_utilization: float = 0.92,
+    gpu_memory_utilization: float = 0.90,
     max_num_batched_tokens: int | None = None,
     format: str | None = None,
     dtype: str | None = None,
+    max_num_seqs: int | None = None,
+    full_sliding_window_cache: bool = False,
+    engine: str | None = None,
+    gpu_type: str | None = None,
+    text_only: bool = False,
+    language_model_only: bool = False,
+    swa_full_tokens_ratio: float | None = None,
+    mem_fraction_static: float | None = None,
 ) -> Estimate | Listing:
     try:
         asyncio.get_running_loop()
@@ -832,7 +1164,15 @@ def run(
                 gpu_memory_utilization,
                 max_num_batched_tokens,
                 format=format,
+                max_num_seqs=max_num_seqs,
+                full_sliding_window_cache=full_sliding_window_cache,
+                engine=engine,
+                gpu_type=gpu_type,
+                text_only=text_only,
+                language_model_only=language_model_only,
                 dtype=dtype,
+                swa_full_tokens_ratio=swa_full_tokens_ratio,
+                mem_fraction_static=mem_fraction_static,
             )
         )
     raise RuntimeError(
