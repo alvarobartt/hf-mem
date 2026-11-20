@@ -1,5 +1,6 @@
 import json
 import os
+import struct
 from pathlib import Path
 from typing import Any
 
@@ -200,6 +201,163 @@ def test_moe_breakdown_skipped_for_non_uniform_experts(tmp_path: Path) -> None:
 
     assert result.moe is None
     assert any("not uniform" in w for w in result.warnings)
+
+
+@pytest.mark.parametrize("nested", [False, True])
+@pytest.mark.parametrize("pooled", [False, True])
+@pytest.mark.parametrize("prefix", ["experts", "local_experts", "routed_experts"])
+def test_fused_experts_match_individually_stored_experts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, nested: bool, pooled: bool, prefix: str
+) -> None:
+    config = llama_config(n_routed_experts=4, num_experts_per_tok=2)
+    if nested:
+        config = {"architectures": ["LlamaForConditionalGeneration"], "text_config": config}
+    tensors: dict[str, tuple[str, list[int]]] = {"model.embed_tokens.weight": ("BF16", [100, 64])}
+    separate = dict(tensors)
+    for layer in range(2):
+        tensors[f"model.layers.{layer}.mlp.{prefix}.gate_up_proj"] = ("BF16", [4, 128, 64])
+        tensors[f"model.layers.{layer}.mlp.{prefix}.down_proj"] = ("BF16", [4, 64, 64])
+        tensors[f"model.layers.{layer}.mlp.{prefix}.bias"] = ("BF16", [4, 64])
+        for expert in range(4):
+            separate[f"model.layers.{layer}.mlp.experts.{expert}.gate_up_proj.weight"] = ("BF16", [128, 64])
+            separate[f"model.layers.{layer}.mlp.experts.{expert}.down_proj.weight"] = ("BF16", [64, 64])
+            separate[f"model.layers.{layer}.mlp.experts.{expert}.bias"] = ("BF16", [64])
+    write_json(str(tmp_path / "fused/config.json"), config)
+    write_json(str(tmp_path / "separate/config.json"), config)
+    write_safetensors(str(tmp_path / "fused/model.safetensors"), tensors)
+    write_safetensors(str(tmp_path / "separate/model.safetensors"), separate)
+    if pooled:
+        monkeypatch.setattr(_safetensors, "POOL_MIN_FILES", 1)
+
+    fused = estimate(str(tmp_path / "fused"))
+    indexed = estimate(str(tmp_path / "separate"))
+
+    assert fused.weights == indexed.weights
+    assert fused.moe == indexed.moe
+    moe = some(fused.moe)
+    assert (moe.experts, moe.active) == (4, 2)
+    assert moe.base.bytes == 100 * 64 * 2
+    assert moe.expert.params == 2 * (128 * 64 + 64 * 64 + 64)
+    assert "EXPERTS (4 x" in table(fused)
+
+
+@pytest.mark.parametrize("count", [None, 3])
+def test_fused_experts_require_a_matching_configured_count(tmp_path: Path, count: int | None) -> None:
+    write_safetensors(
+        str(tmp_path / "model.safetensors"), {"model.layers.0.mlp.experts.gate_up_proj": ("BF16", [4, 32, 16])}
+    )
+    write_json(str(tmp_path / "config.json"), llama_config(n_routed_experts=count))
+
+    result = estimate(str(tmp_path))
+
+    assert result.moe is None
+    assert result.weights.params == 4 * 32 * 16
+    assert result.weights.bytes == 4 * 32 * 16 * 2
+
+
+def test_fused_u8_experts_without_quantization_metadata_are_not_assumed_to_be_fp4(tmp_path: Path) -> None:
+    nbytes = write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {
+            "model.layers.0.mlp.experts.w13_weight": ("U8", [4, 64, 16]),
+            "model.layers.0.mlp.experts.w13_weight_scale": ("F8_E4M3", [4, 64, 2]),
+        },
+    )
+    write_json(str(tmp_path / "config.json"), llama_config(n_routed_experts=4))
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == nbytes
+    assert result.weights.params == 4 * 64 * 16 + 4 * 64 * 2
+    assert set(result.weights.dtypes) == {"U8", "F8_E4M3"}
+    assert some(result.moe).experts == 4
+
+
+@pytest.mark.parametrize(
+    "declared", [None, "invalid", "[]", '{"quant_method":"modelopt","quant_algo":"NVFP4"}']
+)
+def test_quantization_declared_in_the_safetensors_header(tmp_path: Path, declared: str | None) -> None:
+    path = tmp_path / "model.safetensors"
+    nbytes = write_safetensors(
+        str(path),
+        {
+            "model.layers.0.mlp.experts.w13_weight": ("U8", [4, 64, 16]),
+            "model.layers.0.mlp.experts.w13_weight_scale": ("F8_E4M3", [4, 64, 2]),
+        },
+    )
+    raw = path.read_bytes()
+    size = struct.unpack("<Q", raw[:8])[0]
+    header = json.loads(raw[8 : size + 8])
+    if declared is not None:
+        header["__metadata__"]["quantization_config"] = declared
+    metadata = json.dumps(header).encode()
+    path.write_bytes(struct.pack("<Q", len(metadata)) + metadata + raw[8 + size :])
+    write_json(str(tmp_path / "config.json"), llama_config(n_routed_experts=4))
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == nbytes
+    assert some(result.moe).experts == 4
+    if declared and "NVFP4" in declared:
+        assert result.weights.params == 2 * 4 * 64 * 16
+        assert result.weights.dtypes["NVFP4"].params == 2 * 4 * 64 * 16
+    else:
+        assert result.weights.params == 4 * 64 * 16 + 4 * 64 * 2
+        assert set(result.weights.dtypes) == {"U8", "F8_E4M3"}
+
+
+@pytest.mark.parametrize(
+    "quantization", [{"quant_method": "modelopt", "quant_algo": "NVFP4"}, {"quant_method": "nvfp4"}]
+)
+@pytest.mark.parametrize("nested", [False, True])
+def test_nvfp4_fused_experts_count_weights_and_preserve_scale_storage(
+    tmp_path: Path, quantization: dict[str, str], nested: bool
+) -> None:
+    nbytes = write_safetensors(
+        str(tmp_path / "model-00001-of-00002.safetensors"),
+        {
+            "model.embed_tokens.weight": ("BF16", [100, 64]),
+            "model.layers.0.mlp.gate.weight": ("BF16", [4, 64]),
+            "model.layers.0.mlp.experts.w13_weight": ("U8", [4, 64, 16]),
+            "model.layers.0.mlp.experts.w2_weight": ("U8", [4, 32, 16]),
+            "model.layers.0.mlp.shared_experts.w13_weight": ("U8", [64, 16]),
+            "model.layers.0.attn.weight": ("F8_E4M3", [32, 32]),
+            "model.buffer": ("U8", [7]),
+        },
+    )
+    nbytes += write_safetensors(
+        str(tmp_path / "model-00002-of-00002.safetensors"),
+        {
+            "model.layers.0.mlp.experts.w13_weight_scale": ("F8_E4M3", [4, 64, 2]),
+            "model.layers.0.mlp.experts.w2_weight_scale": ("F8_E4M3", [4, 32, 2]),
+            "model.layers.0.mlp.experts.w13_weight_amax": ("F32", [4]),
+            "model.layers.0.mlp.experts.w13_weight_outer_scale_denominator": ("F32", [1]),
+            "model.layers.0.attn.weight_scale_inv": ("F32", [1, 1]),
+            "model.layers.0.attn.q_l2_clip.scale": ("BF16", [32]),
+        },
+    )
+    config = llama_config(n_routed_experts=4, num_experts_per_tok=1, quantization_config=quantization)
+    if nested:
+        config = {"architectures": ["LlamaForConditionalGeneration"], "text_config": config}
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path))
+    moe = some(result.moe)
+
+    assert result.weights.bytes == nbytes
+    assert (
+        result.weights.params
+        == 100 * 64 + 4 * 64 + 2 * (4 * 64 * 16 + 4 * 32 * 16 + 64 * 16) + 32 * 32 + 7 + 32
+    )
+    assert result.weights.dtypes["NVFP4"].params == 2 * (4 * 64 * 16 + 4 * 32 * 16 + 64 * 16)
+    assert result.weights.dtypes["F8_E4M3"].params == 32 * 32
+    assert result.weights.dtypes["F32"].params == 0
+    assert result.weights.dtypes["U8"].params == 7
+    assert (moe.experts, moe.active) == (4, 1)
+    assert moe.expert.params == 2 * (64 * 16 + 32 * 16)
+    assert moe.expert.bytes == 64 * 16 + 32 * 16 + 64 * 2 + 32 * 2 + 4
+    assert moe.experts_total.bytes + moe.base.bytes == result.weights.bytes
+    assert moe.experts_total.params + moe.base.params == result.weights.params
 
 
 @pytest.mark.parametrize("nested", [False, True])

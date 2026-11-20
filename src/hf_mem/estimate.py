@@ -596,6 +596,7 @@ async def _estimate_safetensors(
             prefixes,
             tensor_metadata,
             skipped_weights,
+            _safetensors.expert_count(_config.text_config(config) or config),
         )
         processor: dict[str, Any] = {}
         for result in await gather(*processor_tasks, return_exceptions=True):
