@@ -7,7 +7,7 @@ import struct
 from dataclasses import dataclass
 from typing import Any
 
-from hf_mem._source import HubError
+from hf_mem._source import HubError, gather
 from hf_mem._weights import Weights, choices
 
 PROBE_SIZE = 100_000
@@ -274,7 +274,7 @@ async def read_components(
         probe[0] = max(probe[0], len(raw) + 8)
 
     try:
-        results = await asyncio.gather(*(read(p) for p in paths), return_exceptions=True)
+        results = await gather(*(read(p) for p in paths), return_exceptions=True)
     finally:
         if pool:
             pool.shutdown(cancel_futures=True)

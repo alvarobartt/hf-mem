@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hf_mem import _config, _gguf, _onnx, _overhead, _safetensors
-from hf_mem._source import HubError, Progress, open_source
+from hf_mem._source import HubError, Progress, gather, open_source
 from hf_mem._version import __version__
 from hf_mem._weights import DTYPES, FLOAT_BYTES, Weights
 
@@ -261,7 +261,7 @@ async def _estimate_gguf(
     if file is not None or len(groups) == 1:
         name, paths = _gguf.select_file(groups, file) if file is not None else next(iter(groups.items()))
         projector = None if language_model_only else _gguf.mmproj(source.files, name)
-        header, *extra = await asyncio.gather(
+        header, *extra = await gather(
             _gguf.read_group(source, paths), *([_gguf.read_group(source, [projector])] if projector else [])
         )
         kv = _gguf_kv(header.metadata, max_model_len, batch_size, kv_dtype, full_sliding_window_cache)
@@ -315,7 +315,7 @@ async def _estimate_gguf(
     names = list(groups)
     projectors = {name: None if language_model_only else _gguf.mmproj(source.files, name) for name in names}
     unique = sorted({p for p in projectors.values() if p})
-    first, *results = await asyncio.gather(
+    first, *results = await gather(
         _gguf.read_header(source, groups[names[0]][0]),
         *(_gguf.read_metadata(source, groups[name][0]) for name in names),
         *(_gguf.read_metadata(source, p) for p in unique),
@@ -375,7 +375,7 @@ async def _onnx_lengths(source: Any, labels: list[str]) -> dict[str, tuple[int |
 
     paths = {label: config(label) for label in labels}
     unique = sorted({p for p in paths.values() if p})
-    loaded = dict(zip(unique, await asyncio.gather(*(source.json(p) for p in unique), return_exceptions=True)))
+    loaded = dict(zip(unique, await gather(*(source.json(p) for p in unique), return_exceptions=True)))
     lengths: dict[str, tuple[int | None, int | None]] = {}
     for label, path in paths.items():
         found = loaded[path] if path else None
@@ -408,11 +408,13 @@ async def _estimate_onnx(
         groups = dict([_onnx.select_file(groups, file)])
 
     labels = list(groups)
-    lengths_task = asyncio.ensure_future(_onnx_lengths(source, labels))
-    results = await asyncio.gather(
-        *(_onnx.read_group(source, groups[label]) for label in labels), return_exceptions=True
+    lengths, *results = await gather(
+        _onnx_lengths(source, labels),
+        *(_onnx.read_group(source, groups[label]) for label in labels),
+        return_exceptions=True,
     )
-    lengths = await lengths_task
+    if isinstance(lengths, BaseException):
+        raise lengths
     files = []
     for label, result in zip(labels, results):
         if isinstance(result, HubError) or (isinstance(result, BaseException) and len(labels) == 1):
@@ -492,8 +494,9 @@ async def _encoder_length(source: Any, config: dict[str, Any], override: int | N
             try:
                 if isinstance(length := (await source.json(name)).get("max_seq_length"), int) and length > 0:
                     return length
-            except (RuntimeError, ValueError):
-                pass
+            except (RuntimeError, ValueError) as error:
+                if isinstance(error, HubError) and error.status in {401, 403}:
+                    raise
     positions = config.get("max_position_embeddings")
     if not isinstance(positions, int) or positions <= 0:
         return None
@@ -560,6 +563,8 @@ async def _estimate_safetensors(
         try:
             config = await config_task if config_task else {}
         except (RuntimeError, ValueError) as e:
+            if isinstance(e, HubError) and e.status in {401, 403}:
+                raise
             warnings.append(f"KV cache estimation skipped, as `config.json` could not be read ({e}).")
             config = {}
         inkling = config.get("model_type") == "inkling2"
@@ -593,7 +598,7 @@ async def _estimate_safetensors(
             skipped_weights,
         )
         processor: dict[str, Any] = {}
-        for result in await asyncio.gather(*processor_tasks, return_exceptions=True):
+        for result in await gather(*processor_tasks, return_exceptions=True):
             if isinstance(result, dict):
                 processor.update(result, **(result.get("image_processor") or {}))
     finally:
@@ -738,8 +743,9 @@ async def _estimate_safetensors(
                 text = _config.text_config({**await referenced.json("config.json"), **config["text_config"]})
             finally:
                 await referenced.close()
-        except (RuntimeError, ValueError):
-            pass
+        except (RuntimeError, ValueError) as error:
+            if isinstance(error, HubError) and error.status in {401, 403}:
+                raise
     if text is None:
         warnings.append("KV cache estimation skipped, as no text decoder config was found in `config.json`.")
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
