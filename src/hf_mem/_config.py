@@ -286,6 +286,51 @@ def layer_kinds(config: dict[str, Any], include_shared: bool = False) -> list[st
     ]
 
 
+def cache_config(config: dict[str, Any]) -> dict[str, Any]:
+    config = normalize(config)
+    loop = config.pop("loop_config", None)
+    if not isinstance(loop, dict):
+        return config
+    start, end, passes = (loop.get(key) for key in ("core_start", "core_end", "num_passes"))
+    layers = config["num_hidden_layers"]
+    if not (
+        all(type(value) is int for value in (start, end, passes, layers))
+        and 0 <= start < end <= layers
+        and passes >= 1
+    ):
+        raise RuntimeError("Repeated layers require valid `core_start`, `core_end` and `num_passes`.")
+    indices = list(range(layers)) + list(range(start, end)) * (passes - 1)
+    kinds = layer_kinds(config, include_shared=True)
+    names = {
+        "full": "full_attention",
+        "sliding": "sliding_attention",
+        "state": "linear_attention",
+        "none": "dummy",
+    }
+    config["layer_types"] = [names[kinds[i]] for i in indices]
+    modes = config.get("kv_sharing_modes")
+    if modes is None and isinstance(sources := config.get("kv_source_layers"), list):
+        modes = [None if i == source else "reuse" for i, source in enumerate(sources)]
+    if shared := config.pop("num_kv_shared_layers", 0):
+        modes = [
+            "reuse" if i >= layers - shared else (modes[i] if modes and i < len(modes) else None)
+            for i in range(layers)
+        ]
+    if modes is not None:
+        config["kv_sharing_modes"] = [modes[i] if i < len(modes) else None for i in indices]
+        config.pop("kv_source_layers", None)
+    for key in ("indexer_types", "no_rope_layers"):
+        if isinstance(values := config.get(key), list) and len(values) == layers:
+            config[key] = [values[i] for i in indices]
+    if overrides := config.get("per_layer_config"):
+        overrides = {int(i): value for i, value in overrides.items()}
+        config["per_layer_config"] = {
+            i: overrides[layer] for i, layer in enumerate(indices) if layer in overrides
+        }
+    config["num_hidden_layers"] = len(indices)
+    return config
+
+
 def _layer_configs(config: dict[str, Any]) -> list[dict[str, Any]]:
     # Transformers serializes a sparse mapping with integer or zero-padded string indices.
     overrides = config.get("per_layer_config") or {}
@@ -423,7 +468,7 @@ def kv_cache(
     tensor_parallel_size: int = 1,
     full_sliding_window_cache: bool = False,
 ) -> tuple[int, dict[str, int]]:
-    config = normalize(config)
+    config = cache_config(config)
     if packed := _packed_mla(config, dtype, max_model_len, batch_size, tensor_parallel_size):
         return packed
     if (
@@ -567,7 +612,7 @@ def partitioned_kv_cache(
     tensor_parallel_size: int,
     ratio: float,
 ) -> tuple[int, dict[str, int]]:
-    config = normalize(config)
+    config = cache_config(config)
     kinds = layer_kinds(config, include_shared=True)
     layers = {kind: kinds.count(kind) for kind in ("full", "sliding", "state", "none")}
     if not layers["full"] or not layers["sliding"] or layers["state"]:
@@ -602,7 +647,7 @@ def sglang_kv_cache(
     full_sliding_window_cache: bool = False,
     state_capacity: int = 1,
 ) -> tuple[int, dict[str, int]]:
-    config = normalize(config)
+    config = cache_config(config)
     kinds = layer_kinds(config)
     if not config.get("linear_num_value_heads") or "state" not in kinds:
         return kv_cache(

@@ -20,7 +20,10 @@ OFFLOADED = re.compile(
     r"(?:\.engram\.embed\.(?:weight|scale)|engram_tables\.\d+\.(?:weight|weight_scale_inv)"
     r"|\.ngram_embedding\.shard_\d+\.weight)$"
 )
-_EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(\d+)(?:\.|$)")
+_EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(?:(\d+)(?:\.|$))?")
+_QUANT_METADATA = re.compile(
+    r"(?:^|[._])(?:weight_(?:scale(?:_2|_inv)?|amax|outer_scale_denominator)|input_scale)$"
+)
 POOL_MIN_FILES: int | None = None
 # Sub-models loaded next to the main model, e.g. the audio tokenizer that decodes the generated speech
 AUXILIARY = ("audio_tokenizer", "speech_tokenizer", "audio_decoder", "vocoder", "codec")
@@ -81,18 +84,46 @@ async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
 Summary = tuple[dict[str, list[int]], dict[tuple[int, str], list[int]], dict[str, list[int]], dict[str, int]]
 
 
-def summarize(raw: bytes, quantization: dict[str, Any] | None = None) -> Summary:
+def summarize(
+    raw: bytes, quantization: dict[str, Any] | None = None, num_experts: int | None = None
+) -> Summary:
     dtypes: dict[str, list[int]] = {}
     experts: dict[tuple[int, str], list[int]] = {}
     offloaded: dict[str, list[int]] = {}
     largest: dict[str, int] = {}
+    tensors = json.loads(raw)
+    if not quantization:
+        declared = (tensors.get("__metadata__") or {}).get("quantization_config")
+        if isinstance(declared, str):
+            try:
+                declared = json.loads(declared)
+            except ValueError:
+                declared = None
+        quantization = declared if isinstance(declared, dict) else None
     quantization = quantization or {}
+    quantization = quantization.get("quantization") or quantization
+    formats = {}
+    for component in [quantization, *(value for value in quantization.values() if isinstance(value, dict))]:
+        for group in component.get("parameter_groups", []):
+            encoding = group.get("compute_dtype")
+            if encoding not in {"nvfp4", "mxfp8", "fp8"}:
+                continue
+            for name in group.get("tensors", []):
+                formats[name] = encoding
+                for suffix in ("_scale", "_scale_2", "_scale_inv", "_amax", "_outer_scale_denominator"):
+                    formats[name + suffix] = "metadata"
+    nvfp4 = quantization.get("quant_algo") == "NVFP4" or quantization.get("quant_method") == "nvfp4"
+    scaled = (
+        nvfp4
+        or quantization.get("quant_method") in {"fp8", "mxfp8"}
+        or quantization.get("quant_algo") in {"FP8", "MXFP8"}
+    )
     packed, scales = None, None
     if quantization.get("format") == "mxfp4-pack-quantized":
         packed, scales = "weight_packed", "weight_scale"
     elif quantization.get("quant_method") == "mxfp4":
         packed, scales = "_blocks", "_scales"
-    for tensor, info in json.loads(raw).items():
+    for tensor, info in tensors.items():
         if tensor == "__metadata__":
             continue
         start, end = info["data_offsets"]
@@ -108,6 +139,11 @@ def summarize(raw: bytes, quantization: dict[str, Any] | None = None) -> Summary
                 params, dtype = params * 2, "MXFP4"
             elif dtype == "F8_E8M0" and tensor.endswith(".scale"):
                 params, dtype = 0, "MXFP4"
+        elif nvfp4 or formats.get(tensor) == "nvfp4":
+            if dtype == "U8" and tensor.endswith((".weight", "_weight")):
+                params, dtype = params * 2, "NVFP4"
+        if formats.get(tensor) == "metadata" or (scaled and _QUANT_METADATA.search(tensor)):
+            params = 0
         if quantization.get("quant_method") == "fp8" and (
             dtype == "F8_E8M0"
             and tensor.endswith(".scale")
@@ -121,9 +157,18 @@ def summarize(raw: bytes, quantization: dict[str, Any] | None = None) -> Summary
         if not OFFLOADED.search(tensor):
             largest[dtype] = max(largest.get(dtype, 0), params)
         if expert:
-            entry = experts.setdefault((int(expert.group(1)), dtype), [0, 0])
-            entry[0] += params
-            entry[1] += end - start
+            if expert.group(1) is not None:
+                ids, divisor = [int(expert.group(1))], 1
+            elif num_experts and info["shape"] and info["shape"][0] == num_experts:
+                ids, divisor = range(num_experts), num_experts
+            else:
+                continue
+            if params % divisor or (end - start) % divisor:
+                continue
+            for index in ids:
+                entry = experts.setdefault((index, dtype), [0, 0])
+                entry[0] += params // divisor
+                entry[1] += (end - start) // divisor
     return dtypes, experts, offloaded, largest
 
 
@@ -222,6 +267,7 @@ async def read_components(
     skip_prefixes: tuple[str, ...] = (),
     tensor_metadata: dict[str, Any] | None = None,
     skipped_weights: dict[str, int] | None = None,
+    num_experts: int | None = None,
 ) -> tuple[dict[str, Weights], dict[str, dict[int, Weights]], Weights]:
     paths = sorted({p for ps in components.values() for p in ps})
     semaphore, probe = asyncio.Semaphore(32), [PROBE_SIZE]
@@ -263,9 +309,9 @@ async def read_components(
                     if name.endswith(("lm_head.weight", "model.embed_tokens.weight"))
                 }
             summaries[path] = (
-                await loop.run_in_executor(pool, summarize, raw, quantization)
+                await loop.run_in_executor(pool, summarize, raw, quantization, num_experts)
                 if pool
-                else summarize(raw, quantization)
+                else summarize(raw, quantization, num_experts)
             )
             if tensor_metadata is not None:
                 headers[path] = {k: v for k, v in json.loads(raw).items() if k != "__metadata__"}
@@ -402,13 +448,17 @@ def _int(config: dict[str, Any], *keys: str, minimum: int = 2) -> int | None:
     return next((v for k in keys if type(v := config.get(k)) is int and v >= minimum), None)
 
 
+def expert_count(config: dict[str, Any]) -> int | None:
+    return _int(config, "num_local_experts", "n_routed_experts", "num_experts", "moe_num_experts", minimum=1)
+
+
 def moe_breakdown(
     weights: Weights, experts: dict[int, Weights], config: dict[str, Any], warnings: list[str]
 ) -> MoE | None:
     if not experts:
         return None
     ids = sorted(experts)
-    count = _int(config, "num_local_experts", "n_routed_experts", "num_experts", "moe_num_experts")
+    count = expert_count(config)
     if count is not None and ids != list(range(count)):
         warnings.append(
             f"MoE breakdown skipped, as the expert indices in the weights ({len(ids)}) do not match the "
