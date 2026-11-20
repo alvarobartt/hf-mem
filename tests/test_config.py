@@ -19,6 +19,64 @@ def test_gqa() -> None:
     assert layers == {"full": 4, "sliding": 0, "state": 0, "none": 0}
 
 
+@pytest.mark.parametrize("passes", [1, 2, 4])
+@pytest.mark.parametrize("ranks", [1, 4])
+def test_repeated_layers_match_explicit_cache_slots(passes: int, ranks: int) -> None:
+    config = llama_config(
+        layer_types=["full_attention", "sliding_attention", "full_attention", "sliding_attention"],
+        sliding_window=128,
+        loop_config={"core_start": 1, "core_end": 3, "num_passes": passes},
+    )
+    kinds = config["layer_types"] + config["layer_types"][1:3] * (passes - 1)
+    explicit = {**config, "num_hidden_layers": len(kinds), "layer_types": kinds}
+    explicit.pop("loop_config")
+
+    result = _config.kv_cache(config, "BF16", 10000, 2, 64, ranks)
+
+    assert result == _config.kv_cache(explicit, "BF16", 10000, 2, 64, ranks)
+    assert result[1] == {"full": passes + 1, "sliding": passes + 1, "state": 0, "none": 0}
+    assert _config.partitioned_kv_cache(
+        config, "BF16", 10000, 2, 64, ranks, 0.5
+    ) == _config.partitioned_kv_cache(explicit, "BF16", 10000, 2, 64, ranks, 0.5)
+    assert _config.sglang_kv_cache(config, "BF16", 10000, 2, 64, ranks) == result
+
+
+def test_repeated_layer_cache_normalization_preserves_overrides_and_sharing() -> None:
+    config = llama_config(
+        layer_types=["full_attention", "sliding_attention", "full_attention", "sliding_attention"],
+        loop_config={"core_start": 1, "core_end": 3, "num_passes": 2},
+        per_layer_config={"1": {"head_dim": 64}},
+        indexer_types=["none", "none", "full", "none"],
+        kv_source_layers=[0, 0, 2, 3],
+        num_kv_shared_layers=1,
+    )
+
+    expanded = _config.cache_config(config)
+
+    assert expanded["num_hidden_layers"] == 6
+    assert expanded["per_layer_config"] == {1: {"head_dim": 64}, 4: {"head_dim": 64}}
+    assert expanded["indexer_types"] == ["none", "none", "full", "none", "none", "full"]
+    assert expanded["kv_sharing_modes"] == [None, "reuse", None, "reuse", "reuse", None]
+    assert expanded == _config.cache_config(expanded)
+    assert config["num_hidden_layers"] == 4 and config["loop_config"]["num_passes"] == 2
+    assert config["per_layer_config"] == {"1": {"head_dim": 64}}
+
+
+@pytest.mark.parametrize(
+    "loop",
+    [
+        {"core_start": -1, "core_end": 3, "num_passes": 2},
+        {"core_start": 1, "core_end": 5, "num_passes": 2},
+        {"core_start": 1, "core_end": 1, "num_passes": 2},
+        {"core_start": 1, "core_end": 3, "num_passes": 0},
+        {"core_start": True, "core_end": 3, "num_passes": 2},
+    ],
+)
+def test_invalid_repeated_layer_geometry_is_rejected(loop: dict[str, int]) -> None:
+    with pytest.raises(RuntimeError, match="Repeated layers require"):
+        kv(llama_config(loop_config=loop))
+
+
 def test_mla_caches_the_latent() -> None:
     config = llama_config(kv_lora_rank=512, qk_rope_head_dim=64)
     assert kv(config)[0] == 4 * 1024 * (512 + 64) * 2

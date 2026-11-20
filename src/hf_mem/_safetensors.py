@@ -21,6 +21,9 @@ OFFLOADED = re.compile(
     r"|\.ngram_embedding\.shard_\d+\.weight)$"
 )
 _EXPERT = re.compile(r"(?:^|\.)(?:local_|routed_)?experts?\.(?:(\d+)(?:\.|$))?")
+_QUANT_METADATA = re.compile(
+    r"(?:^|[._])(?:weight_(?:scale(?:_2|_inv)?|amax|outer_scale_denominator)|input_scale)$"
+)
 POOL_MIN_FILES: int | None = None
 # Sub-models loaded next to the main model, e.g. the audio tokenizer that decodes the generated speech
 AUXILIARY = ("audio_tokenizer", "speech_tokenizer", "audio_decoder", "vocoder", "codec")
@@ -98,7 +101,23 @@ def summarize(
                 declared = None
         quantization = declared if isinstance(declared, dict) else None
     quantization = quantization or {}
+    quantization = quantization.get("quantization") or quantization
+    formats = {}
+    for component in [quantization, *(value for value in quantization.values() if isinstance(value, dict))]:
+        for group in component.get("parameter_groups", []):
+            encoding = group.get("compute_dtype")
+            if encoding not in {"nvfp4", "mxfp8", "fp8"}:
+                continue
+            for name in group.get("tensors", []):
+                formats[name] = encoding
+                for suffix in ("_scale", "_scale_2", "_scale_inv", "_amax", "_outer_scale_denominator"):
+                    formats[name + suffix] = "metadata"
     nvfp4 = quantization.get("quant_algo") == "NVFP4" or quantization.get("quant_method") == "nvfp4"
+    scaled = (
+        nvfp4
+        or quantization.get("quant_method") in {"fp8", "mxfp8"}
+        or quantization.get("quant_algo") in {"FP8", "MXFP8"}
+    )
     packed, scales = None, None
     if quantization.get("format") == "mxfp4-pack-quantized":
         packed, scales = "weight_packed", "weight_scale"
@@ -120,25 +139,11 @@ def summarize(
                 params, dtype = params * 2, "MXFP4"
             elif dtype == "F8_E8M0" and tensor.endswith(".scale"):
                 params, dtype = 0, "MXFP4"
-        elif nvfp4:
+        elif nvfp4 or formats.get(tensor) == "nvfp4":
             if dtype == "U8" and tensor.endswith((".weight", "_weight")):
                 params, dtype = params * 2, "NVFP4"
-            elif tensor.endswith(
-                (
-                    ".weight_scale",
-                    "_weight_scale",
-                    ".weight_scale_2",
-                    "_weight_scale_2",
-                    ".weight_scale_inv",
-                    "_weight_scale_inv",
-                    ".weight_amax",
-                    "_weight_amax",
-                    "_weight_outer_scale_denominator",
-                    ".input_scale",
-                    "_input_scale",
-                )
-            ):
-                params = 0
+        if formats.get(tensor) == "metadata" or (scaled and _QUANT_METADATA.search(tensor)):
+            params = 0
         if quantization.get("quant_method") == "fp8" and (
             dtype == "F8_E8M0"
             and tensor.endswith(".scale")

@@ -27,6 +27,22 @@ def test_dense_model_with_kv_cache(tmp_path: Path) -> None:
     assert result.total == nbytes + some(result.kv_cache).bytes + some(result.overhead).bytes
 
 
+def test_repeated_layers_expand_cache_without_duplicating_stored_weights(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    config = llama_config(layer_types=["full_attention"] * 4)
+    write_json(str(tmp_path / "config.json"), config)
+    single = estimate(str(tmp_path))
+    config["loop_config"] = {"core_start": 1, "core_end": 3, "num_passes": 3}
+    write_json(str(tmp_path / "config.json"), config)
+
+    repeated = estimate(str(tmp_path))
+
+    assert repeated.weights == single.weights
+    assert some(repeated.kv_cache).bytes == 2 * some(single.kv_cache).bytes
+    assert some(repeated.kv_cache).layers == {"full": 8, "sliding": 0, "state": 0, "none": 0}
+    assert some(repeated.recommended_gpu_memory) > some(single.recommended_gpu_memory)
+
+
 def test_inkling2_config_estimates_the_decoder_and_local_layers(tmp_path: Path) -> None:
     # https://huggingface.co/thinkingmachines/Inkling-2-Small/blob/main/config.json
     config = json.loads((Path(__file__).parent / "fixtures" / "inkling2.json").read_text())
@@ -306,6 +322,62 @@ def test_quantization_declared_in_the_safetensors_header(tmp_path: Path, declare
         assert set(result.weights.dtypes) == {"U8", "F8_E4M3"}
 
 
+@pytest.mark.parametrize("standalone", [False, True])
+def test_mixed_precision_parameter_groups_preserve_bytes_and_count_packed_values(
+    tmp_path: Path, standalone: bool
+) -> None:
+    packed, floating = "model.layers.0.mlp.experts.w13_weight", "model.layers.1.mlp.experts.w13_weight"
+    nbytes = write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {
+            packed: ("U8", [4, 64, 16]),
+            packed + "_scale": ("F8_E4M3", [4, 64, 2]),
+            packed + "_amax": ("F32", [4]),
+            floating: ("F8_E4M3", [4, 64, 32]),
+            floating + "_scale": ("F8_E4M3", [4, 2, 1]),
+            floating + "_outer_scale_denominator": ("F32", [1]),
+            "model.norm.scale": ("BF16", [64]),
+            "model.buffer": ("U8", [3]),
+        },
+    )
+    quantization = {
+        "model": {
+            "parameter_groups": [
+                {"compute_dtype": "nvfp4", "output_dtype": "uint8", "tensors": [packed]},
+                {"compute_dtype": "mxfp8", "output_dtype": "float8_e4m3fn", "tensors": [floating]},
+                {"compute_dtype": "bfloat16", "tensors": ["model.norm.scale"]},
+            ]
+        }
+    }
+    config = llama_config(n_routed_experts=4)
+    if standalone:
+        write_json(str(tmp_path / "hf_quant_config.json"), quantization)
+    else:
+        config["quantization_config"] = quantization
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == nbytes
+    assert result.weights.params == 2 * 4 * 64 * 16 + 4 * 64 * 32 + 64 + 3
+    assert result.weights.dtypes["F8_E4M3"].params == 4 * 64 * 32
+    assert result.weights.dtypes["F32"].params == 0
+    assert some(result.moe).experts == 4
+    assert some(result.moe).expert.params == 2 * 64 * 16 + 64 * 32
+
+
+@pytest.mark.parametrize("contents", ["invalid", "[]"])
+def test_invalid_standalone_quantization_keeps_the_stored_weights(tmp_path: Path, contents: str) -> None:
+    nbytes = write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config())
+    (tmp_path / "hf_quant_config.json").write_text(contents)
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == nbytes
+    assert any("hf_quant_config.json" in warning for warning in result.warnings)
+
+
 @pytest.mark.parametrize(
     "quantization", [{"quant_method": "modelopt", "quant_algo": "NVFP4"}, {"quant_method": "nvfp4"}]
 )
@@ -478,6 +550,31 @@ def test_fp8_scales_are_storage_not_parameters(tmp_path: Path) -> None:
     assert result.weights.dtypes["F32"].bytes == 136
     assert some(result.offloaded).params == 64
     assert some(result.offloaded).bytes == 65
+
+
+def test_block_fp8_fused_experts_keep_unsigned_scales_out_of_parameter_counts(tmp_path: Path) -> None:
+    nbytes = write_safetensors(
+        str(tmp_path / "model.safetensors"),
+        {
+            "model.layers.0.mlp.experts.w13_weight": ("F8_E4M3", [4, 64, 32]),
+            "model.layers.0.mlp.experts.w13_weight_scale": ("U8", [4, 64, 1]),
+            "model.layers.0.attn.q_l2_clip.scale": ("BF16", [32]),
+            "model.buffer": ("U8", [3]),
+        },
+    )
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(n_routed_experts=4, quantization_config={"quant_method": "fp8", "scale_fmt": "ue8m0"}),
+    )
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == nbytes
+    assert result.weights.params == 4 * 64 * 32 + 32 + 3
+    assert result.weights.dtypes["U8"].params == 3
+    assert result.weights.dtypes["U8"].bytes == 4 * 64 + 3
+    assert some(result.moe).expert.params == 64 * 32
+    assert some(result.moe).expert.bytes == 64 * 32 + 64
 
 
 def test_pickle_weights_are_not_estimated(tmp_path: Path) -> None:

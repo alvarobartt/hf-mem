@@ -580,6 +580,18 @@ async def _estimate_safetensors(
             or (config.get("text_config") or {}).get("quantization_config")
             or {}
         )
+        if not quantization and "hf_quant_config.json" in files:
+            try:
+                declared = await source.json("hf_quant_config.json")
+                if not isinstance(declared, dict):
+                    raise ValueError("expected a JSON object")
+                quantization = declared
+            except (RuntimeError, ValueError) as error:
+                if isinstance(error, HubError) and error.status in {401, 403}:
+                    raise
+                warnings.append(
+                    f"Packed weight parameter counts may be incomplete, as `hf_quant_config.json` could not be read ({error})."
+                )
         prefixes = _safetensors.language_model_prefixes(config) if language_model_only else ()
         if language_model_only and prefixes:
             selected = {name: paths for name, paths in selected.items() if name not in _safetensors.AUXILIARY}
@@ -757,6 +769,7 @@ async def _estimate_safetensors(
         estimate.moe = _safetensors.moe_breakdown(
             estimate.components[name], experts.get(name, {}), text, warnings
         )
+    text = _config.cache_config(text)
     length = max_model_len or text.get("max_position_embeddings")
     if not isinstance(length, int):
         warnings.append(
