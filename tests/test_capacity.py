@@ -10,6 +10,59 @@ from hf_mem._render import markdown, table
 GIB = 1 << 30
 
 
+@pytest.mark.parametrize("engine", ["vllm", "sglang"])
+@pytest.mark.parametrize("gpu_memory", [None, "2x16", "8x16"])
+def test_hybrid_gpu_fit_with_explicit_layout_and_nested_state_dimensions(
+    tmp_path: Path, engine: str, gpu_memory: str | None
+) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    config = llama_config(
+        kv_lora_rank=32,
+        qk_rope_head_dim=8,
+        layer_types=["linear_attention", "deepseek_sparse_attention"] * 2,
+        linear_attn_config={
+            "full_attn_layers": [1, 3],
+            "kda_layers": [0, 2],
+            "num_heads": 4,
+            "head_dim": 16,
+            "short_conv_kernel_size": 4,
+        },
+    )
+    canonical = {
+        **config,
+        "linear_num_value_heads": 4,
+        "linear_num_key_heads": 4,
+        "linear_key_head_dim": 16,
+        "linear_value_head_dim": 16,
+        "linear_conv_kernel_dim": 4,
+        "mamba_ssm_dtype": "float32",
+    }
+    arguments = dict(
+        engine=engine,
+        gpu_memory=gpu_memory,
+        max_model_len=32768,
+        max_num_batched_tokens=128,
+        max_num_seqs=4,
+    )
+    write_json(
+        str(tmp_path / "config.json"),
+        {"architectures": ["LlamaForConditionalGeneration"], "text_config": canonical},
+    )
+    expected = estimate(str(tmp_path), **arguments)
+    write_json(
+        str(tmp_path / "config.json"),
+        {"architectures": ["LlamaForConditionalGeneration"], "text_config": config},
+    )
+
+    actual = estimate(str(tmp_path), **arguments)
+
+    assert actual.weights == expected.weights
+    assert actual.kv_cache == expected.kv_cache
+    assert actual.fit == expected.fit
+    assert actual.recommended_gpu_memory == expected.recommended_gpu_memory
+    assert actual.kv_cache is not None and actual.kv_cache.layers["state"] == 2
+
+
 @pytest.mark.parametrize("ranks", [1, 2, 8])
 @pytest.mark.parametrize("utilization", [0.5, 0.9, 1.0])
 @pytest.mark.parametrize("context", [0, GIB // 2, 4 * GIB])
