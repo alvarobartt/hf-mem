@@ -84,6 +84,42 @@ async def read_header(source: Any, path: str, probe: int = PROBE_SIZE) -> bytes:
 Summary = tuple[dict[str, list[int]], dict[tuple[int, str], list[int]], dict[str, list[int]], dict[str, int]]
 
 
+def _compressed_formats(tensors: dict[str, Any], quantization: dict[str, Any]) -> dict[str, str]:
+    groups = quantization.get("config_groups") or {}
+    encodings = {
+        "nvfp4-pack-quantized": "nvfp4",
+        "mxfp4-pack-quantized": "mxfp4",
+        "mxfp8-quantized": "mxfp8",
+        "float-quantized": "fp8",
+    }
+    formats = {}
+    for name in tensors:
+        module, _, parameter = name.rpartition(".")
+        if parameter not in {
+            "weight",
+            "weight_packed",
+            "weight_scale",
+            "weight_global_scale",
+            "input_global_scale",
+        } or module.endswith("norm"):
+            continue
+        if any(_matches(module, target) for target in quantization.get("ignore", [])):
+            continue
+        for group in groups.values():
+            encoding = encodings.get(group.get("format") or quantization.get("format"))
+            targets = group.get("targets") or []
+            if encoding and (
+                not targets or "Linear" in targets or any(_matches(module, target) for target in targets)
+            ):
+                formats[name] = encoding if parameter in {"weight", "weight_packed"} else "metadata"
+                break
+    return formats
+
+
+def _matches(module: str, target: str) -> bool:
+    return bool(re.match(target[3:], module)) if target.startswith("re:") else module == target
+
+
 def summarize(
     raw: bytes, quantization: dict[str, Any] | None = None, num_experts: int | None = None
 ) -> Summary:
@@ -102,7 +138,7 @@ def summarize(
         quantization = declared if isinstance(declared, dict) else None
     quantization = quantization or {}
     quantization = quantization.get("quantization") or quantization
-    formats = {}
+    formats = _compressed_formats(tensors, quantization)
     for component in [quantization, *(value for value in quantization.values() if isinstance(value, dict))]:
         for group in component.get("parameter_groups", []):
             encoding = group.get("compute_dtype")
@@ -129,7 +165,9 @@ def summarize(
         start, end = info["data_offsets"]
         params, dtype = math.prod(info["shape"]), info["dtype"]
         expert = _EXPERT.search(tensor) if "expert" in tensor else None
-        if packed and scales and dtype == "U8":
+        if formats.get(tensor) == "mxfp4" and dtype == "U8" and tensor.endswith(".weight_packed"):
+            params, dtype = params * 2, "MXFP4"
+        elif packed and scales and dtype == "U8" and not quantization.get("config_groups"):
             if tensor.endswith(packed):
                 params, dtype = params * 2, "MXFP4"
             elif tensor.endswith(scales):
@@ -140,7 +178,7 @@ def summarize(
             elif dtype == "F8_E8M0" and tensor.endswith(".scale"):
                 params, dtype = 0, "MXFP4"
         elif nvfp4 or formats.get(tensor) == "nvfp4":
-            if dtype == "U8" and tensor.endswith((".weight", "_weight")):
+            if dtype == "U8" and tensor.endswith((".weight", "_weight", ".weight_packed")):
                 params, dtype = params * 2, "NVFP4"
         if formats.get(tensor) == "metadata" or (scaled and _QUANT_METADATA.search(tensor)):
             params = 0

@@ -366,6 +366,81 @@ def test_mixed_precision_parameter_groups_preserve_bytes_and_count_packed_values
     assert some(result.moe).expert.params == 2 * 64 * 16 + 64 * 32
 
 
+@pytest.mark.parametrize("selectors", ["exact", "regex"])
+@pytest.mark.parametrize("nested", [False, True])
+def test_compressed_tensor_groups_count_mixed_packed_weights(
+    tmp_path: Path, selectors: str, nested: bool
+) -> None:
+    expert = "model.layers.0.mlp.experts.0.up_proj"
+    dense = "model.layers.0.self_attn.q_proj"
+    tensors = {
+        expert + ".weight_packed": ("U8", [32, 16]),
+        expert + ".weight_scale": ("F8_E4M3", [32, 2]),
+        expert + ".weight_global_scale": ("F32", [1]),
+        expert + ".input_global_scale": ("F32", [1]),
+        dense + ".weight": ("F8_E4M3", [32, 32]),
+        dense + ".weight_scale": ("U8", [32, 1]),
+        "model.buffer": ("U8", [7]),
+    }
+    nbytes = write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    quantization = {
+        "quant_method": "compressed-tensors",
+        "format": "mixed-precision",
+        "config_groups": {
+            "packed": {
+                "format": "nvfp4-pack-quantized",
+                "targets": [expert] if selectors == "exact" else [r"re:.*mlp\.experts\.\d+\."],
+            },
+            "floating": {
+                "format": "mxfp8-quantized",
+                "targets": [dense] if selectors == "exact" else [r"re:.*self_attn\."],
+            },
+        },
+    }
+    config = llama_config(n_routed_experts=1, quantization_config=quantization)
+    if nested:
+        config = {"architectures": ["LlamaForConditionalGeneration"], "text_config": config}
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == nbytes
+    assert result.weights.params == 2 * 32 * 16 + 32 * 32 + 7
+    assert result.weights.dtypes["NVFP4"].params == 1024
+    assert result.weights.dtypes["F8_E4M3"].params == 1024
+    assert result.weights.dtypes["F32"].params == 0
+    assert result.weights.dtypes["U8"].params == 7
+    assert some(result.moe).expert.params == 1024
+    assert some(result.moe).expert.bytes == 32 * 16 + 32 * 2 + 8
+
+
+@pytest.mark.parametrize("encoding", ["nvfp4", "mxfp4"])
+@pytest.mark.parametrize("target", ["Linear", "model.proj", "re:model\\.proj$"])
+@pytest.mark.parametrize("ignore", ["model.skip", "re:model\\.skip$"])
+def test_compressed_tensor_group_targets_and_ignores(
+    tmp_path: Path, encoding: str, target: str, ignore: str
+) -> None:
+    tensors = {}
+    for module in ["model.proj", "model.skip", "model.norm"]:
+        tensors[module + ".weight_packed"] = ("U8", [32, 16])
+        tensors[module + ".weight_scale"] = ("U8", [32, 1])
+    nbytes = write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    quantization = {
+        "quant_method": "compressed-tensors",
+        "format": encoding + "-pack-quantized",
+        "ignore": [ignore],
+        "config_groups": {"group": {"targets": [target]}},
+    }
+    write_json(str(tmp_path / "config.json"), llama_config(quantization_config=quantization))
+
+    result = estimate(str(tmp_path))
+
+    assert result.weights.bytes == nbytes == 1632
+    assert result.weights.params == 1024 + 2 * 544
+    assert result.weights.dtypes[encoding.upper()].params == 1024
+    assert result.weights.dtypes["U8"].params == 2 * 544
+
+
 @pytest.mark.parametrize("contents", ["invalid", "[]"])
 def test_invalid_standalone_quantization_keeps_the_stored_weights(tmp_path: Path, contents: str) -> None:
     nbytes = write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
@@ -468,8 +543,11 @@ def test_mxfp4_parameters_include_both_packed_values(
     assert "MXFP4" in table(result)
 
 
-@pytest.mark.parametrize("quantization", [{}, {"format": "pack-quantized"}])
-def test_u8_tensors_are_not_assumed_to_be_mxfp4(tmp_path: Path, quantization: dict[str, str]) -> None:
+@pytest.mark.parametrize(
+    "quantization",
+    [{}, {"format": "pack-quantized"}, {"config_groups": {"group": {"targets": ["Linear"]}}}],
+)
+def test_u8_tensors_are_not_assumed_to_be_mxfp4(tmp_path: Path, quantization: dict[str, Any]) -> None:
     write_safetensors(
         str(tmp_path / "model.safetensors"),
         {"layer.weight_packed": ("U8", [32, 16]), "layer.weight_scale": ("U8", [32, 1])},
