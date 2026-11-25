@@ -387,13 +387,39 @@ def kv_heads(config: dict[str, Any]) -> int:
     )
 
 
-def _compressed(config: dict[str, Any], max_model_len: int, batched_tokens: int) -> tuple[int, dict[str, int]]:
-    ratios: list[int] = config["compress_ratios"]
-    sources: list[int] = config["kv_source_layer_ids"]
+def _compressed(
+    config: dict[str, Any], max_model_len: int, batched_tokens: int, dtype: str, full_cache: bool
+) -> tuple[int, dict[str, int]]:
+    ratios: list[int] = config["compress_ratios"][: config.get("num_hidden_layers")]
+    sources: list[int] | None = config.get("kv_source_layer_ids")
     window = config.get("sliding_window") or 128
-    sliding = min(window - 1 + 2 * batched_tokens, max_model_len)
-    per_token = (DSV4_RECORD + DSV4_INDEX_RECORD) * sum(1 / ratios[i] for i in sources if ratios[i])
-    size = len(ratios) * _cdiv(sliding, 32) * 32 * DSV4_RECORD + per_token * max_model_len
+    sliding = max_model_len if full_cache else min(window - 1 + 2 * batched_tokens, max_model_len)
+    if sources is not None:
+        sources = [i for i in sources if 0 <= i < len(ratios)]
+        per_token = (DSV4_RECORD + DSV4_INDEX_RECORD) * sum(1 / ratios[i] for i in sources if ratios[i])
+        size = len(ratios) * _cdiv(sliding, 32) * 32 * DSV4_RECORD + per_token * max_model_len
+        return int(size), {"compressed": len(sources), "sliding": len(ratios), "full": 0, "state": 0, "none": 0}
+    sources = [i for i, ratio in enumerate(ratios) if ratio > 1]
+    dimension = config.get("head_dim") or config.get("kv_lora_rank") or 512
+    rope = config.get("qk_rope_head_dim") or 0
+    width = dimension * _BYTES.get(dtype, 2)
+    if _BYTES.get(dtype, 2) == 1:
+        width = dimension + rope + _cdiv(_cdiv(dimension - rope, 64), 8) * 8
+    size = len(ratios) * _cdiv(sliding, 32) * 32 * width
+    indexed = config.get("index_source_layer_ids")
+    if indexed is None:
+        indexed = [i for i in sources if ratios[i] == 4 and config.get("index_head_dim")]
+    for i in sources:
+        ratio = ratios[i]
+        compressed = _cdiv(_cdiv(max_model_len, ratio), BLOCK_SIZE) * BLOCK_SIZE
+        size += compressed * width
+        overlap = 1 + (ratio == 4)
+        retained = max_model_len if full_cache else min(overlap * ratio - 1 + 2 * batched_tokens, max_model_len)
+        states = _cdiv(retained, BLOCK_SIZE) * BLOCK_SIZE * 2 * overlap * 4
+        size += states * dimension
+        if i in indexed:
+            index = config.get("index_head_dim") or 128
+            size += compressed * (index + _cdiv(index, 128) * 4) + states * index
     return int(size), {"compressed": len(sources), "sliding": len(ratios), "full": 0, "state": 0, "none": 0}
 
 
@@ -550,8 +576,8 @@ def kv_cache(
         return int(attention) + _short_conv(
             config, _BYTES.get(dtype, 2), tensor_parallel_size
         ) * batch_size, layers
-    if config.get("compress_ratios") and config.get("kv_source_layer_ids") is not None:
-        size, counts = _compressed(config, max_model_len, batched_tokens)
+    if config.get("compress_ratios"):
+        size, counts = _compressed(config, max_model_len, batched_tokens, dtype, full_sliding_window_cache)
         return size * batch_size, counts
     heads: int = config["num_attention_heads"]
     cache_heads: int = config["num_key_value_heads"] or heads

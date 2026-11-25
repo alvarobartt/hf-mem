@@ -424,7 +424,8 @@ def test_global_attention_layers_use_their_own_kv_heads_and_head_dim() -> None:
     assert size == (131072 * 2 * 4 * 512 + 3 * sliding_tokens(1024, 131072) * 2 * 16 * 256) * 2
 
 
-def test_deepseek_v41_compressed_kv_cache() -> None:
+@pytest.mark.parametrize("auxiliary", [False, True])
+def test_deepseek_v41_compressed_kv_cache(auxiliary: bool) -> None:
     config = {
         "num_hidden_layers": 4,
         "num_attention_heads": 8,
@@ -437,12 +438,62 @@ def test_deepseek_v41_compressed_kv_cache() -> None:
         "index_source_layer_ids": [1, 2],
         "index_head_dim": 128,
     }
+    if auxiliary:
+        config["compress_ratios"].append(2)
+        config["kv_source_layer_ids"].append(4)
     size, layers = _config.kv_cache(config, "F8_E4M3", 4096, 1, batched_tokens=1024)
     sliding = 4 * _config._cdiv(127 + 2048, 32) * 32 * _config.DSV4_RECORD
     per_token = (_config.DSV4_RECORD + _config.DSV4_INDEX_RECORD) * 1.5
     assert size == int(sliding + per_token * 4096)
     assert layers["compressed"] == 2 and layers["sliding"] == 4
     assert _config.kv_dtype(config, "auto", Weights(), []) == "F8_E4M3"
+
+
+@pytest.mark.parametrize("ranks", [1, 2, 8])
+@pytest.mark.parametrize("batch", [1, 3])
+def test_unshared_compressed_cache_includes_compression_states(ranks: int, batch: int) -> None:
+    config = {
+        "num_hidden_layers": 3,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 1,
+        "hidden_size": 64,
+        "head_dim": 512,
+        "qk_rope_head_dim": 64,
+        "index_head_dim": 128,
+        "sliding_window": 128,
+        "compress_ratios": [4, 128, 0, 128],
+    }
+    size, layers = _config.kv_cache(config, "F8_E4M3", 32768, batch, 32, ranks)
+    longer, _ = _config.kv_cache(config, "F8_E4M3", 65536, batch, 32, ranks)
+    wider, _ = _config.kv_cache(config, "F8_E4M3", 32768, batch, 64, ranks)
+    half, _ = _config.kv_cache(config, "BF16", 32768, batch, 32, ranks)
+
+    assert size == 7956992 * ranks * batch
+    assert longer - size == 6014976 * ranks * batch
+    assert wider - size == 1029632 * ranks * batch
+    assert half == 11927552 * ranks * batch
+    assert layers == {"compressed": 2, "sliding": 3, "full": 0, "state": 0, "none": 0}
+    assert config["compress_ratios"] == [4, 128, 0, 128]
+
+
+def test_compressed_cache_honors_index_sources_and_full_retention() -> None:
+    config = {
+        "num_hidden_layers": 2,
+        "num_attention_heads": 8,
+        "num_key_value_heads": 1,
+        "hidden_size": 64,
+        "head_dim": 512,
+        "qk_rope_head_dim": 64,
+        "index_head_dim": 128,
+        "sliding_window": 128,
+        "compress_ratios": [4, 128],
+    }
+    indexed, _ = _config.kv_cache(config, "F8_E4M3", 32768, 1, 32)
+    plain, _ = _config.kv_cache({**config, "index_source_layer_ids": []}, "F8_E4M3", 32768, 1, 32)
+    full, _ = _config.kv_cache(config, "F8_E4M3", 32768, 1, 32, full_sliding_window_cache=True)
+
+    assert indexed - plain == 1245184
+    assert full > indexed
 
 
 def test_kimi_linear_attention_config() -> None:
