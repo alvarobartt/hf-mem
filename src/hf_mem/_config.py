@@ -97,16 +97,17 @@ def normalize(config: dict[str, Any]) -> dict[str, Any]:
                 value if value is not None else _DEFAULTS.get(str(config.get("model_type")), {}).get(key)
             )
     config = {**_DEFAULTS.get(str(config.get("model_type")), {}), **config}
-    if isinstance(linear := config.get("linear_attn_config"), dict) and config.get("layer_types") is None:
+    if isinstance(linear := config.get("linear_attn_config"), dict):
         full, heads, head_dim = (
             set(linear.get("full_attn_layers") or []),
             linear.get("num_heads"),
             linear.get("head_dim"),
         )
-        config["layer_types"] = [
-            "full_attention" if i + 1 in full else "linear_attention"
-            for i in range(config["num_hidden_layers"] or 0)
-        ]
+        if config.get("layer_types") is None:
+            config["layer_types"] = [
+                "full_attention" if i + 1 in full else "linear_attention"
+                for i in range(config["num_hidden_layers"] or 0)
+            ]
         for key, value in (
             ("linear_num_value_heads", heads),
             ("linear_num_key_heads", heads),

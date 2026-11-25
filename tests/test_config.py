@@ -467,6 +467,72 @@ def test_kimi_linear_attention_config() -> None:
     assert (layers["full"], layers["state"]) == (1, 3)
 
 
+@pytest.mark.parametrize("tp", [1, 2, 4, 8])
+def test_explicit_hybrid_layout_preserves_nested_recurrent_geometry(tp: int) -> None:
+    layout = ["linear_attention", "deepseek_sparse_attention", "linear_attention", "deepseek_sparse_attention"]
+    config = llama_config(
+        kv_lora_rank=32,
+        qk_rope_head_dim=8,
+        layer_types=layout,
+        linear_attn_config={
+            "full_attn_layers": [1, 3],
+            "kda_layers": [0, 2],
+            "num_heads": 4,
+            "head_dim": 16,
+            "short_conv_kernel_size": 4,
+        },
+    )
+    geometry = {
+        "linear_num_value_heads": 4,
+        "linear_num_key_heads": 4,
+        "linear_key_head_dim": 16,
+        "linear_value_head_dim": 16,
+        "linear_conv_kernel_dim": 4,
+        "mamba_ssm_dtype": "float32",
+    }
+
+    normalized = _config.normalize(config)
+
+    assert normalized["layer_types"] == layout
+    assert _config.layer_kinds(normalized) == ["state", "full", "state", "full"]
+    assert {key: normalized.get(key) for key in geometry} == geometry
+    assert _config._state(normalized, 2) == (3 * 4 * 16 * 3 * 2 + 4 * 16 * 16 * 4, 3)
+    assert _config.normalize(normalized) == normalized
+    assert "linear_num_value_heads" not in config
+    expected = {**config, **geometry}
+    assert _config.kv_cache(config, "BF16", 32768, 2, tensor_parallel_size=tp) == _config.kv_cache(
+        expected, "BF16", 32768, 2, tensor_parallel_size=tp
+    )
+    assert _config.sglang_kv_cache(
+        config, "BF16", 32768, 2, 128, tp, state_capacity=4
+    ) == _config.sglang_kv_cache(expected, "BF16", 32768, 2, 128, tp, state_capacity=4)
+
+
+def test_nested_recurrent_defaults_preserve_explicit_geometry() -> None:
+    config = llama_config(
+        layer_types=["linear_attention"] * 4,
+        linear_attn_config={"num_heads": 8, "head_dim": 32, "short_conv_kernel_size": 4},
+        linear_num_value_heads=2,
+        linear_num_key_heads=1,
+        linear_key_head_dim=8,
+        linear_value_head_dim=16,
+        linear_conv_kernel_dim=3,
+        mamba_ssm_dtype="bfloat16",
+    )
+
+    normalized = _config.normalize(config)
+
+    for key in (
+        "linear_num_value_heads",
+        "linear_num_key_heads",
+        "linear_key_head_dim",
+        "linear_value_head_dim",
+        "linear_conv_kernel_dim",
+        "mamba_ssm_dtype",
+    ):
+        assert normalized[key] == config[key]
+
+
 def test_indexer_cache_only_on_indexer_layers() -> None:
     base = {
         "num_hidden_layers": 4,
