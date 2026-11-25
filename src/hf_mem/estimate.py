@@ -233,7 +233,8 @@ def _mxfp4_padding(
     config: dict[str, Any], text: dict[str, Any], weights: Weights
 ) -> Callable[[int], int] | None:
     quantization = config.get("quantization_config") or text.get("quantization_config") or {}
-    if quantization.get("quant_method") != "mxfp4" and quantization.get("expert_dtype") != "fp4":
+    expert_dtype = quantization.get("expert_dtype") or config.get("expert_dtype") or text.get("expert_dtype")
+    if quantization.get("quant_method") != "mxfp4" and expert_dtype != "fp4":
         return None
     experts = sum(weights.dtypes[d].bytes for d in ("U8", "I8", "F8_E8M0", "MXFP4") if d in weights.dtypes)
     intermediate = text.get("moe_intermediate_size") or text.get("intermediate_size") or 0
@@ -592,6 +593,9 @@ async def _estimate_safetensors(
                 warnings.append(
                     f"Packed weight parameter counts may be incomplete, as `hf_quant_config.json` could not be read ({error})."
                 )
+        expert_dtype = config.get("expert_dtype") or (config.get("text_config") or {}).get("expert_dtype")
+        if expert_dtype:
+            quantization = {"expert_dtype": expert_dtype, **quantization}
         prefixes = _safetensors.language_model_prefixes(config) if language_model_only else ()
         if language_model_only and prefixes:
             selected = {name: paths for name, paths in selected.items() if name not in _safetensors.AUXILIARY}
