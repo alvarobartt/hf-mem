@@ -584,7 +584,11 @@ def test_gpt_oss_mxfp4_blocks_count_both_values(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("expert_dtype,params", [("fp4", 1024), ("fp8", 512)])
-def test_deepseek_fp4_experts_keep_the_fp8_weights(tmp_path: Path, expert_dtype: str, params: int) -> None:
+@pytest.mark.parametrize("field", ["config", "quantization_config"])
+@pytest.mark.parametrize("nested", [False, True])
+def test_fp4_expert_precision_keeps_the_fp8_weights(
+    tmp_path: Path, expert_dtype: str, params: int, field: str, nested: bool
+) -> None:
     write_safetensors(
         str(tmp_path / "model.safetensors"),
         {
@@ -594,8 +598,11 @@ def test_deepseek_fp4_experts_keep_the_fp8_weights(tmp_path: Path, expert_dtype:
             "layers.0.attn.wq.scale": ("F8_E8M0", [1, 1]),
         },
     )
-    quantization = {"quant_method": "fp8", "expert_dtype": expert_dtype}
-    write_json(str(tmp_path / "config.json"), llama_config(quantization_config=quantization))
+    config = llama_config(quantization_config={"quant_method": "fp8"})
+    (config if field == "config" else config["quantization_config"])["expert_dtype"] = expert_dtype
+    if nested:
+        config = {"architectures": ["LlamaForConditionalGeneration"], "text_config": config}
+    write_json(str(tmp_path / "config.json"), config)
 
     result = estimate(str(tmp_path))
 
