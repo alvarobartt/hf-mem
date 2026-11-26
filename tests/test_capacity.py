@@ -10,6 +10,58 @@ from hf_mem._render import markdown, table
 GIB = 1 << 30
 
 
+@pytest.mark.parametrize("engine,static", [("vllm", None), ("sglang", None), ("sglang", 0.858)])
+@pytest.mark.parametrize("fused", [False, True])
+def test_fused_packed_weight_allocations_follow_the_allocator_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, engine: str, static: float | None, fused: bool
+) -> None:
+    tensors = llama_tensors()
+    for layer in range(2):
+        names = (
+            {"gate_up_proj": 5760, "down_proj": 2880}
+            if fused
+            else {"gate_proj": 2880, "up_proj": 2880, "down_proj": 2880}
+        )
+        for name, width in names.items():
+            prefix = f"model.layers.{layer}.mlp.experts.{name}"
+            tensors[prefix + "_blocks"] = ("U8", [2, width, 90, 16])
+            tensors[prefix + "_scales"] = ("U8", [2, width, 90])
+    write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(
+            num_hidden_layers=2,
+            hidden_size=2880,
+            intermediate_size=2880,
+            num_local_experts=2,
+            quantization_config={"quant_method": "mxfp4"},
+        ),
+    )
+    arguments = dict(
+        engine=engine,
+        gpu_memory="95",
+        gpu_type="nvidia-rtx-pro-6000",
+        mem_fraction_static=static,
+    )
+    monkeypatch.delenv("PYTORCH_ALLOC_CONF", raising=False)
+    monkeypatch.delenv("PYTORCH_CUDA_ALLOC_CONF", raising=False)
+    native = estimate(str(tmp_path), **arguments)
+    monkeypatch.setenv(
+        "PYTORCH_ALLOC_CONF" if static is None else "PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True"
+    )
+    expandable = estimate(str(tmp_path), **arguments)
+
+    assert native.weights == expandable.weights
+    assert native.kv_cache == expandable.kv_cache
+    assert native.recommended_gpu_memory is not None and expandable.recommended_gpu_memory is not None
+    if engine == "sglang" and fused:
+        assert native.total > expandable.total
+        assert native.recommended_gpu_memory > expandable.recommended_gpu_memory
+    else:
+        assert native.total == expandable.total
+        assert native.recommended_gpu_memory == expandable.recommended_gpu_memory
+
+
 @pytest.mark.parametrize("engine", ["vllm", "sglang"])
 @pytest.mark.parametrize(
     "quantization,ranks",
