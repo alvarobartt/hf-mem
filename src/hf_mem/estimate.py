@@ -785,17 +785,18 @@ async def _estimate_safetensors(
     profile_memory = gpu_memory
     estimate.mem_fraction_static = mem_fraction_static
     tokens = _overhead.batched_tokens(profile_memory, max_num_batched_tokens, gpu_type, engine)
-    if (
-        max_num_batched_tokens is None
-        and engine == "vllm"
-        and gpu_type is None
-        and gpu_memory
-        and 70 <= _overhead.parse_gpu_memory(gpu_memory)[1] / _overhead.GIB < 90
-    ):
-        warnings.append(
-            "vLLM batches 8192 tokens on GPUs with 70 GiB or more except on A100s, which use 2048, so set "
-            "`--max-num-batched-tokens 2048` for an A100."
+    if gpu_memory and gpu_type is None:
+        warning = (
+            "GPU runtime defaults are inferred from memory capacity. GPUs with similar capacity can use different "
+            "scheduler defaults and kernels; `--gpu-type` selects a hardware profile."
         )
+        if (
+            max_num_batched_tokens is None
+            and engine == "vllm"
+            and 70 <= _overhead.parse_gpu_memory(gpu_memory)[1] / _overhead.GIB < 90
+        ):
+            warning += " For an A100, set `--gpu-type nvidia-a100` or `--max-num-batched-tokens 2048`."
+        warnings.append(warning)
 
     full_sliding_window_cache = full_sliding_window_cache or (
         engine == "sglang" and text.get("model_type") == "gemma3_text"
@@ -965,6 +966,21 @@ async def _estimate_safetensors(
         startup_reserve=startup,
         capacity_at_context=static_capacity if mem_fraction_static is not None else None,
     )
+    ranks = (estimate.fit.gpus or 1) if estimate.fit is not None else 1
+    block = quantization.get("weight_block_size") or []
+    alignment = block[0] if isinstance(block, list) and block else 0
+    if not alignment and (
+        "MXFP4" in weights.dtypes
+        or quantization.get("quant_method") == "mxfp4"
+        or quantization.get("expert_dtype") == "fp4"
+    ):
+        alignment = 128
+    intermediate = text.get("moe_intermediate_size") or text.get("intermediate_size") or 0
+    if ranks > 1 and isinstance(alignment, int) and alignment > 0 and intermediate % (ranks * alignment):
+        warnings.append(
+            f"The {intermediate}-wide quantized projection at TP={ranks} does not split into whole "
+            f"{alignment}-value blocks. An estimated byte fit does not guarantee that the engine supports this partition."
+        )
     return estimate
 
 

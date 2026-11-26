@@ -11,6 +11,41 @@ GIB = 1 << 30
 
 
 @pytest.mark.parametrize("engine", ["vllm", "sglang"])
+@pytest.mark.parametrize(
+    "quantization,ranks",
+    [({"quant_method": "fp8", "weight_block_size": [128, 128]}, 8), ({"quant_method": "mxfp4"}, 4)],
+)
+def test_quantized_partition_warning_preserves_byte_fit(
+    tmp_path: Path, engine: str, quantization: dict[str, Any], ranks: int
+) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    config = llama_config(intermediate_size=1280, quantization_config=quantization)
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path), engine=engine, gpu_memory=f"{ranks}x24", gpu_type="nvidia-l4")
+
+    assert result.fit is not None and result.fit.fits
+    assert any(f"TP={ranks}" in warning and "128-value blocks" in warning for warning in result.warnings)
+    config["intermediate_size"] = 2048
+    write_json(str(tmp_path / "config.json"), config)
+    aligned = estimate(str(tmp_path), engine=engine, gpu_memory=f"{ranks}x24", gpu_type="nvidia-l4")
+    assert not any("supports this partition" in warning for warning in aligned.warnings)
+
+
+def test_capacity_only_profiles_are_optional_and_identified(tmp_path: Path) -> None:
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), llama_config())
+
+    generic = estimate(str(tmp_path))
+    capacity = estimate(str(tmp_path), gpu_memory="95")
+    hardware = estimate(str(tmp_path), gpu_memory="95", gpu_type="nvidia-rtx-pro-6000")
+
+    assert not any("inferred from memory capacity" in warning for warning in generic.warnings)
+    assert any("inferred from memory capacity" in warning for warning in capacity.warnings)
+    assert not any("inferred from memory capacity" in warning for warning in hardware.warnings)
+
+
+@pytest.mark.parametrize("engine", ["vllm", "sglang"])
 @pytest.mark.parametrize("gpu_memory", [None, "2x16", "8x16"])
 def test_hybrid_gpu_fit_with_explicit_layout_and_nested_state_dimensions(
     tmp_path: Path, engine: str, gpu_memory: str | None
