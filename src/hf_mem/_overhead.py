@@ -201,7 +201,7 @@ def _capacity_gib(gpu_memory: str | None, gpu_type: str | None) -> float:
 
 def graph_capacity(gpu_memory: str | None, gpu_type: str | None, ranks: int, engine: str) -> int:
     if engine == "vllm":
-        return 256
+        return 512
     size = _capacity_gib(gpu_memory, gpu_type)
     if size < 20:
         return 8
@@ -403,6 +403,7 @@ def decoder(
         default=hidden,
     )
     activation_width = (hidden + max(hidden, query_width / n)) / 2
+    streams = max(1, config.get("hc_mult") or 1)
     gdn = hybrid and bool(config.get("linear_num_value_heads"))
     if engine == "sglang" and (not hopper or gdn):
         activations = 0.9 * GIB + tokens * (32 * activation_width + 2.6 * intermediate / n) + logits
@@ -419,6 +420,17 @@ def decoder(
         else:
             activations = small + fraction * (large - small)
         activations += logits
+    activations += tokens * hidden * (streams - 1) * 4
+    buffers = position_buffers(config)
+    if config.get("compress_ratios") and engine == "vllm":
+        ratios = [ratio for ratio in config["compress_ratios"][: layers or None] if ratio > 0]
+        if ratios:
+            keys = math.ceil(context_length / min(ratios))
+            buffers += min(tokens, 4) * (keys + (config.get("sliding_window") or 0) + tokens) * head_dim * 2
+            if config.get("index_head_dim"):
+                activations += min(tokens, capacity) * keys * 4
+        if streams > 1:
+            graphs = max(graphs, 4 * layers * bounded_capacity * (hidden * streams + intermediate / n))
     if engine == "vllm":
         communication = 1.0 if hopper else 0.65 if fast else 0.1
     else:
@@ -459,7 +471,7 @@ def decoder(
         int(max(0, graphs)),
         int(non_torch + context + communication + (capacity + 1) * context_length * 4 * (engine == "sglang")),
         int(context),
-        buffers=position_buffers(config),
+        buffers=int(buffers),
         max_num_seqs=capacity,
         reference_engine=engine,
         gpu_type=gpu_type_name(gpu_type) if gpu_type is not None else None,

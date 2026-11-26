@@ -617,7 +617,12 @@ async def _estimate_safetensors(
         prefixes = _safetensors.language_model_prefixes(config) if language_model_only else ()
         if language_model_only and prefixes:
             selected = {name: paths for name, paths in selected.items() if name not in _safetensors.AUXILIARY}
-        tensor_metadata: dict[str, Any] | None = {} if engine == "sglang" and inkling else None
+        tensor_metadata: dict[str, Any] | None = (
+            {}
+            if (engine == "sglang" and inkling)
+            or (_config.text_config(config) or config).get("compress_ratios")
+            else None
+        )
         skipped_weights: dict[str, int] = {}
         components, experts, offloaded = await _safetensors.read_components(
             source,
@@ -800,6 +805,11 @@ async def _estimate_safetensors(
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
     dtype = _config.kv_dtype(text, kv_dtype, weights, warnings)
+    if text.get("compress_ratios"):
+        warnings.append(
+            "Compressed-attention page pools and workspace reservations vary by engine and are not fully "
+            "represented by checkpoint metadata; validate an estimated fit with the selected engine."
+        )
     profile_memory = gpu_memory
     estimate.mem_fraction_static = mem_fraction_static
     tokens = _overhead.batched_tokens(profile_memory, max_num_batched_tokens, gpu_type, engine)
@@ -849,12 +859,20 @@ async def _estimate_safetensors(
             )
         return _config.kv_cache(cache_text, dtype, length, batch_size, tokens, n, full_sliding_window_cache)
 
+    replicated = (
+        _safetensors.replicated_attention_bytes(tensor_metadata or {}) if text.get("compress_ratios") else 0
+    )
+
     def weight_adjustment(n: int) -> int:
-        return _safetensors.inkling_weight_adjustment(
-            tensor_metadata or {},
-            n,
-            _safetensors.language_model_prefixes(config),
-            marlin=_overhead.hardware(profile_memory, gpu_type)[2],
+        return (n - 1) * replicated + (
+            _safetensors.inkling_weight_adjustment(
+                tensor_metadata or {},
+                n,
+                _safetensors.language_model_prefixes(config),
+                marlin=_overhead.hardware(profile_memory, gpu_type)[2],
+            )
+            if inkling and engine == "sglang"
+            else 0
         )
 
     size, layers = cache(length)
@@ -933,7 +951,7 @@ async def _estimate_safetensors(
         )
         if tensor_metadata is not None:
             result.weight_adjustment = math.ceil(weight_adjustment(n) / n)
-            if _overhead.hardware(profile_memory, gpu_type)[2]:
+            if inkling and engine == "sglang" and _overhead.hardware(profile_memory, gpu_type)[2]:
                 blocks = math.ceil(text["num_hidden_layers"] / text["n_layers_per_attn_res_block"])
                 routed = text.get("num_experts_per_tok") or 1
                 prefill_pool = 0.30 * _overhead.GIB + tokens * text["hidden_size"] * (

@@ -6,12 +6,6 @@ from hf_mem._weights import Weights
 KV_CACHE_DTYPES = ["auto", "bfloat16", "float16", "fp8", "fp8_ds_mla", "fp8_e4m3", "fp8_e5m2", "fp8_inc"]
 MAX_NUM_BATCHED_TOKENS = 8192
 BLOCK_SIZE = 16
-# DeepSeek-V4.1 in vLLM: packed FP8 (`fp8_ds_mla`) KV and indexer records per compressed token, fitted on vLLM 0.33
-DSV4_RECORD = 584
-DSV4_INDEX_RECORD = 148
-# FP8 indexer key scale of the DeepSeek-V3.2 and GLM-5 sparse attention indexers
-DSV4_INDEX_SCALE = 4
-
 _BYTES = {"F64": 8, "F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "FP8_DS_MLA": 1, "I8": 1}
 _TORCH = {
     "float32": "F32",
@@ -387,13 +381,57 @@ def kv_heads(config: dict[str, Any]) -> int:
     )
 
 
-def _compressed(config: dict[str, Any], max_model_len: int, batched_tokens: int) -> tuple[int, dict[str, int]]:
-    ratios: list[int] = config["compress_ratios"]
-    sources: list[int] = config["kv_source_layer_ids"]
+def _index_width(dimension: int) -> int:
+    return dimension + _cdiv(dimension, 128) * _BYTES["F32"]
+
+
+def _compressed_width(config: dict[str, Any], dtype: str) -> int:
+    rope = config.get("qk_rope_head_dim") or 0
+    dimension = (
+        config.get("head_dim")
+        or ((config["kv_lora_rank"] + rope) if config.get("kv_lora_rank") else 0)
+        or config["hidden_size"] // config["num_attention_heads"]
+    )
+    size = _BYTES.get(dtype, 2)
+    if size == 1:
+        return dimension + rope + _cdiv(_cdiv(dimension - rope, 64), 8) * 8
+    return int(dimension * size)
+
+
+def _compressed(
+    config: dict[str, Any], max_model_len: int, batched_tokens: int, dtype: str, full_cache: bool
+) -> tuple[int, dict[str, int]]:
+    ratios: list[int] = config["compress_ratios"][: config.get("num_hidden_layers")]
+    sources: list[int] | None = config.get("kv_source_layer_ids")
     window = config.get("sliding_window") or 128
-    sliding = min(window - 1 + 2 * batched_tokens, max_model_len)
-    per_token = (DSV4_RECORD + DSV4_INDEX_RECORD) * sum(1 / ratios[i] for i in sources if ratios[i])
-    size = len(ratios) * _cdiv(sliding, 32) * 32 * DSV4_RECORD + per_token * max_model_len
+    sliding = max_model_len if full_cache else min(window - 1 + 2 * batched_tokens, max_model_len)
+    shared = sources is not None
+    sources = (
+        [i for i in sources if 0 <= i < len(ratios) and ratios[i] > 0]
+        if sources is not None
+        else [i for i, ratio in enumerate(ratios) if ratio > 1]
+    )
+    width = _compressed_width(config, dtype)
+    dimension = _compressed_width(config, "BF16") // 2
+    size = len(ratios) * _cdiv(sliding, 32) * 32 * width
+    indexed = config.get("index_source_layer_ids")
+    if indexed is None:
+        indexed = [i for i in sources if (shared or ratios[i] == 4) and config.get("index_head_dim")]
+    index = config.get("index_head_dim") or 0
+    for i in sources:
+        ratio = ratios[i]
+        compressed = _cdiv(_cdiv(max_model_len, ratio), BLOCK_SIZE) * BLOCK_SIZE
+        size += compressed * width
+        if i in indexed:
+            size += compressed * _index_width(index)
+        if shared:
+            continue
+        overlap = 1 + (ratio == 4)
+        retained = max_model_len if full_cache else min(overlap * ratio - 1 + 2 * batched_tokens, max_model_len)
+        states = _cdiv(retained, BLOCK_SIZE) * BLOCK_SIZE * 2 * overlap * 4
+        size += states * dimension
+        if i in indexed:
+            size += states * index
     return int(size), {"compressed": len(sources), "sliding": len(ratios), "full": 0, "state": 0, "none": 0}
 
 
@@ -420,7 +458,7 @@ def _packed_mla(
         if dtype == "FP8_DS_MLA"
         else (rank + rope) * _BYTES.get(dtype, 2)
     )
-    row_token = full * (token + config["index_head_dim"] + DSV4_INDEX_SCALE)
+    row_token = full * (token + _index_width(config["index_head_dim"]))
     state_bytes, pages = _state(config, 2)
     state_bytes = _cdiv(state_bytes, tensor_parallel_size)
     groups = _cdiv(state, full)
@@ -431,7 +469,7 @@ def _packed_mla(
     row = block * row_token
     if block > 64:
         # Both cache views must split into whole 64-token kernel pages within the shared row.
-        alignment = lcm(64 * token, 64 * (config["index_head_dim"] + DSV4_INDEX_SCALE))
+        alignment = lcm(64 * token, 64 * _index_width(config["index_head_dim"]))
         row = _cdiv(row, alignment) * alignment
     size = row * (_cdiv(length, block) + groups * pages)
     layers = {"full": full, "sliding": 0, "state": state, "none": len(kinds) - full - state}
@@ -550,8 +588,8 @@ def kv_cache(
         return int(attention) + _short_conv(
             config, _BYTES.get(dtype, 2), tensor_parallel_size
         ) * batch_size, layers
-    if config.get("compress_ratios") and config.get("kv_source_layer_ids") is not None:
-        size, counts = _compressed(config, max_model_len, batched_tokens)
+    if config.get("compress_ratios"):
+        size, counts = _compressed(config, max_model_len, batched_tokens, dtype, full_sliding_window_cache)
         return size * batch_size, counts
     heads: int = config["num_attention_heads"]
     cache_heads: int = config["num_key_value_heads"] or heads
@@ -575,9 +613,7 @@ def kv_cache(
     if index := config.get("index_head_dim"):
         types = config.get("indexer_types")
         indexed = types.count("full") if isinstance(types, list) else len(layer_kinds(config))
-        indexer = (
-            indexed * _cdiv(max_model_len, BLOCK_SIZE) * BLOCK_SIZE * (index + DSV4_INDEX_SCALE) * batch_size
-        )
+        indexer = indexed * _cdiv(max_model_len, BLOCK_SIZE) * BLOCK_SIZE * _index_width(index) * batch_size
     kinds = layer_kinds(config)
     full, sliding, state = kinds.count("full"), kinds.count("sliding"), kinds.count("state")
     layers = {"full": full, "sliding": sliding, "state": state, "none": len(kinds) - full - sliding - state}

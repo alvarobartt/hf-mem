@@ -240,13 +240,59 @@ def test_scheduler_capacity_scales_overhead_without_removing_fixed_memory() -> N
     reference = _overhead.decoder(config, False, False, 8192, encoder_bytes=GIB, max_num_seqs=1024)
     one = _overhead.decoder(config, False, False, 8192, encoder_bytes=GIB, max_num_seqs=1)
     many = _overhead.decoder(config, False, False, 8192, encoder_bytes=GIB, max_num_seqs=256)
-    assert reference.bytes == default.bytes
+    assert reference.bytes > default.bytes
     assert one.activations < many.activations == default.activations
     assert 0 < one.graphs < many.graphs == default.graphs
     assert one.runtime >= one.context == many.context == default.context
     assert one.encoder == many.encoder == default.encoder == GIB
     assert default.to_dict()["max_num_seqs"] == 256
     assert one.to_dict()["max_num_seqs"] == 1
+
+
+@pytest.mark.parametrize("dimension", [128, 256])
+@pytest.mark.parametrize("ranks", [1, 4])
+def test_compressed_attention_workspace_grows_with_context(dimension: int, ranks: int) -> None:
+    config = {
+        "num_hidden_layers": 8,
+        "num_attention_heads": 16,
+        "hidden_size": 1024,
+        "head_dim": dimension,
+        "compress_ratios": [4, 32] * 4,
+        "index_head_dim": 64,
+        "sliding_window": 128,
+    }
+    options: dict[str, Any] = dict(
+        moe=False, hybrid=False, tokens=2048, tensor_parallel_size=ranks, max_num_seqs=128
+    )
+    short = _overhead.decoder(config, context_length=16384, **options)
+    long = _overhead.decoder(config, context_length=65536, **options)
+    streams = _overhead.decoder({**config, "hc_mult": 4}, context_length=65536, **options)
+    auxiliary = _overhead.decoder(
+        {**config, "compress_ratios": [*config["compress_ratios"], 1]}, context_length=65536, **options
+    )
+
+    assert long.buffers - short.buffers == 4 * (65536 - 16384) // 4 * dimension * 2
+    assert long.activations - short.activations == 128 * (65536 - 16384) // 4 * 4
+    assert streams.activations > long.activations
+    assert streams.graphs >= long.graphs
+    assert auxiliary == long
+
+
+def test_wide_residual_streams_reserve_graph_storage() -> None:
+    config = {
+        "num_hidden_layers": 16,
+        "num_attention_heads": 32,
+        "hidden_size": 4096,
+        "head_dim": 128,
+        "compress_ratios": [4, 32] * 8,
+    }
+    options: dict[str, Any] = dict(
+        moe=False, hybrid=False, tokens=8192, gpu_type="nvidia-h200", max_num_seqs=1024
+    )
+    single = _overhead.decoder(config, **options)
+    streams = _overhead.decoder({**config, "hc_mult": 4}, **options)
+
+    assert streams.graphs > single.graphs
 
 
 def test_fit_recomputes_overhead_for_gpu_search_and_context_fit() -> None:

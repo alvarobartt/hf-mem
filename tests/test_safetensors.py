@@ -75,6 +75,46 @@ def test_kv_cache_options(tmp_path: Path) -> None:
         estimate(str(tmp_path), kv_cache_dtype="Q4_K")
 
 
+@pytest.mark.parametrize("engine", ["vllm", "sglang"])
+@pytest.mark.parametrize("compressed", [False, True])
+def test_compressed_cache_fit_warns_about_runtime_reservations(
+    tmp_path: Path, engine: str, compressed: bool
+) -> None:
+    config = llama_config()
+    if compressed:
+        config.update(compress_ratios=[4, 128, 4, 128], index_head_dim=32)
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path), engine=engine, gpu_memory="80", gpu_type="nvidia-h100")
+
+    assert some(result.fit).fits
+    assert any("page pools and workspace reservations" in warning for warning in result.warnings) == compressed
+
+
+@pytest.mark.parametrize("engine", ["vllm", "sglang"])
+def test_compressed_attention_projections_are_replicated_across_ranks(tmp_path: Path, engine: str) -> None:
+    tensors = {
+        "model.layers.0.self_attn.q_a_proj.weight": ("BF16", [32, 64]),
+        "model.layers.0.self_attn.compressor.wkv.weight": ("BF16", [64, 64]),
+        "model.layers.0.self_attn.indexer.weights_proj.weight": ("BF16", [8, 64]),
+        "model.layers.0.mlp.gate.weight": ("BF16", [4, 64]),
+        "model.layers.0.input_layernorm.weight": ("BF16", [64]),
+        "model.layers.0.mlp.experts.0.gate_proj.weight": ("BF16", [128, 64]),
+    }
+    write_safetensors(str(tmp_path / "model.safetensors"), tensors)
+    write_json(
+        str(tmp_path / "config.json"),
+        llama_config(compress_ratios=[4] * 4, head_dim=32, hidden_size=64),
+    )
+    single = estimate(str(tmp_path), engine=engine, gpu_memory="1x80")
+    parallel = estimate(str(tmp_path), engine=engine, gpu_memory="4x80")
+
+    assert single.weights == parallel.weights
+    assert some(single.overhead).weight_adjustment == 0
+    assert some(parallel.overhead).weight_adjustment == 3 * 2 * (32 * 64 + 64 * 64 + 8 * 64 + 4 * 64 + 64)
+
+
 def test_sharded_model_uses_the_index(tmp_path: Path) -> None:
     tensors = list(llama_tensors().items())
     first = write_safetensors(str(tmp_path / "model-00001-of-00002.safetensors"), dict(tensors[:5]))
