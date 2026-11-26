@@ -425,28 +425,39 @@ def test_global_attention_layers_use_their_own_kv_heads_and_head_dim() -> None:
 
 
 @pytest.mark.parametrize("auxiliary", [False, True])
-def test_deepseek_v41_compressed_kv_cache(auxiliary: bool) -> None:
+@pytest.mark.parametrize(
+    "head,rope,index,dtype,width,index_width",
+    [(512, 64, 128, "F8_E4M3", 584, 132), (256, 32, 64, "F8_E4M3", 296, 68), (256, 32, 64, "BF16", 512, 68)],
+)
+def test_shared_compressed_kv_cache(
+    auxiliary: bool, head: int, rope: int, index: int, dtype: str, width: int, index_width: int
+) -> None:
     config = {
         "num_hidden_layers": 4,
         "num_attention_heads": 8,
         "num_key_value_heads": 1,
         "hidden_size": 64,
-        "kv_lora_rank": 512,
+        "head_dim": head,
+        "qk_rope_head_dim": rope,
         "sliding_window": 128,
         "compress_ratios": [0, 2, 1, 0],
         "kv_source_layer_ids": [1, 2],
         "index_source_layer_ids": [1, 2],
-        "index_head_dim": 128,
+        "index_head_dim": index,
     }
     if auxiliary:
         config["compress_ratios"].append(2)
         config["kv_source_layer_ids"].append(4)
-    size, layers = _config.kv_cache(config, "F8_E4M3", 4096, 1, batched_tokens=1024)
-    sliding = 4 * _config._cdiv(127 + 2048, 32) * 32 * _config.DSV4_RECORD
-    per_token = (_config.DSV4_RECORD + _config.DSV4_INDEX_RECORD) * 1.5
+    size, layers = _config.kv_cache(config, dtype, 4096, 1, batched_tokens=1024)
+    sliding = 4 * 2176 * width
+    per_token = (width + index_width) * 1.5
     assert size == int(sliding + per_token * 4096)
     assert layers["compressed"] == 2 and layers["sliding"] == 4
     assert _config.kv_dtype(config, "auto", Weights(), []) == "F8_E4M3"
+    without_index, _ = _config.kv_cache(
+        {**config, "index_source_layer_ids": []}, dtype, 4096, 1, batched_tokens=1024
+    )
+    assert size - without_index == index_width * 6144
 
 
 @pytest.mark.parametrize("ranks", [1, 2, 8])
@@ -584,7 +595,8 @@ def test_nested_recurrent_defaults_preserve_explicit_geometry() -> None:
         assert normalized[key] == config[key]
 
 
-def test_indexer_cache_only_on_indexer_layers() -> None:
+@pytest.mark.parametrize("index,width", [(64, 68), (128, 132), (256, 264)])
+def test_indexer_cache_only_on_indexer_layers(index: int, width: int) -> None:
     base = {
         "num_hidden_layers": 4,
         "num_attention_heads": 8,
@@ -593,15 +605,18 @@ def test_indexer_cache_only_on_indexer_layers() -> None:
         "qk_rope_head_dim": 64,
     }
     plain = _config.kv_cache(base, "BF16", 1024, 1)[0]
-    every = _config.kv_cache({**base, "index_head_dim": 128}, "BF16", 1024, 1)[0]
+    every = _config.kv_cache({**base, "index_head_dim": index}, "BF16", 1024, 1)[0]
     some_layers = _config.kv_cache(
-        {**base, "index_head_dim": 128, "indexer_types": ["full", "shared", "shared", "full"]}, "BF16", 1024, 1
+        {**base, "index_head_dim": index, "indexer_types": ["full", "shared", "shared", "full"]},
+        "BF16",
+        1024,
+        1,
     )[0]
-    assert every - plain == 4 * 1024 * 132 and some_layers - plain == 2 * 1024 * 132
+    assert every - plain == 4 * 1024 * width and some_layers - plain == 2 * 1024 * width
     dsa = _config.kv_cache(
-        {**base, "dsa_config": {"dsa_layers": [2, 4], "index_head_dim": 128}}, "BF16", 1024, 1
+        {**base, "dsa_config": {"dsa_layers": [2, 4], "index_head_dim": index}}, "BF16", 1024, 1
     )[0]
-    assert dsa - plain == 2 * 1024 * 132
+    assert dsa - plain == 2 * 1024 * width
     assert _config.kv_dtype({**base, "dsa_config": {}}, "auto", Weights(), []) == "FP8_DS_MLA"
     assert _config.kv_cache(base, "FP8_DS_MLA", 1024, 1)[0] == 4 * 1024 * 656
 
