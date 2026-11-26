@@ -75,6 +75,23 @@ def test_kv_cache_options(tmp_path: Path) -> None:
         estimate(str(tmp_path), kv_cache_dtype="Q4_K")
 
 
+@pytest.mark.parametrize("engine", ["vllm", "sglang"])
+@pytest.mark.parametrize("compressed", [False, True])
+def test_compressed_cache_fit_warns_about_runtime_reservations(
+    tmp_path: Path, engine: str, compressed: bool
+) -> None:
+    config = llama_config()
+    if compressed:
+        config.update(compress_ratios=[4, 128, 4, 128], index_head_dim=32)
+    write_safetensors(str(tmp_path / "model.safetensors"), llama_tensors())
+    write_json(str(tmp_path / "config.json"), config)
+
+    result = estimate(str(tmp_path), engine=engine, gpu_memory="80", gpu_type="nvidia-h100")
+
+    assert some(result.fit).fits
+    assert any("page pools and workspace reservations" in warning for warning in result.warnings) == compressed
+
+
 def test_sharded_model_uses_the_index(tmp_path: Path) -> None:
     tensors = list(llama_tensors().items())
     first = write_safetensors(str(tmp_path / "model-00001-of-00002.safetensors"), dict(tensors[:5]))

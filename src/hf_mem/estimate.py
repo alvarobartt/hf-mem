@@ -800,6 +800,11 @@ async def _estimate_safetensors(
         _fit(estimate, 0, 0.0, gpu_memory, utilization)
         return estimate
     dtype = _config.kv_dtype(text, kv_dtype, weights, warnings)
+    if text.get("compress_ratios"):
+        warnings.append(
+            "Compressed-attention page pools and workspace reservations vary by engine and are not fully "
+            "represented by checkpoint metadata; validate an estimated fit with the selected engine."
+        )
     profile_memory = gpu_memory
     estimate.mem_fraction_static = mem_fraction_static
     tokens = _overhead.batched_tokens(profile_memory, max_num_batched_tokens, gpu_type, engine)
