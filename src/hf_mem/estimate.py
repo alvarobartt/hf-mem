@@ -229,18 +229,36 @@ def _fit(
         estimate.overhead.weight_adjustment += estimate.fit.required - estimate.total
 
 
-def _mxfp4_padding(
-    config: dict[str, Any], text: dict[str, Any], weights: Weights
+def _packed_weight_overhead(
+    config: dict[str, Any], text: dict[str, Any], weights: Weights, engine: str
 ) -> Callable[[int], int] | None:
     quantization = config.get("quantization_config") or text.get("quantization_config") or {}
     expert_dtype = quantization.get("expert_dtype") or config.get("expert_dtype") or text.get("expert_dtype")
-    if quantization.get("quant_method") != "mxfp4" and expert_dtype != "fp4":
+    if quantization.get("quant_method") != "mxfp4" and expert_dtype != "fp4" and "MXFP4" not in weights.dtypes:
         return None
     experts = sum(weights.dtypes[d].bytes for d in ("U8", "I8", "F8_E8M0", "MXFP4") if d in weights.dtypes)
     intermediate = text.get("moe_intermediate_size") or text.get("intermediate_size") or 0
     if not experts or not intermediate or not text.get("hidden_size"):
         return None
-    return _overhead.mxfp4_padding(experts, intermediate, text["hidden_size"])
+    padding = _overhead.mxfp4_padding(experts, intermediate, text["hidden_size"])
+    packed = weights.dtypes.get("MXFP4")
+    layers = text.get("num_hidden_layers") or 1
+    allocator = (
+        (os.getenv("PYTORCH_ALLOC_CONF") or os.getenv("PYTORCH_CUDA_ALLOC_CONF") or "").replace(" ", "").lower()
+    )
+    retain = (
+        engine == "sglang"
+        and packed is not None
+        and packed.params > 0
+        and packed.largest * 3 * layers >= packed.params * 2
+        and "expandable_segments:true" not in allocator
+    )
+
+    def extra(ranks: int) -> int:
+        size = padding(ranks)
+        return size + (max(0, experts - size) // 3 if retain else 0)
+
+    return extra
 
 
 async def _estimate_gguf(
@@ -931,7 +949,7 @@ async def _estimate_safetensors(
 
     def static_capacity(n: int, context_length: int) -> int:
         reserved = overhead(n, context_length)
-        padding = _mxfp4_padding(config, text, weights)
+        padding = _packed_weight_overhead(config, text, weights, engine)
         static = weights.bytes + cache(context_length, n)[0] + (padding(n) if padding else 0)
         static += n * (reserved.buffers + reserved.weight_adjustment)
         return math.ceil(static / (mem_fraction_static or 1)) + n * reserved.context
@@ -959,7 +977,7 @@ async def _estimate_safetensors(
         gpu_memory,
         utilization,
         _config.kv_heads(text),
-        _mxfp4_padding(config, text, weights),
+        _packed_weight_overhead(config, text, weights, engine),
         lambda length, n: cache(length, n)[0],
         overhead,
         lambda n, length: overhead(n, length).bytes,
