@@ -449,6 +449,27 @@ async def read_components(
     return weights, experts, offloaded
 
 
+def replicated_attention_bytes(tensors: dict[str, Any]) -> int:
+    return sum(
+        info["data_offsets"][1] - info["data_offsets"][0]
+        for name, info in tensors.items()
+        if any(
+            part in "." + name
+            for part in (
+                ".compressor.",
+                ".indexer.",
+                ".wq_a.",
+                ".wkv.",
+                ".q_a_proj.",
+                ".kv_a_proj_with_mqa.",
+                ".gate.",
+                ".hc_",
+            )
+        )
+        or (len(info["shape"]) == 1 and name.endswith(".weight"))
+    )
+
+
 def inkling_weight_adjustment(
     tensors: dict[str, Any], ranks: int, encoder_prefixes: tuple[str, ...], marlin: bool = True
 ) -> int:
