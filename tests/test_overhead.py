@@ -267,11 +267,15 @@ def test_compressed_attention_workspace_grows_with_context(dimension: int, ranks
     short = _overhead.decoder(config, context_length=16384, **options)
     long = _overhead.decoder(config, context_length=65536, **options)
     streams = _overhead.decoder({**config, "hc_mult": 4}, context_length=65536, **options)
+    auxiliary = _overhead.decoder(
+        {**config, "compress_ratios": [*config["compress_ratios"], 1]}, context_length=65536, **options
+    )
 
     assert long.buffers - short.buffers == 4 * (65536 - 16384) // 4 * dimension * 2
     assert long.activations - short.activations == 128 * (65536 - 16384) // 4 * 4
     assert streams.activations > long.activations
     assert streams.graphs >= long.graphs
+    assert auxiliary == long
 
 
 def test_wide_residual_streams_reserve_graph_storage() -> None:

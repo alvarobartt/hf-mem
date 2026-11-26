@@ -423,7 +423,7 @@ def decoder(
     activations += tokens * hidden * (streams - 1) * 4
     buffers = position_buffers(config)
     if config.get("compress_ratios") and engine == "vllm":
-        ratios = [ratio for ratio in config["compress_ratios"] if ratio > 0]
+        ratios = [ratio for ratio in config["compress_ratios"][: layers or None] if ratio > 0]
         if ratios:
             keys = math.ceil(context_length / min(ratios))
             buffers += min(tokens, 4) * (keys + (config.get("sliding_window") or 0) + tokens) * head_dim * 2
